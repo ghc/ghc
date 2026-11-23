@@ -422,6 +422,10 @@ test('NativeTypeLambdaQuote',
      [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
       extra_files([open_eval_dir + 'TypeLambda.hs', open_eval_dir + 'TypeLambdaQuote.hs'])],
      run_command, ['bash NativeTypeLambdaQuote.sh "{compiler}" "{libdir}"'])
+test('NativeTypeLambdaTypeApp',
+     [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
+      extra_files([open_eval_dir + 'TypeLambda.hs', open_eval_dir + 'TypeLambdaArgument.hs'])],
+     run_command, ['bash NativeTypeLambdaTypeApp.sh "{compiler}" "{libdir}"'])
 
 test('NativeCSEProjection',
      [only_ways(['normal']), extra_files(['NativeCSEProjectionLib.hs'])],

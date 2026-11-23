@@ -2201,9 +2201,10 @@ See Note [Checking local lambda captures] in GHC.Tc.Gen.HsType.
 Emit the helpers in the current declaration group, using the same
 accumulator as signature splices. Expression annotations use the same
 scope and accumulator. An annotation's explicit forall can supply kind
-information to an annotation inside its expression. The generated owner
-label denotes the annotation in diagnostics. Only the ordinary compiler
-path can lift these signatures. It does not execute or copy splices.
+information to an annotation inside its expression. Visible type arguments
+use an empty explicit telescope. See Note [Type lambdas in visible type
+arguments] in GHC.Rename.HsType. The generated owner label identifies
+the source position in diagnostics. The lifter does not execute or copy splices.
 -}
 
 -- | Lift a local type lambda after its lexical scope has entered the renamer.
@@ -2211,12 +2212,13 @@ path can lift these signatures. It does not execute or copy splices.
 rnLocalSignatureLambdas
   :: RdrName -> Bool -> MiniFixityEnv -> TcRef [([TyClGroup GhcRn], FreeNames)]
   -> TcRef Int -> LocalSignatureKinds -> HsDocContext -> LHsSigWcType GhcPs
-  -> RnM (LHsSigWcType GhcRn, FreeNames)
+  -> RnM (Maybe (LHsSigWcType GhcRn, FreeNames))
 rnLocalSignatureLambdas sigma named_wildcards fix_env generated local_lambdas kinds
   doc ty@HsWC{hswc_body = L sig_loc HsSig{sig_bndrs = outer, sig_body = body}}
   | let names = case doc of
           TypeSigCtx binders -> binders
           ExprWithTySigCtx -> [L (l2l sig_loc) (mkRdrUnqual (mkVarOcc "$expression"))]
+          HsTypeCtx -> [L (l2l sig_loc) (mkRdrUnqual (mkVarOcc "$type-argument"))]
           _ -> []
   , not (null names), hasLambda body && copyable ty && no_named_hole
   = do
@@ -2253,9 +2255,9 @@ rnLocalSignatureLambdas sigma named_wildcards fix_env generated local_lambdas ki
             rnTyClDecls hidden scopes declarations
           updTcRef generated (renamed :)
           updTcRef local_lambdas (+ 1)
-          restoreEnvs envs (rnHsSigWcType doc result)
-        _ -> rnHsSigWcType doc ty
-  | otherwise = rnHsSigWcType doc ty
+          Just <$> restoreEnvs envs (rnHsSigWcType doc result)
+        _ -> pure Nothing
+  | otherwise = pure Nothing
   where
     occurrences = extractHsTyRdrTyVars body
     no_named_hole = not named_wildcards ||

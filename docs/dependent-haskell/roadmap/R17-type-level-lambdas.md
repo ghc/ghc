@@ -201,6 +201,28 @@ comparing their results on a fresh argument.
 [#242 review of arity and apartness](https://github.com/ghc-proposals/ghc-proposals/pull/242#issuecomment-503360362)
 and [GHC's partial synonym rule](../../../compiler/GHC/Core/Type.hs).
 
+## A lambda in a visible type argument
+
+```haskell
+messageCells :: forall (e :: Type). e -> Fields '[Either e Int, Either e Bool]
+messageCells msg = rowFor @(\cell -> Either e cell) Proxy (Right 42) (Left msg)
+```
+
+`rowFor` has an explicit parameter `f :: Type %U -> Type`. The visible
+argument chooses the error type for both columns. Its lambda captures
+`e` from the enclosing signature. An untyped expression splice can use
+the same syntax. The lifter copies complete, splice-free arguments
+and preserves the scope of each capture. A free name in a visible type
+argument cannot introduce a binder. An ordinary `@_` still selects an
+inferred argument. [Row builder](../examples/open-evaluation/TypeLambdaArgument.hs)
+and [source-hidden tests](../../../testsuite/tests/dependent/should_run/NativeTypeLambdaTypeApp.sh).
+
+The syntax extends GHC's visible type argument with an anonymous type
+function. Agda also allows a caller to pass an anonymous function as an
+explicit argument. [GHC TypeApplications](https://downloads.haskell.org/ghc/9.14.1/docs/users_guide/exts/type_applications.html),
+[Agda lambda expressions](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#lambda-expressions)
+and [Agda application of implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html).
+
 ## Rows under an erased forall
 
 ```haskell

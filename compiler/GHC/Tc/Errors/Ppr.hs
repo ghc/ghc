@@ -1181,7 +1181,7 @@ instance Diagnostic TcRnMessage where
            text "A type case needs a supported position in a top-level type synonym, a closed type family equation RHS, a top-level value signature, or a constructor field."
     TcRnTypeLambdaContext
       -> mkSimpleDecorated $
-           text "A type lambda needs a supported position in a top-level type synonym, the right-hand side of a type family equation, a value signature, an expression type annotation, or an ordinary constructor field."
+           text "A type lambda needs a supported position in a top-level type synonym, the right-hand side of a type family equation, a value signature, an expression type annotation, a complete visible type argument, or an ordinary constructor field."
            $$ text "A local signature can use a type lambda during ordinary compilation when GHC can copy the kinds of its captures, or infer their kinds and check the body in that scope."
 
     TcRnInvalidVisibleKindArgument arg ty

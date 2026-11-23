@@ -162,12 +162,18 @@ rnLocalHsSigWcType bound_names doc ty@(HsWC { hswc_body = sig_ty })
 -- | Use the local type-lambda lifter in the current declaration group.
 rnScopedHsSigWcType :: HsDocContext -> LHsSigWcType GhcPs
                     -> RnM (LHsSigWcType GhcRn, FreeNames)
-rnScopedHsSigWcType doc ty = do
+rnScopedHsSigWcType doc ty =
+  tryLiftLocalTypeLambdas doc ty >>= maybe (rnHsSigWcType doc ty) pure
+
+-- | Try the local type-lambda lifter while renaming a declaration group.
+tryLiftLocalTypeLambdas :: HsDocContext -> LHsSigWcType GhcPs
+                        -> RnM (Maybe (LHsSigWcType GhcRn, FreeNames))
+tryLiftLocalTypeLambdas doc ty = do
   level <- getThLevel
   lift_lambdas <- tcg_rn_local_lambdas <$> getGblEnv
   case (level, lift_lambdas) of
     (Comp, Just (scope, lift_sig)) -> lift_sig scope doc ty
-    _ -> rnHsSigWcType doc ty
+    _ -> pure Nothing
 
 -- | Get the optional written kinds of explicitly scoped erased binders.
 signatureWrittenKinds :: [Name] -> LHsSigType GhcRn -> LocalSignatureKinds
@@ -197,8 +203,37 @@ rnHsTypeApp ty@(HsWC { hswc_body = hs_ty })
        ; if experimental
          then do { free_vars <- filterInScopeM (extractHsTyRdrTyVars hs_ty)
                  ; rnWithRetainedAliases emptyNameSet RetainedPartialTypeArgument free_vars hs_ty $
-                     rnHsWcType HsTypeCtx ty }
+                     rn_argument }
          else rnHsWcType HsTypeCtx ty }
+  where
+    rn_argument
+      | not (hasParsedRetainedPi hs_ty)
+      = do
+          -- See Note [Type lambdas in visible type arguments].
+          let wrapper = HsWC noExtField
+                          (L (l2l (getLoc hs_ty)) (mkHsExplicitSigType noAnn [] hs_ty))
+          lifted <- tryLiftLocalTypeLambdas HsTypeCtx wrapper
+          case lifted of
+            Just (HsWC { hswc_ext = wcs, hswc_body = L _ HsSig { sig_body = body } }, fvs)
+              -> pure (HsWC wcs body, fvs)
+            Nothing -> rnHsWcType HsTypeCtx ty
+      | otherwise = rnHsWcType HsTypeCtx ty
+
+{- Note [Type lambdas in visible type arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In rowFor @(\cell -> Either e cell), e can refer to an enclosing
+ScopedTypeVariables binder. A visible type argument cannot bind a free
+type variable. Give the local signature lifter an empty explicit
+telescope so it lifts lambdas with the same lexical scope as the argument.
+Discard the temporary signature after lifting. The type checker receives
+the result as an ordinary visible type argument.
+
+The local lifter accepts only copyable types. When it emits no helper,
+rename the original argument with rnHsWcType. Ordinary wildcards and the
+checks for retained Pi arguments use their existing visible argument path.
+In an untyped quote, leave the lambda in the quoted syntax. The lifter
+runs when the argument is spliced into the ordinary declaration group.
+-}
 
 -- | Scope aliases for complete types that capture lexical runtime Names.
 -- The excluded Names belong to an unavailable signature binding group.
