@@ -100,7 +100,7 @@ import GHC.Tc.Gen.OpenTypeEval (OpenTypeFailure(InvalidInput), instantiateOpenMe
                                instantiateOpenTypeFunction, observeOpenType,
                                openTypeFailureReason, readOpenMethodWorker)
 import GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableFamilyUse, sourceTableTypeUses,
-                              sourceCaseKindUse, sourceTableReferenceUse, indexedProjectionSource, isSourceConstructorCase, monomorphicEnumCaseArity, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField,
+                              sourceCaseKindUse, sourceTableOccurrence, sourceTableReferenceUse, indexedProjectionSource, isSourceConstructorCase, monomorphicEnumCaseArity, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField,
                               isFinalStructuralSource,
                               lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource,
                               lookupSourceBinaryMethod, sourceMapSelector, lookupSourceContainerMethod,
@@ -3026,6 +3026,11 @@ tc_app_ty_external mode rn_ty exp_kind
       do { env <- getGblEnv
          ; if nameIsLocalOrFrom (tcg_semantic_mod env) name
            then case (lookupNameEnv (tcg_local_open_defs env) name, value_args) of
+             (Just (fun, _), Just [_])
+               | isTypeLevel (mode_tyki mode), ordinary_call
+               , Just table <- sourceTableOccurrence env fun >>= sourceTableId_maybe
+               -> do { sourceTableReferenceUse table
+                     ; tc_app_ty_with_head mode rn_ty exp_kind (mkTyConTy table) }
              (Just (fun, _), Just args)
                | isTypeLevel (mode_tyki mode), ordinary_call
                , Just (instantiated, domains, result_kind) <- instantiateOpenTypeFunction True fun

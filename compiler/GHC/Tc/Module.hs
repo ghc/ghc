@@ -81,7 +81,7 @@ import GHC.Core (CoreExpr)
 import qualified GHC.Core as Core
 import GHC.Core.Utils (exprType)
 import GHC.Data.OrdList (fromOL)
-import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCaseTables, isStructuralSourceTable, isNominalStructuralSource, sourceRuleOwners, sourceRuleOwnersAt, visibleSourceMethodRules,
+import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCaseTables, sourceCharacterTables, isStructuralSourceTable, isNominalStructuralSource, sourceRuleOwners, sourceRuleOwnersAt, visibleSourceMethodRules,
                                hasSourceMethodRule, hasSourceMethodRuleAt, sourceLiteralWorkers, checkSourceMethodUses,
                                checkOptionalSourceUses, checkAndInstallSourceProofs,
                                sourceMapSelector, sourceTableDependencies)
@@ -1930,8 +1930,28 @@ tcTopSrcDeclsThen requests group finish = do
     if null previous then check_current else do
       -- tc_rn_src_decls has solved these bindings before running each splice.
       failIfErrsM
-      definitions <- localOpenDefinitions previous (tcg_ev_binds env) (tcg_binds env)
-      withLocalOpenDefinitions definitions check_current
+      definitions@(cores, _) <- localOpenDefinitions previous (tcg_ev_binds env) (tcg_binds env)
+      -- See Note [Checked character cases after a splice].
+      let alias_target name = pure $ case lookupNameEnv cores name of
+            Just (_, Core.Var target) -> unitNameSet (idName target)
+            _ -> emptyNameSet
+      demanded <- closeLocalNames alias_target emptyNameSet (map fst previous)
+      let selected (owner, _) = idName owner `elemNameSet` demanded
+      tables <- sourceCharacterTables (filterNameEnv selected cores)
+      checked <- installSourceTables tables
+      setGblEnv checked (withLocalOpenDefinitions definitions check_current)
+
+{- Note [Checked character cases after a splice]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The later group has already renamed its ordinary call to the term Name.
+localOpenDefinitions checks the source of that Name against the earlier
+group's solved bindings. It rejects pending typed splices before zonking.
+
+Certify only demanded bindings and their exact alias targets. Give the
+type checker the installed family for the same owner. Checking stays
+in the later group and uses the terms already in scope. Record family
+use through the usual rule checks so a later rule can invalidate the proof.
+-}
 
 -- | Check only a closed producer fragment before imported family equations.
 -- See Note [Independent imported-family producers].

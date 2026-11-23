@@ -15,6 +15,8 @@ for opt in 0 2; do
     "${ghc[@]}" "${flags[@]}" -c CharacterCase.hs
     "${ghc[@]}" --show-iface CharacterCase.hi > provider.iface
     grep -Fq 'SourceTable T:flag' provider.iface
+    grep -Fq 'SourceTable T:flagAlias' provider.iface
+    grep -Fq 'SourceTable T:upperAlias' provider.iface
     cp CharacterCase.hi ../alias/
     cat >Uncertified.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes #-}
@@ -48,10 +50,13 @@ HS
     "${ghc[@]}" "${flags[@]}" -c CharacterExport.hs
     cat >AliasExport.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
-module AliasExport (Alias, Reexport) where
+module AliasExport (Alias, Reexport, LocalFlag, LocalUpper) where
+import CharacterCase (flagAlias, upperAlias)
 import Forward (alias, flag)
 type Alias (c :: Char) = alias c
 type Reexport (c :: Char) = flag c
+type LocalFlag (c :: Char) = flagAlias c
+type LocalUpper (c :: Char) = upperAlias c
 HS
     "${ghc[@]}" "${flags[@]}" -c AliasExport.hs
     cp ./*.hi ../reader/
@@ -61,7 +66,7 @@ HS
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
 module Proof where
 import CharacterExport (Flag)
-import AliasExport (Alias, Reexport)
+import AliasExport (Alias, Reexport, LocalFlag, LocalUpper)
 import Data.Type.Equality ((:~:) (Refl))
 literal :: Flag 'x' :~: 'True
 literal = Refl
@@ -74,6 +79,12 @@ reexported = Refl
 
 fallback :: Alias '!' :~: 'False
 fallback = Refl
+
+localFlag :: LocalFlag 'x' :~: 'True
+localFlag = Refl
+
+localUpper :: LocalUpper 'x' :~: 'X'
+localUpper = Refl
 HS
     "${ghc[@]}" "${flags[@]}" -c Proof.hs
     "${ghc[@]}" "${flags[@]}" -c Proof.hs -v1 > warm.log 2>&1
@@ -128,7 +139,7 @@ HS
     cd ../reader
     if "${ghc[@]}" "${flags[@]}" -c Proof.hs -ddump-hi-diffs > changed.log 2>&1 ||
        ! grep -Fq '[GHC-83865]' changed.log ||
-       [[ $(grep -Fc '[GHC-83865]' changed.log) -lt 2 ]]; then
+       [[ $(grep -Fc '[GHC-83865]' changed.log) != 3 ]]; then
         cat changed.log >&2
         exit 1
     fi

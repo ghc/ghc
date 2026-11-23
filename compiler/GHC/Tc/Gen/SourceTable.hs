@@ -1,5 +1,5 @@
 -- | Closed type families for checked functions that match one constructor.
-module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableTyCons, sourceCaseTables, finalCoreMappers, verifyFinalCoreMapper, failedFinalListTables, finalCoreSourceFamilies, isFinalCoreIdentity, indexedProjectionSource, isFinalCoreReverseWrapper, sourcePairBuilderField, lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
+module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableTyCons, sourceCaseTables, sourceCharacterTables, finalCoreMappers, verifyFinalCoreMapper, failedFinalListTables, finalCoreSourceFamilies, isFinalCoreIdentity, indexedProjectionSource, isFinalCoreReverseWrapper, sourcePairBuilderField, lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
                               sourceTableCallees, sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
                               sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, monomorphicEnumCaseArity, groundFirstHead,
                               isFinalStructuralSource, isStructuralSourceTable, isNominalStructuralSource,
@@ -90,7 +90,8 @@ import GHC.Types.Name (Name, OccName, isExternalName, mkSourceTableOcc, mkSource
                        isVarOcc, mkTyVarOcc, mkVarOcc, nameModule_maybe, nameOccName, nameSrcSpan, occNameString, setOccNameSpace, sourceTableTermOcc, stableNameCmp, nameStableString, tvName, SourceProofRule, SourceProofArgs, SourceProofArg(..))
 import GHC.Core.Opt.Pipeline (pairObservationOcc, pairObservationType, scalarRecipeTableOcc)
 import GHC.Types.Name.Reader (gre_imp, is_decl, is_isboot, lookupGRE_Name)
-import GHC.Types.Name.Env (delFromNameEnv, extendNameEnv_C, lookupNameEnv, mkNameEnv, plusNameEnv_C, isEmptyNameEnv)
+import GHC.Types.Name.Env (NameEnv, delFromNameEnv, elemNameEnv, extendNameEnv, extendNameEnv_C, isEmptyNameEnv,
+                           lookupNameEnv, mkNameEnv, nonDetNameEnvElts, plusNameEnv_C)
 import GHC.Types.Name.Set (NameSet, emptyNameSet, elemNameSet, extendNameSet, extendNameSetList, filterNameSet,
                            intersectsNameSet,
                            intersectNameSet, isEmptyNameSet, minusNameSet, mkNameSet, nameSetElemsStable,
@@ -2153,8 +2154,8 @@ sourceCaseTables binds = do
       certified <- forM root_cores $ \(owner, rhs) ->
         certifyBinding env exported enum_enabled rdr_env helpers owner rhs
       let (root_entries, fields) = unzip certified
-          roots = catMaybes root_entries
-          helper_tables = mkNameEnv [(tyConName table, table) | (_, table) <- helpers]
+      roots <- publishCharacterAliases env root_cores (catMaybes root_entries)
+      let helper_tables = mkNameEnv [(tyConName table, table) | (_, table) <- helpers]
           used = helperClosure helper_tables emptyNameSet (calleeNames roots)
           referenced (_, table) = tyConName table `elemNameSet` used
           used_helpers = filter referenced helpers
@@ -2253,7 +2254,7 @@ sourceCaseTables binds = do
       | otherwise = (, []) <$>
           case rhs of
             Core.Var target | Just result <- charCaseResultTyCon (varType owner) ->
-              forwarding env result owner target
+              forwardSourceCharacter env result owner target
             _ | Just projection <- checkedPairCase owner rhs ->
                   Just . (owner,) <$> publishPairCase owner projection
               | let imported = ordinaryImport rdr_env
@@ -2269,10 +2270,7 @@ sourceCaseTables binds = do
                             (SourceTableId (idName owner) table ExecutableSourceTable)
                         | otherwise = owner
                   pure (Just (certified, table))
-              | Right certificate <- certify owner rhs
-              , certOwner certificate == idName owner ->
-                  publish owner (certResultTyCon certificate) (certRows certificate) (certDefault certificate)
-              | otherwise -> pure Nothing
+              | otherwise -> publishCertifiedCharacter owner rhs
 
     -- A binary enumeration certificate inspects the first argument.
     -- Each row can return the second argument without inspecting it.
@@ -2289,43 +2287,123 @@ sourceCaseTables binds = do
       | imported (idName actual) = sourceTableId_maybe actual
       | otherwise = Nothing
 
-    forwarding env result owner target
-      | Just target_mod <- nameModule_maybe (idName target)
-      , target_mod /= tcg_semantic_mod env
-      , not (isHoleModule target_mod)
-      , (installed, Nothing) <- getModuleInstantiation target_mod
-      , Just IsBoot /= (gwib_isBoot <$> lookupInstalledModuleEnv
-                                      (imp_boot_mods (tcg_imports env)) installed)
-      , varType target `eqType` varType owner
-      , Just table <- sourceTableId_maybe target
-      , [arg] <- tyConTyVars table
-      , tyVarKind arg `eqType` charTy
-      , tyConResKind table `eqType` mkTyConTy result
-      = do
-        dependencies <- sourceTableDependencies table
-        case dependencies of
-          Just callees -> do
-            let uses = [(v, Nothing) | v <- target : callees]
-            changed <- changedSourceUse uses
-            case changed of
-              Nothing -> do
-                forwarded <- publish owner result [] (\arg_ty -> mkTyConApp table [arg_ty])
-                publishSourceUses uses
-                pure forwarded
-              Just _ -> pure Nothing
-          Nothing -> pure Nothing
-      | otherwise = pure Nothing
+-- | Check character cases demanded from completed declaration groups.
+-- The caller supplies the guarded, zonked definitions from that group.
+sourceCharacterTables :: NameEnv (Id, Core.CoreExpr) -> TcM [(Id, TyCon)]
+sourceCharacterTables definitions = do
+  env <- getGblEnv
+  let candidates = sortBy (\(left, _) (right, _) -> stableNameCmp (idName left) (idName right))
+                   (nonDetNameEnvElts definitions)
+  direct <- fmap catMaybes $ forM candidates $ \(owner, rhs) ->
+    case charCaseResultTyCon (varType owner) of
+      Just result
+        | Just old <- sourceTableOccurrence env owner >>= sourceTableId_maybe ->
+            pure (Just (owner, old))
+        | Core.Var target <- rhs ->
+            forwardSourceCharacter env result owner target
+        | otherwise -> publishCertifiedCharacter owner rhs
+      Nothing -> pure Nothing
+  publishCharacterAliases env candidates direct
 
-    publish owner result rows fallback = do
-      let loc = nameSrcSpan (idName owner)
-          literal (input, value) _ =
-            mkCoAxBranch [] [] [] [mkCharLitTy input] value [] loc
-      var <- flip mkTyVar charTy <$> newSysName (mkTyVarOcc "c")
-      let ty = mkTyVarTy var
-          default_branch _ = mkCoAxBranch [var] [] [] [ty] (fallback ty) [Nominal] loc
-      table <- makeFamily (idName owner) (ClosedInput charTy []) [] result
-                          (map literal rows ++ [default_branch])
-      pure (Just (owner, table))
+-- | Order exact aliases of checked character workers by source identity.
+publishCharacterAliases :: TcGblEnv -> [(Id, Core.CoreExpr)] -> [(Id, TyCon)]
+                        -> TcM [(Id, TyCon)]
+publishCharacterAliases env candidates direct = do
+  let root_tables = mkNameEnv [(idName owner, table) | (owner, table) <- direct]
+      aliases =
+        [ DigraphNode (owner, target, result) (idName owner) [idName target]
+        | (owner, Core.Var target) <- candidates
+        , not (idName owner `elemNameEnv` root_tables)
+        , nameModule_maybe (idName target) == Just (tcg_semantic_mod env)
+        , Just result <- [charCaseResultTyCon (varType owner)]
+        ]
+  (_, forwarded) <- foldM publishLocalAlias (root_tables, [])
+                        (stronglyConnCompFromEdgedVerticesUniq aliases)
+  pure (direct ++ reverse forwarded)
+
+publishCertifiedCharacter :: Id -> Core.CoreExpr -> TcM (Maybe (Id, TyCon))
+publishCertifiedCharacter owner rhs
+  | Right certificate <- certify owner rhs
+  , certOwner certificate == idName owner =
+      Just <$> publishSourceCharacter owner (certResultTyCon certificate)
+                                     (certRows certificate) (certDefault certificate)
+  | otherwise = pure Nothing
+
+publishLocalAlias :: (NameEnv TyCon, [(Id, TyCon)]) -> SCC (Id, Id, TyCon)
+                  -> TcM (NameEnv TyCon, [(Id, TyCon)])
+publishLocalAlias (tables, published) (AcyclicSCC (owner, target, result))
+  | Just table <- lookupNameEnv tables (idName target)
+  , compatibleForwarding owner target result table
+  = do
+      entry@(_, alias) <- publishForwarding owner result table
+      pure (extendNameEnv tables (idName owner) alias, entry : published)
+publishLocalAlias checked _ = pure checked
+
+compatibleForwarding :: Id -> Id -> TyCon -> TyCon -> Bool
+compatibleForwarding owner target result table =
+  varType target `eqType` varType owner &&
+  tyConResKind table `eqType` mkTyConTy result &&
+  case tyConTyVars table of
+    [arg] -> tyVarKind arg `eqType` charTy
+    _ -> False
+
+publishForwarding :: Id -> TyCon -> TyCon -> TcM (Id, TyCon)
+publishForwarding owner result table =
+  publishSourceCharacter owner result [] (\arg_ty -> mkTyConApp table [arg_ty])
+
+-- | Publish a forwarding equation for an exact imported owner.
+forwardSourceCharacter :: TcGblEnv -> TyCon -> Id -> Id -> TcM (Maybe (Id, TyCon))
+forwardSourceCharacter env result owner target
+  | Just target_mod <- nameModule_maybe (idName target)
+  , target_mod /= tcg_semantic_mod env
+  , not (isHoleModule target_mod)
+  , (installed, Nothing) <- getModuleInstantiation target_mod
+  , Just IsBoot /= (gwib_isBoot <$> lookupInstalledModuleEnv
+                                  (imp_boot_mods (tcg_imports env)) installed)
+  , Just table <- sourceTableId_maybe target
+  , compatibleForwarding owner target result table
+  = do
+    dependencies <- sourceTableDependencies table
+    case dependencies of
+      Just callees -> do
+        let uses = [(v, Nothing) | v <- target : callees]
+        changed <- changedSourceUse uses
+        case changed of
+          Nothing -> do
+            forwarded <- publishForwarding owner result table
+            publishSourceUses uses
+            pure (Just forwarded)
+          Just _ -> pure Nothing
+      Nothing -> pure Nothing
+  | otherwise = pure Nothing
+
+publishSourceCharacter :: Id -> TyCon -> [(Char, Type)] -> (Type -> Type)
+                       -> TcM (Id, TyCon)
+publishSourceCharacter owner result rows fallback = do
+  let loc = nameSrcSpan (idName owner)
+      literal (input, value) _ =
+        mkCoAxBranch [] [] [] [mkCharLitTy input] value [] loc
+  var <- flip mkTyVar charTy <$> newSysName (mkTyVarOcc "c")
+  let ty = mkTyVarTy var
+      default_branch _ = mkCoAxBranch [var] [] [] [ty] (fallback ty) [Nominal] loc
+  table <- makeFamily (idName owner) (ClosedInput charTy []) [] result
+                      (map literal rows ++ [default_branch])
+  pure (owner, table)
+
+{- Note [Publishing local source aliases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An exact alias can publish a family that calls the target's checked family.
+Publish each local target before its aliases. Use the same SCC analysis as
+for constructor helpers. A cycle or an unchecked target supplies no table.
+A Template Haskell declaration-group boundary still constrains the names
+in the checked bindings.
+
+This pass runs after type checking. It supplies no equations for an
+earlier local type. installSourceTables (GHC.Tc.Module) adds the candidate
+owners to the environment together, then checks transitive dependencies
+and rewrite rules. Keep the target's family in the alias equation so
+the checks and interface fingerprints follow the exact dependency.
+-}
 
 {- Note [Checked Char cases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
