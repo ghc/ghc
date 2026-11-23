@@ -12,7 +12,9 @@ Compiler `1efc4bcaf2` passed all 578 Showcase observations in native
 `-O0`, default `-O2` and GHCi. A spliced declaration can capture the
 error type in a row schema. HaskLib can infer both element types of
 `zip xs ys` in the composed length proof. The installed proof passed
-at both optimization levels with rewrite rules disabled.
+at both optimization levels with rewrite rules disabled. Job 1969 also
+ran the current out-of-line HaskLib proof at default `-O2`. It returned
+`Refl` while the independent counts differed in demand.
 [Examples and qualification](CHECKPOINTS.md#a-spliced-row-schema-and-inferred-zip-arguments).
 
 Job 1900 built both compiler stages. All 13 selected registrations and
