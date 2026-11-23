@@ -8688,3 +8688,21 @@ length and illustrates a separate, length-changing case.
 [Haskell 2010 Report, §3.15.3](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-500003.15.3),
 [Agda record update](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html#record-update),
 and [the R04 source cases](roadmap/R04-dependent-sums.md#named-fields-at-one-stored-length).
+
+### Termination of a forwarding type lambda
+
+GHC compares the arguments of a type-family call with the patterns on
+the left of the enclosing equation. Lifting a nonrecursive lambda can
+introduce an equation that passes exactly the same arguments to the
+target. Agda's termination checker offers a comparison: its structural
+decrease condition concerns recursive calls. The fork keeps GHC's
+normal check for user equations. For a generated forwarding equation,
+it inspects the closed target. If every result consists only of
+constructors, variables and literals, that target introduces no further
+family call. Job 2074 checked a two-equation example with
+`NoUndecidableInstances`. An ordinary client obtained
+`((),Right 42)` at both optimization levels.
+[GHC family decidability rules](../users_guide/exts/type_families.rst),
+[Agda termination checking](https://agda.readthedocs.io/en/v2.8.0/language/termination-checking.html),
+[the compiler check](../../compiler/GHC/Tc/Validity.hs) and
+[the cell schema](examples/open-evaluation/CellValidation.hs).

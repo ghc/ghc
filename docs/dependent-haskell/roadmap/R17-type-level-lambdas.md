@@ -236,7 +236,11 @@ type Stamped tag = \cell -> Stamp tag cell
 A recursive target and a target that applies a captured callback still
 use the ordinary termination check. For an open target, an ordinary
 parameterized synonym `type Stamped tag cell = Stamp tag cell` works
-without the extension.
+without the extension. In the Showcase, the closed `CheckCell` family
+leaves an empty cell at `()` and validates an `Int` cell as
+`Either String Int`. The client can supply the error type before it
+knows the cell type.
+[Cell schema and termination references](../REFERENCES.md#termination-of-a-forwarding-type-lambda).
 [Forwarding regression](../../../testsuite/tests/dependent/should_run/NativeTypeLambdaEta.hs).
 
 The same conversion applies to a captured callback in a partially
