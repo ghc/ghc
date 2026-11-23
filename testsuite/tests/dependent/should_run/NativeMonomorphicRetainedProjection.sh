@@ -14,6 +14,8 @@ for opt in -O0 -O2; do
     "${ghc[@]}" "$opt" --make -no-link RetainedCharLength.hs
     "${ghc[@]}" --show-iface RetainedCharLength.hi > first.iface
     grep -Fq 'SourceTable T:storedLength' first.iface
+    "${ghc[@]}" --show-iface RetainedCharVector.hi > vector.iface
+    grep -Fq 'SourceTable T:lengthOf' vector.iface
     cp ./*.hi "$src/"{RetainedCharProjection,RetainedCharLocal}.hs ../projection/
 
     cd ../projection
@@ -36,19 +38,37 @@ HS
 
     cd ../client
     test ! -e RetainedCharProjection.hs
+    test ! -e RetainedCharVector.hs
     cat > Main.hs <<'HS'
 module Main where
-import RetainedCharClient (observeProjection, observeSeparateProjection)
+import RetainedCharClient (observeProjection, observeSeparateProjection, observeReplacement)
 main :: IO ()
 main = do
     observeProjection >>= print
     observeSeparateProjection >>= print
+    observeReplacement >>= print
 HS
     "${ghc[@]}" "$opt" -c RetainedCharClient.hs
     "${ghc[@]}" "$opt" -c Main.hs
     "${ghc[@]}" Main.o RetainedCharClient.o ../projection/{RetainedCharProjection,RetainedCharLocal}.o ../owner/*.o -o observe
     timeout 15 ./observe > actual
-    printf '%s\n' '(1,"r",True)' '(1,"r",True)' | cmp - actual
+    printf '%s\n' '(1,"r",True)' '(1,"r",True)' '(Just "b",True)' | cmp - actual
+
+    cat > UncheckedReplacement.hs <<'HS'
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+module UncheckedReplacement where
+import RetainedCharVector (CharVector(..), cellsOf, lengthOf)
+
+replaceCells :: CharVector -> CharVector -> Maybe CharVector
+replaceCells target source = Just (CharVector (lengthOf target) (cellsOf source))
+HS
+    if "${ghc[@]}" "$opt" -c UncheckedReplacement.hs > unchecked.log 2>&1 ||
+       ! grep -Fq 'GHC-83865' unchecked.log ||
+       ! grep -Fq 'lengthOf source' unchecked.log ||
+       ! grep -Fq 'lengthOf target' unchecked.log; then
+        cat unchecked.log >&2
+        exit 1
+    fi
 
     if [[ "$opt" = -O0 ]]; then
         cd ../projection

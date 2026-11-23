@@ -1,13 +1,17 @@
-{-# LANGUAGE NoExperimentalDependentTypes #-}
-module RetainedCharClient (observeProjection, observeSeparateProjection) where
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+module RetainedCharClient
+    (observeProjection, observeSeparateProjection, observeReplacement) where
 
 import Control.Exception (ErrorCall, displayException, evaluate, try)
+import Data.IORef (newIORef, readIORef)
 import Data.List (isInfixOf)
-import PackedVecLibrary (Nat, natToInt, toList)
+import Data.Maybe (isNothing)
+import Data.Type.Equality ((:~:)(Refl))
+import PackedVecLibrary (Nat(..), Vec(..), natToInt, sameNat, toList)
 import RetainedCharLength (storedLength)
 import RetainedCharLocal (localLength, localCells)
 import RetainedCharProjection (storedCells)
-import RetainedCharVector (CharVector, bottomFields, bottomPayload, sample)
+import RetainedCharVector (CharVector(..), bottomFields, bottomPayload, cellsOf, lengthOf, sample)
 
 readCells :: CharVector -> String
 readCells vector = toList (storedCells vector)
@@ -30,3 +34,20 @@ observeFields readLength readVector = do
             Left ex -> "forced payload" `isInfixOf` displayException ex
             Right _ -> False
     pure (natToInt (readLength bottomPayload), readVector sample, foundPayload)
+
+-- | Replace the payload when the source and target have equal lengths.
+replaceCells :: CharVector -> CharVector -> Maybe CharVector
+replaceCells target source = case sameNat (lengthOf target) (lengthOf source) of
+    Nothing -> Nothing
+    Just Refl -> Just (CharVector (lengthOf target) (cellsOf source))
+
+-- | Observe a replacement and a length mismatch with two undefined payloads.
+observeReplacement :: IO (Maybe String, Bool)
+observeReplacement = do
+    source <- newIORef (CharVector (S Z) (VCons 'b' VNil)) >>= readIORef
+    let emptyTarget = CharVector Z (error "forced target payload")
+    pure (fmap render (replaceCells bottomPayload source),
+          isNothing (replaceCells emptyTarget bottomPayload))
+  where
+    render :: CharVector -> String
+    render vector = toList (cellsOf vector)

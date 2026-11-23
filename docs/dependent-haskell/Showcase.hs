@@ -2455,6 +2455,7 @@ listBoundaries = do
     observe "project the vector at the length stored in its own package"
         (toList (PackedProjection.payload p))
     RetainedCharClient.observeProjection >>= observe "project each field using a local retained witness"
+    RetainedCharClient.observeReplacement >>= observe "replace a vector after checking the stored lengths"
     observe "project the length of a known dependent package in a type"
         (Refl :: PackedProjection.Length PackedProjection.One :~: 'S 'Z)
     let vector = Retain n (replicateNative n 'x') :: Retained (Vec Char)

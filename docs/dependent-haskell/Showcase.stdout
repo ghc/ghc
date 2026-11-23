@@ -283,6 +283,7 @@ safeHead after checking for exactly one cell: (Just 'x',Nothing,Nothing)
 first cell of a packaged list: Just 'p'
 project the vector at the length stored in its own package: "ab"
 project each field using a local retained witness: (1,"r",True)
+replace a vector after checking the stored lengths: (Just "b",True)
 project the length of a known dependent package in a type: Refl
 project from two payload families with the same dependent function: ("xx",7)
 use the stored length and vector in a generic dependent eliminator: (2,"xx")
