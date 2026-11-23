@@ -36,7 +36,7 @@ import GHC.Driver.Plugins
 import GHC.Iface.Syntax
 import GHC.Iface.Binary (sourceTableLocations, couldInferLiberalSynonymMatchability,
                          scopedSumDomainFields)
-import GHC.Iface.Ext.Fields (getExtensibleFields, writeField)
+import GHC.Iface.Ext.Fields (getExtensibleFields, readField, writeField)
 import GHC.Iface.Recomp.Binary
 import GHC.Iface.Recomp.Types
 import GHC.Iface.Load
@@ -93,7 +93,7 @@ import Control.Monad.Trans.State
 import Data.List (find, isPrefixOf, isSuffixOf, sortBy, sort, sortOn)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Data.Word (Word64)
+import Data.Word (Word8, Word64)
 import Data.Either
 
 --Qualified import so we can define a Semigroup instance
@@ -764,27 +764,17 @@ checkFlagHash hsc_env iface self_recomp = do
                       Nothing -> pure [missingExtraFlagInfo]
                       Just old_flags -> checkIfaceFlags old_flags new_flags
         out_of_date logger FlagsChanged (fmap vcat diffs)
-    retained <- case previous of
+    ordered <- case previous of
       UpToDate
         | old_fp `notElem` (class_generations ++ [staged_fp, previous_fp, ordered_fp])
         , mi_hsc_src iface == HsSrcFile
         , couldExportOrderedTypeCase iface ->
             liftIO $ recheck "Compiler now checks type case constructor order"
-        | old_fp /= new_fp
-        , old_fp `elem` (ordered_fp : retained_case_fp : result_kind_fp :
-                         intermediate_kind_fp : old_readback_fp :
-                         open_matchability_fp : closed_matchability_fp : archived)
-        , mi_hsc_src iface == HsSrcFile -> do
-          let abstract_only = old_fp == retained_case_fp || old_fp == ordered_fp
-          candidate <- couldExportRetainedCase abstract_only iface (mi_sr_usages self_recomp)
-          if candidate
-            then liftIO $ recheck "Compiler now checks retained package case projections"
-            else pure UpToDate
       _ -> pure previous
-    flags <- case retained of
+    flags <- case ordered of
       UpToDate | old_fp `notElem` class_generations, couldInferClassDefaultSelector iface ->
         liftIO $ recheck "Compiler now infers matchability for associated type defaults"
-      _ -> pure retained
+      _ -> pure ordered
     let check_identity
           | old_fp `notElem` [new_fp, identity_base_fp, scoped_identity_fp]
           , backendGeneratesCode (backend dflags)
@@ -866,6 +856,18 @@ checkFlagHash hsc_env iface self_recomp = do
               candidate <- couldExportSourceSignature (isOneShot (ghcMode dflags)) iface GuardedListPair
               if candidate
                 then liftIO $ recheck "Compiler now checks lazy guarded list pairs"
+                else pure UpToDate
+          | otherwise = pure UpToDate
+        check_retained_case
+          | checkStructuralCases dflags iface = do
+              reviewed <- liftIO $ readField retainedCaseReviewField (mi_ext_fields iface)
+              let generation = fromMaybe 0 reviewed
+              candidate <- if generation >= retainedCaseReviewGeneration
+                then pure False
+                else couldExportRetainedCase generation iface (map snd (mi_decls iface))
+                       (mi_sr_usages self_recomp)
+              if candidate
+                then liftIO $ recheck "Compiler now checks retained package case projections"
                 else pure UpToDate
           | otherwise = pure UpToDate
         check_structural_case
@@ -980,6 +982,7 @@ checkFlagHash hsc_env iface self_recomp = do
                                      `recompThen` check_fold_method
                                      `recompThen` check_monomorphic_fold
                                      `recompThen` check_guarded_pair
+                                     `recompThen` check_retained_case
                                      `recompThen` check_structural_case
                                      `recompThen` check_size_list_case
                                      `recompThen` check_source_provider
@@ -1565,38 +1568,48 @@ couldExportOrderedTypeCase = any candidate . mi_decls
         in any (`isPrefixOf` occ) ["$case:", "$lambda:"]
     candidate _ = False
 
--- | Find exported ordinary worker signatures whose direct domain uses a
--- retained package telescope from a normal import or a local declaration.
--- The actual source certification still checks the body and RULES.
+-- | The generation of the review of candidate retained-package workers.
+retainedCaseReviewField :: String
+retainedCaseReviewField = "retained-case-workers-reviewed"
+
+retainedCaseReviewGeneration :: Word8
+retainedCaseReviewGeneration = 2
+
+-- | Find a possible source worker that has no equation and needs review.
 -- See Note [Recompiling retained package workers].
-couldExportRetainedCase :: Bool -> ModIface -> [Usage] -> IfG Bool
-couldExportRetainedCase abstract_only iface usages = anyM candidate (mi_decls iface)
+couldExportRetainedCase :: Word8 -> ModIface_ phase -> [IfaceDecl] -> [Usage] -> IfG Bool
+couldExportRetainedCase reviewed iface decls usages = anyM candidate decls
   where
+    exportNames :: ModIface_ p -> NameSet
     exportNames = mkNameSet . concatMap availNames . mi_exports
     exports = exportNames iface
+    this_module = mi_semantic_module iface
 
-    candidate (_, IfaceId{ifIdDetails = IfSourceTableId{}}) = pure False
-    candidate (_, IfaceId{ifName = name, ifType = ty})
+    candidate IfaceId{ifIdDetails = IfSourceTableId{}} = pure False
+    candidate IfaceId{ifName = name, ifType = ty}
       | name `elemNameSet` exports, Just (domain, args, result) <- operand ty
       , not (isWiredInName domain), Just owner <- nameModule_maybe domain
-      = if owner == mi_semantic_module iface
-        then pure (any (package exports domain args result owner) (mi_decls iface))
-        else if any (fromModuleWithConstructor owner) usages then do
+      = if owner == this_module
+        then pure (isJust (findPackage exports domain args result decls))
+        else if any (usesPackage owner domain) usages then do
           mb_provider <- readRecompProvider (text "Checking retained package") owner
-          pure $ case mb_provider of
-            Just provider | mi_hsc_src provider == HsSrcFile ->
-              any (package (exportNames provider) domain args result owner) (mi_decls provider)
-            _ -> False
+          case mb_provider of
+            Just provider
+              | mi_hsc_src provider == HsSrcFile
+              , Just con <- findPackage (exportNames provider) domain args result
+                              (map snd (mi_decls provider))
+              -> anyM (importsConstructor owner con) usages
+            _ -> pure False
         else pure False
     candidate _ = pure False
 
     operand (IfaceForAllTy ma (Bndr IfaceTvBndr{} _) body)
       | nullaryName ma == Just unmatchableDataConName = operand body
-    operand (IfaceFunTy FTF_T_T ma mult (IfaceTyConApp tc args@IA_Arg{}) res)
+    operand (IfaceFunTy FTF_T_T ma mult (IfaceTyConApp tc args) res)
       | nullaryName ma == Just unmatchableDataConName
       , nullaryName mult == Just manyDataConName
       , let actuals = appArgsIfaceTypes args
-      , (not abstract_only && is_tycon_app res) || res `elem` actuals
+      , is_tycon_app res || res `elem` actuals
       = Just (ifaceTyConName tc, actuals, res)
     operand _ = Nothing
 
@@ -1606,7 +1619,10 @@ couldExportRetainedCase abstract_only iface usages = anyM candidate (mi_decls if
     nullaryName (IfaceTyConApp tc IA_Nil) = Just (ifaceTyConName tc)
     nullaryName _ = Nothing
 
-    package names domain actuals result owner (_, IfaceData{ifName = name, ifCons = IfDataTyCon False [con]})
+    findPackage names domain actuals result =
+      listToMaybe . mapMaybe (package names domain actuals result)
+
+    package names domain actuals result IfaceData{ifName = name, ifCons = IfDataTyCon False [con]}
       | name == domain
       , name `elemNameSet` names, ifConName con `elemNameSet` names
       , not (ifConWrapper con), null (ifConExTCvs con), null (ifConEqSpec con)
@@ -1615,12 +1631,12 @@ couldExportRetainedCase abstract_only iface usages = anyM candidate (mi_decls if
       , [(mult, witness_kind), (_, payload)] <- ifConArgTys con
       , case witness_kind of
           IfaceTyVar var -> lookup var (zip (map ifaceBndrName (ifConUnivTvs con)) actuals) == Just result
-          _ -> not abstract_only && witness_kind == result
+          _ -> witness_kind == result
       , nullaryName mult == Just manyDataConName
       , payloadUsesWitness con witness payload
-      = owner == mi_semantic_module iface ||
-        any (usesConstructor owner (ifConName con)) usages
-    package _ _ _ _ _ _ = False
+      , reviewed < retainedCaseReviewGeneration
+      = Just (ifConName con)
+    package _ _ _ _ _ = Nothing
 
     payloadUsesWitness _ witness (IfaceTyConApp _ args)
       | IfaceTermVar use : _ <- reverse (appArgsIfaceTypes args) = witness == use
@@ -1629,42 +1645,57 @@ couldExportRetainedCase abstract_only iface usages = anyM candidate (mi_decls if
       = witness == use && any ((== family) . ifaceBndrName) (ifConUnivTvs con)
     payloadUsesWitness _ _ _ = False
 
-    fromModule owner UsageHomeModule{usg_mod_name = mod_name, usg_unit_id = unit}
-      = owner == mkModule (RealUnit (Definite unit)) mod_name
-    fromModule owner UsagePackageModule{usg_mod = mod_name} = owner == mod_name
-    fromModule _ _ = False
+    homeModule unit = mkModule (RealUnit (Definite unit))
+    usesPackage owner domain UsageHomeModule{usg_mod_name = mod_name, usg_unit_id = unit,
+                                            usg_entities = entities}
+      = owner == homeModule unit mod_name
+        && any ((== nameOccName domain) . fst) entities
+    usesPackage owner _ UsagePackageModule{usg_mod = mod_name} = owner == mod_name
+    usesPackage _ _ _ = False
 
-    fromModuleWithConstructor owner usage@UsageHomeModule{usg_entities = entities}
-      = fromModule owner usage && any (isDataOcc . fst) entities
-    fromModuleWithConstructor owner usage = fromModule owner usage
-
-    usesConstructor owner name usage@UsageHomeModule{usg_entities = entities}
-      = fromModule owner usage && any ((== nameOccName name) . fst) entities
-    usesConstructor owner _ usage = fromModule owner usage
+    importsConstructor owner con UsageHomeModule
+      { usg_mod_name = mod_name, usg_unit_id = unit
+      , usg_exports = Just (HomeModImport _ imported) } =
+        case imported of
+          HMIA_Explicit{hmia_imported_avails = DetOrdAvails avails} ->
+            pure (any (elem con . availNames) avails)
+          HMIA_Implicit{}
+            | imported_module == owner -> pure True
+            | otherwise -> do
+                provider <- readRecompProvider (text "Checking retained constructor visibility")
+                                              imported_module
+                pure (maybe False (elemNameSet con . exportNames) provider)
+      where
+        imported_module = homeModule unit mod_name
+    importsConstructor owner _ UsagePackageModule{usg_mod = mod_name} = pure (owner == mod_name)
+    importsConstructor _ _ _ = pure False
 
 {- Note [Recompiling retained package workers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-An imported datatype can now give an ordinary worker a source table.
-The old worker interface lacks the table. The worker needs a source
-rebuild before a consumer checks a projection. Keep all earlier upgrade
-reasons. If a recognized older flag hash otherwise allows reuse, inspect
-exported ordinary signatures with a direct datatype operand. Read that
-datatype's interface to find its retained witness and dependent payload.
-The direct result must be the witness type.
-For a witness declared at a datatype parameter, look up that parameter
-in the applied datatype. Its name in the worker can differ from the
-name in the constructor interface. After the fixed-domain upgrade only
-this parameter case can require a new certificate.
-A home use records the constructor occurrence.
-Package uses have only module-level usage. Read the full defining
-interface directly when the home graph does not have it. The external
-package table can discard declarations. Do not repopulate it during this
-check.
+An older interface can record an ordinary witness projection with no
+source equation. Recheck the module after normal usage validation if
+its exported worker has a possible signature. Its argument can be a
+nullary retained package or an application of a parameterized package.
+Read the exact package and constructor from the local declarations or
+the defining interface. The package and its matched constructor must
+be public. A worker with an existing table needs no review.
 
-This check is only a reason to rebuild source. It does not admit a
-certificate from a stale installed interface, or certify a fresh
-worker that fails a body, visibility, or RULE check. Interfaces with
-the current key do not repeat this check.
+A home usage records a constructor's parent. Look instead at the exact
+imported Names in an explicit import list, which also covers explicit
+re-exports. For whole-module and hiding imports the old interface keeps
+only an export hash. Check the exports for the constructor's exact Name.
+Package usages record only the module. These cases can rebuild once
+when the original source had only the type in scope. The ordinary
+source and final Core checks decide whether the constructor is visible
+and the body and RULES permit a certificate. The metadata can only
+request a source rebuild. It supplies no equation.
+
+Mark the review even if the source cannot publish a table. Only mark
+candidate source modules that generate code. Include the generation
+in the full interface hash so a rejected worker writes the review
+marker. The marker changes no declaration ABI. Later widening of the
+eligible telescope can use a newer generation for the new shapes and
+retain the older review for shapes it already checked.
 -}
 
 -- | Read declarations from the home table or the installed interface file.
@@ -3125,6 +3156,11 @@ addFingerprints hsc_env iface0 = do
         | otherwise = pure False
   stamp_structural_cases <- stamp_source_case StructuralCase
   stamp_size_list_cases <- stamp_source_case SizeListCase
+  stamp_retained_workers <- case mi_self_recomp_info iface0 of
+    Just info | checkStructuralCases (hsc_dflags hsc_env) iface0 ->
+      initIfaceLoad hsc_env $
+        couldExportRetainedCase 0 iface0 (map snd decls_w_hashes) (mi_sr_usages info)
+    _ -> pure False
 
    -- put the declarations in a canonical order, sorted by OccName
   let sorted_decls :: [(Fingerprint, IfaceDecl)]
@@ -3195,13 +3231,20 @@ addFingerprints hsc_env iface0 = do
                            Map.member field (getExtensibleFields (mi_ext_fields iface0))]
       checked_hash = foldl' (\fp field -> computeFingerprint putNameLiterally (fp, field))
                             base_hash checked_fields
+      reviewed_hash
+        | stamp_retained_workers =
+            computeFingerprint putNameLiterally (checked_hash, retainedCaseReviewField, retainedCaseReviewGeneration)
+        | otherwise = checked_hash
       !iface_hash = case sourceTableLocations sorted_decls of
-        []   -> checked_hash
-        locs -> computeFingerprint putNameLiterally (checked_hash, locs)
+        []   -> reviewed_hash
+        locs -> computeFingerprint putNameLiterally (reviewed_hash, locs)
 
   fields <- foldM (\fields field -> writeField field () fields) (mi_ext_fields iface) checked_fields
-  let checked_iface | null checked_fields = iface
-                    | otherwise = set_mi_ext_fields fields iface
+  fields' <- if stamp_retained_workers
+    then writeField retainedCaseReviewField retainedCaseReviewGeneration fields
+    else pure fields
+  let checked_iface | null checked_fields && not stamp_retained_workers = iface
+                    | otherwise = set_mi_ext_fields fields' iface
       final_iface = completePartialModIface checked_iface iface_hash
                      sorted_decls sorted_extra_decls abiHashes caches
    --
