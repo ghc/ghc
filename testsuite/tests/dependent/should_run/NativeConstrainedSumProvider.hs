@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, FlexibleInstances, GADTs, TypeFamilies, UndecidableInstances #-}
 
-module NativeConstrainedSumProvider (Choice (Shape), Permit (Permit), Staged (Staged), make) where
+module NativeConstrainedSumProvider (Allowed, Choice (Shape), Forward (Forwarded), Permit (Permit), Staged (Staged), make) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy)

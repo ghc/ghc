@@ -31,7 +31,8 @@ import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Solver ( tcRewriteFamilyAxioms )
-import GHC.Tc.Solver.Monad ( bumpReductionDepth, runTcSEqualities )
+import GHC.Tc.Solver.Monad ( bumpReductionDepthTcM )
+import GHC.Tc.Validity ( checkConstrainedSignature )
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Utils.Env ( isExistsPackName, tcLookupIdMaybe, tcLookupConLike
@@ -44,7 +45,7 @@ import GHC.Tc.Types.TcRef ( TcRef )
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint (WantedConstraints(wc_simple), ctPred, ctEvLoc, ctEvEvId,
                                 mkNonCanonical, DelayedError(DE_SourceMethod))
-import GHC.Tc.Types.ErrCtxt ( FunAppCtxtFunArg(..), UserTypeCtxt(ExprSigCtxt)
+import GHC.Tc.Types.ErrCtxt ( FunAppCtxtFunArg(..), UserTypeCtxt(ExprSigCtxt, TypeAppCtxt)
                            , ReportRedundantConstraints(NoRRC) )
 import GHC.Tc.Types.CtLoc ( CtLoc )
 import GHC.Tc.Types.Origin
@@ -8701,24 +8702,23 @@ tcKnownRetainedConstructorResult args fun@(XExpr (ConLikeTc (RealDataCon dc))) s
       , tc == parent
       = return (Just ty)
       | Just (family, _) <- tcSplitTyConApp_maybe ty
-      , can_reduce family
+      , isTypeFamilyTyCon family
       = do { envs <- tcGetFamInstEnvs
            ; loc <- getCtLocM (OccurrenceOf (tyConName family)) (Just TypeLevel)
-           ; tryTcDiscardingErrs (return Nothing) $
-               runTcSEqualities (follow envs loc ty) }
+           ; tryTcDiscardingErrs (return Nothing) (follow envs loc ty) }
       | otherwise = return Nothing
       where
         follow envs loc ty
           = case tcSplitTyConApp_maybe ty of
               Just (tc, _) | tc == parent -> return (Just ty)
               Just (tc, tys)
-                | can_reduce tc
+                | isTypeFamilyTyCon tc
                 , Just (Reduction _ rhs) <- reduceTyFamApp_maybe envs Nominal tc tys
-                -> do { loc <- bumpReductionDepth loc ty
+                -> do { when (isConstrainedFamilyTyCon tc) $
+                          checkNoErrs (checkConstrainedSignature TypeAppCtxt ty)
+                      ; loc <- bumpReductionDepthTcM loc ty
                       ; follow envs loc rhs }
               _ -> return Nothing
-
-    can_reduce tc = isTypeFamilyTyCon tc && not (isConstrainedFamilyTyCon tc)
 tcKnownRetainedConstructorResult _ _ _ _ = return Nothing
 
 {- Note [Retained constructors with a known Quick Look result]
@@ -8726,8 +8726,13 @@ tcKnownRetainedConstructorResult _ _ _ _ = return Nothing
 A fully applied retained constructor can get its erased parameters from a
 known expected result, as in consume (Pair True payload). A type family in
 the expected type can hide the constructor's parent. Follow nominal family
-equations at the head only. The preview does not record an axiom use. Final
-subsumption still checks the original result and records any evidence use.
+equations at the head only. An associated family's nominal equation can
+match without evidence for its domain. Check that domain in the current
+lexical scope before using the result of each such step. This is the same
+domain check used by retained package patterns. A missing domain leaves
+the application to ordinary checking. The preview supplies no evidence
+or type variable assignment. Final subsumption still checks the original
+result and records any evidence use.
 
 Quick Look on the argument would instantiate the constructor without this
 expected result. If the existing worker matcher finds every erased

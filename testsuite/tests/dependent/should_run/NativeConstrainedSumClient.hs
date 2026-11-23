@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, DataKinds, FlexibleContexts, GADTs, NoExperimentalDependentTypes, TypeFamilies, TypeOperators #-}
+{-# LANGUAGE CPP, DataKinds, FlexibleContexts, GADTs, ImpredicativeTypes, NoExperimentalDependentTypes, TypeFamilies, TypeOperators #-}
 
 module Main (main) where
 
@@ -10,7 +10,7 @@ import Data.Proxy (Proxy (..))
 import Data.Type.Equality ((:~:) (Refl))
 import GHC.Sigma (Sigma (Pair), first)
 import NativeAssociatedSumProvider (DefaultSum (Defaulted), Tagged (..))
-import NativeConstrainedSumProvider (Choice (Shape), Permit (Permit), Staged (Staged), make)
+import NativeConstrainedSumProvider (Allowed, Choice (Shape), Forward (Forwarded), Permit (Permit), Staged (Staged), make)
 
 instance DefaultSum Char
 
@@ -64,6 +64,9 @@ main = do
     outer <- try (evaluate (readPair (error "outer pair"))) :: IO (Either ErrorCall Bool)
     case outer of
         Left _ -> do
+            if readDefaultPair False || not (readGivenPair Permit (Proxy :: Proxy Bool) True)
+               then fail "incorrect witness from a constructed package"
+               else pure ()
             let pkg = Pair False (error "unused default payload") :: Defaulted Char
                 shaped = Pair True (error "unused shaped payload") :: Shape Bool Char
                 staged = Staged (error "unused earlier field" :: Proxy Bool)
@@ -72,3 +75,22 @@ main = do
                    readGiven Permit (Proxy :: Proxy Bool), readKnown shaped,
                    readRefined shaped, readProof Refl shaped, readStaged staged)
         Right _ -> fail "package pattern left the outer constructor unevaluated"
+
+readDefaultPair :: Bool -> Bool
+readDefaultPair tag = readPair (Pair tag (error "unused constructed default payload"))
+
+readForwarded :: Allowed a => Proxy a -> Forwarded [a] -> Bool
+readForwarded _ = first
+
+readGivenPair :: Permit a -> Proxy a -> Bool -> Bool
+readGivenPair Permit ix tag = readForwarded ix (Pair tag (error "unused constructed forwarded payload"))
+
+#ifdef WRONG_CONSTRUCTED_PAYLOAD
+badConstructorPayload :: (Bool, Char)
+badConstructorPayload = readPayload (Pair False (Yes 'x'))
+#endif
+
+#ifdef MISSING_CONSTRUCTOR_DOMAIN
+badConstructorDomain :: Bool
+badConstructorDomain = readForwarded (Proxy :: Proxy Int) (Pair True (error "missing constructor domain"))
+#endif

@@ -54,5 +54,9 @@ for opt in O0 O2; do
             "${ghc[@]}" "-$opt" -fforce-recomp -DNEWTYPE_HEAD -c "$client.hs"
         reject "$client.hs:56:39-42: error: [GHC-83605]" 'In the pattern: Pair tag _' \
             "${ghc[@]}" "-$opt" -fforce-recomp -DREPRESENTATIONAL_ONLY -c "$client.hs"
+        reject "$client.hs:90:50-56: error: [GHC-83865]" 'Expected: Tagged False Char' \
+            "${ghc[@]}" "-$opt" -fforce-recomp -DWRONG_CONSTRUCTED_PAYLOAD -c "$client.hs"
+        reject "$client.hs:95:60-63: error: [GHC-83605]" 'Quick Look inference' \
+            "${ghc[@]}" "-$opt" -fforce-recomp -fdefer-type-errors -DMISSING_CONSTRUCTOR_DOMAIN -c "$client.hs"
     done
 done
