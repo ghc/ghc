@@ -2,7 +2,8 @@
 {-# LANGUAGE ScopedTypeVariables, TypeApplications, TypeFamilies, TypeOperators, UndecidableInstances #-}
 -- | Bind an intermediate result in a type synonym.
 module TypeLet (F, Shadow, Reuse, Outer, Nested, CaptureBeforeShadow, CaseResult, Frame,
-                DimensionSum, frameRow, frameToList, frameValues, roadmap) where
+                DimensionSum, Dimensions(..), ProductDimensionSum, UnknownDepth,
+                frameRow, frameToList, frameValues, roadmap) where
 import Data.Type.Equality ((:~:)(Refl))
 import qualified GHC.TypeNats as TypeNats
 import PackedVecLibrary (Nat, Vec(..), toList, type (+))
@@ -24,6 +25,17 @@ type F a = let b = G a in H b b
 type DimensionSum (dimensions :: (TypeNats.Nat, TypeNats.Nat)) =
   let (rows, cols) = dimensions
   in rows TypeNats.+ cols
+
+-- | Rows, columns and depth of a promoted product.
+data Dimensions = Dimensions TypeNats.Nat TypeNats.Nat TypeNats.Nat
+
+-- | Add rows and columns without reducing the depth.
+type ProductDimensionSum (dimensions :: Dimensions) =
+  let Dimensions rows cols _ = dimensions
+  in rows TypeNats.+ cols
+
+-- | Leave the depth unknown when checking the sum.
+type family UnknownDepth :: TypeNats.Nat
 
 -- | Both uses of b refer to the local definition.
 type Shadow (b :: Bool) = let b = 'True in H b b

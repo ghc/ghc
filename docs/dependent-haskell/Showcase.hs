@@ -1708,6 +1708,9 @@ main = do
     observe "name and reuse a type-level intermediate result" TypeLet.roadmap
     observe "sum two matrix dimensions with a type let"
         (TypeNats.natVal (Proxy @(TypeLet.DimensionSum '(2, 3))))
+    observe "sum two named dimensions while leaving depth unknown"
+        (TypeNats.natVal (Proxy @(TypeLet.ProductDimensionSum
+            ('TypeLet.Dimensions 2 3 TypeLet.UnknownDepth))))
     observe "splice a type let that shadows its outer binder"
         (Right (Just True) :: $([t| let a = Bool in let a = Maybe a in Either a a |]))
     observe "capture an outer type in a let group before shadowing its name"

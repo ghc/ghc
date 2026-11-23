@@ -163,6 +163,24 @@ of `dims`. Each nested pair must have a pair kind. An unused nested pair
 need not reduce to a constructor. Agda also composes projections for
 nested record patterns. [Agda record pattern translation](https://agda.github.io/agda/src/Agda.TypeChecking.RecordPatterns.html).
 
+## A named product binding
+
+`let Dimensions rows cols _ = dimensions in rows TypeNats.+ cols` binds
+fields of a regular datatype with one constructor. GHC checks that the
+resolved constructor is the sole constructor of its datatype, the pattern
+supplies all fields, and the scrutinee has that datatype as its kind. The
+checks also run for a pattern with only wildcards.
+
+Each field can be a name or a wildcard. A generic application split and
+the pair selectors expose the fields. A closed family compares the actual
+head with the written constructor before returning a field. An unknown
+head leaves the selection stuck. The Showcase adds `2` and `3` while
+leaving `UnknownDepth` stuck. The new patterns are available in source
+types. A quotation rejects them until Template Haskell can represent
+the constructor check. [Agda record-pattern lets](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where.html#let-binding-record-patterns),
+[example](../examples/open-evaluation/TypeLet.hs) and
+[source-hidden checks](../../../testsuite/tests/dependent/should_run/NativeTypeLet.sh).
+
 ## Type quotations and splices
 
 A type quotation represents `let a = rhs in body` as `LetT a rhs body`.
