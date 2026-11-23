@@ -448,9 +448,10 @@ Jobs 992 and 998 used the candidate to build all 17 modules of
 `first-class-families-0.8.2.0` with its published Cabal settings.
 The migration makes the two indices parameters of the package's
 `Endo` and specifies M on the patterns of its promoted operations.
-In `FoldrDefault_`, `Pure1 'Endo` passes the constructor without its
-callback. That use still requires `Pure1 ('Endo @M @M)`. Without it,
-the package failed in `Fcf.Class.Foldable` with GHC-83865.
+Those jobs also changed `Pure1 'Endo` in `FoldrDefault_` to
+`Pure1 ('Endo @M @M)`. Earlier compilers defaulted both indices to U
+as soon as `Pure1` received the bare constructor. The package then
+failed in `Fcf.Class.Foldable` with GHC-83865.
 
 With that package change, its own test passed. Three clients then
 compiled with the provider sources hidden. The original promoted
@@ -474,6 +475,15 @@ when no argument selects a matchability and rejected all four
 incompatible choices at both optimization levels.
 [Showcase provider](../examples/open-evaluation/PromotedEndo.hs)
 and [consumer](../examples/open-evaluation/LaterMatchabilityClient.hs).
+
+When checking a bare promoted constructor against an arrow kind,
+GHC now lets the surrounding declaration constrain the omitted
+matchabilities. In `FoldrDefault_`, `Pure1` supplies the arrow kind
+and the surrounding use of `UnEndo` fixes both indices to M. The
+package can retain `Pure1 'Endo`. An isolated `type Lift = Pure1 'Endo`
+still uses U for both indices. Explicit indices remain fixed.
+[Source-hidden regression](../../../testsuite/tests/dependent/should_run/NativeLaterMatchability.sh)
+and [Agda's expected-type rule for trailing implicit arguments](https://agda.readthedocs.io/en/stable/language/implicit-arguments.html).
 
 ### Arrow patterns in family equations
 

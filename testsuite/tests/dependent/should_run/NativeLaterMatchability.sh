@@ -40,6 +40,50 @@ HS
 "${ghc[@]}" Main.o LaterMatchabilityClient.o ../provider/{AnchorReceiver,LaterMatchability,PromotedEndo}.o -o ranked-map
 test "$(./ranked-map)" = '((Just True,[False]),(Just False,[True]),(True,Refl))'
 
+cat >BareEndo.hs <<'HS'
+{-# LANGUAGE CPP, DataKinds, GADTs, Modifiers, NoExperimentalDependentTypes,
+             PolyKinds, StandaloneKindSignatures, TypeApplications, TypeFamilies, TypeOperators #-}
+module BareEndo where
+
+import Data.Kind (Type)
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Matchability (M, U)
+import PromotedEndo (Endo(Endo), Eval, Exp, UnEndo)
+
+data Pure1 :: (a -> b) -> a -> Exp b
+type instance Eval (Pure1 f x) = f x
+
+data Echo :: Bool -> Exp Bool
+type instance Eval (Echo x) = x
+
+type Unanchored = Pure1 'Endo
+
+type Holder :: ((Bool %M -> Bool %M -> Type) %M -> Endo @M @M Bool) -> Type
+data Holder f
+
+#if defined(WRONG_FIRST)
+type Wrong = Holder ('Endo @U)
+#elif defined(WRONG_SECOND)
+type Wrong = Holder ('Endo @M @U)
+#else
+type Partial = Holder ('Endo @M)
+
+folded :: Eval (UnEndo (Eval (Pure1 'Endo Echo)) 'True) :~: 'True
+folded = Refl
+#endif
+HS
+"${ghc[@]}" -c BareEndo.hs
+"${ghc[@]}" -fprint-explicit-kinds -dppr-cols=500 --show-iface BareEndo.hi >bare-endo.iface
+grep -Eq 'type Unanchored .* = Pure1 .*Endo @.*Unmatchable @.*Unmatchable @' bare-endo.iface
+for which in WRONG_FIRST WRONG_SECOND; do
+    if "${ghc[@]}" -fforce-recomp -D"$which" -c BareEndo.hs >bare-endo.log 2>&1 ||
+       ! grep -Fq '[GHC-83865]' bare-endo.log ||
+       ! grep -Fq 'In the first argument of' bare-endo.log; then
+        cat bare-endo.log >&2
+        exit 1
+    fi
+done
+
 cat >ComputedMismatch.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, KindSignatures, TypeApplications, TypeFamilies #-}
 module ComputedMismatch where
