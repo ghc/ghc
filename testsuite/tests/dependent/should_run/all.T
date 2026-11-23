@@ -163,6 +163,10 @@ test('NativeOpenPreludeZipWith',
                   + ['NativeOpenZipDemandControls.hs', 'NativeOpenZipWrongMinimum.hs',
                      'NativeZipWithRuntimeClient.hs'])],
      run_command, ['bash NativeOpenPreludeZipWith.sh "{compiler}" "{libdir}"'])
+test('NativeInferredSourceOperands',
+     [only_ways(['normal']),
+      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs'])],
+     run_command, ['bash NativeInferredSourceOperands.sh "{compiler}" "{libdir}"'])
 test('NativeOpenMinimum',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files(['NativeLocalMinSizeRule.hs'] + [open_eval_dir + f for f in
