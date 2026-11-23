@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitForAll #-}
 {-# LANGUAGE TypeFamilies #-}
-module FamilyCasePayload (ChoosePayload, KeepPayload, Dispatch) where
+module FamilyCasePayload (ChoosePayload, KeepPayload, Dispatch, Count(..), Down) where
 
 import Data.Kind (Type)
 
@@ -22,3 +22,11 @@ type family Dispatch (flag :: Bool) (input :: Maybe Type) :: Type where
   Dispatch 'False input = case input of
     Nothing -> Char
     Just field -> Maybe field
+
+data Count = Z | S Count
+
+type family Down (count :: Count) :: Bool where
+  Down 'Z = 'False
+  Down ('S count) = case count of
+    Z -> 'True
+    S prior -> Down ('S prior)

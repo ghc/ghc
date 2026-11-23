@@ -86,9 +86,12 @@ first = Refl
 second :: Dispatch 'False ('Just Char) :~: Maybe Char
 second = Refl
 
+decreases :: Down ('S ('S ('S 'Z))) :~: 'True
+decreases = Refl
+
 main :: IO ()
-main = case (first, second) of
-  (Refl, Refl) -> print (fallback, found, keep)
+main = case (first, second, decreases) of
+  (Refl, Refl, Refl) -> print (fallback, found, keep)
 HS
     "${g[@]}" -XNoExperimentalDependentTypes -XNoUnsaturatedTypeFamilies -c FamilyCaseClient.hs
     "${g[@]}" FamilyCaseClient.o FamilyCasePayload.o -o family-case
@@ -104,9 +107,34 @@ import Data.Type.Equality ((:~:)(Refl))
 
 bad :: forall (input :: Maybe Type). Proxy input -> ChoosePayload Bool input :~: Bool
 bad _ = Refl
+
+blocked :: forall (n :: Count). Proxy n -> Down ('S n) :~: 'True
+blocked _ = Refl
 HS
     reject FamilyCaseRigid 10:9 '[GHC-83865]'
     grep -Fq 'ChoosePayload Bool input :~: Bool' bad.log
+    grep -Fq 'FamilyCaseRigid.hs:13:13: error: [GHC-83865]' bad.log
+    grep -Fq 'Down (S n) :~: True' bad.log
+
+    cat >FamilyCaseRecursion.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeFamilies #-}
+module FamilyCaseRecursion where
+import FamilyCasePayload (Count(..))
+
+type family Same (n :: Count) :: Bool where
+  Same ('S n) = let selected = n in case selected of
+    Z -> 'True
+    S _ -> Same ('S n)
+
+type family Growing (n :: Count) :: Bool where
+  Growing ('S n) = case n of
+    Z -> 'True
+    S prior -> Growing ('S ('S ('S prior)))
+HS
+    reject FamilyCaseRecursion 6:3 '[GHC-22979]'
+    grep -Fq 'FamilyCaseRecursion.hs:11:3: error: [GHC-22979]' bad.log
+    grep -Fq 'Same (S (S _))' bad.log
+    grep -Fq 'Growing (S (S (S prior)))' bad.log
 )
 
 "${g[@]}" -fomit-interface-pragmas -c NativeTypeCaseHeadProvider.hs

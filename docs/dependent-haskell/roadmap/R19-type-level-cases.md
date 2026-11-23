@@ -61,13 +61,18 @@ A generated selector in the same checking group needs no
 `UndecidableInstances` when its checked arguments, branch results,
 and constructor-headed result kind contain only constructor types,
 variables, and literals. It can return a part of an argument or build
-a constructor type from those parts. Cases with family calls or
-variable-headed applications still use the ordinary termination check.
-For example, a recursive branch can still require
-`UndecidableInstances` when the corresponding hand-written equations
-pass. Checking a branch call against the case helper's left-hand
-side alone can count duplicate captures and overestimate the size of
-the original equation.
+a constructor type from those parts.
+
+A direct recursive call can also pass. In `Down ('S n)`, a case
+on `n` selects the pattern `S prior`. The compiler checks the call
+`Down ('S prior)` against the refined source LHS
+`Down ('S ('S prior))`. It also substitutes the refined `n` in each
+capture. For example, `Down ('S n)` in that branch is the same size
+as the refined LHS and fails. An unknown `n` still blocks reduction.
+This check covers flat constructor patterns on a variable of closed
+kind. The helper's generated equations also pass the ordinary checks.
+A branch that decreases only against the refined source LHS can still
+need `UndecidableInstances` if the helper's own LHS is smaller.
 
 [Provider](../examples/open-evaluation/FamilyCasePayload.hs) ·
 [Source-hidden client and rigid control](../../../testsuite/tests/dependent/should_run/NativeTypeCase.sh) ·
