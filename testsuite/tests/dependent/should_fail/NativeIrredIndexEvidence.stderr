@@ -1,14 +1,19 @@
-NativeIrredIndexEvidence.hs:21:35: error: [GHC-18872]
-    • Couldn't match type ‘p0’ with ‘Flip a’
-        arising from a type equality Proxy other1 ~ Proxy v1
-      ‘p0’ is untouchable
-        inside the constraints: ()
-        bound by a retained application
-        at NativeIrredIndexEvidence.hs:21:35-46
+NativeIrredIndexEvidence.hs:21:35: error: [GHC-05617]
+    • Could not deduce ‘other1 ~ v1’
+      from the context: b1 ~ Flip a
+        bound by a pattern with constructor:
+                   Refl :: forall {k} (a :: k). a :~: a,
+                 in an equation for ‘wrong’
+        at NativeIrredIndexEvidence.hs:21:19-22
+      Expected: Proxy v1
+        Actual: Proxy other1
     • In the second argument of ‘View’, namely ‘(Proxy @other)’
       In the expression: View @a (Proxy @other)
       In an equation for ‘wrong’:
           wrong a b v other Refl = View @a (Proxy @other)
+    • Relevant bindings include
+        other :: Token b1 (bound at NativeIrredIndexEvidence.hs:21:13)
+        v :: Token b1 (bound at NativeIrredIndexEvidence.hs:21:11)
 
 NativeIrredIndexEvidence.hs:33:45: error: [GHC-05617]
     • Could not deduce ‘other ~ v’
@@ -17,8 +22,8 @@ NativeIrredIndexEvidence.hs:33:45: error: [GHC-05617]
                    Refl :: forall {k} (a :: k). a :~: a,
                  in an equation for ‘wrongFixed’
         at NativeIrredIndexEvidence.hs:33:24-27
-      Expected: Payload (Flip a1) v
-        Actual: Payload (Flip a1) other
+      Expected: Payload (Flip a) v
+        Actual: Payload (Flip a) other
     • In the second argument of ‘FixedView’, namely
         ‘(Payload @(Flip a) @other)’
       In the expression: FixedView @a (Payload @(Flip a) @other)
