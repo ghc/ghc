@@ -8586,3 +8586,23 @@ same two types when `zip xs ys` occurs in a retained operand.
 [Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html),
 [GHC visible type application](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_applications.html)
 and [R16 list proof](roadmap/R16-open-term-evaluator.md#map-over-the-result-of-zip).
+
+### Specialisation of an indexed zip operand
+
+In `lengthMap f (zip xs ys)` the source call `zip xs ys` determines a
+result index. Replacing it with a fused `build` expression requires an
+index that Core can typecheck. A GHC optimizer rule carries no proof of
+nominal equality for that substitution. Agda's `REWRITE` registers
+an equality for conversion. Its optional confluence check examines
+overlapping reductions. The private GHC change applies the current
+substitution to the checked operand and leaves fusion available in ordinary
+calls. [GHC rule semantics](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rewrite_rules.html#semantics)
+and [Agda rewriting](https://agda.readthedocs.io/en/latest/language/rewriting.html#confluence-checking).
+
+Johann and Voigtländer's Theorem 8.2 gives sufficient conditions for
+`foldr/build` equality in the presence of `seq`. A polymorphic producer
+can inspect its supplied step. The optimized zip client exercises this
+case. Preserving the source call inside the proof fixes the ill-typed Core
+and leaves the independent count observations accessible to the caller.
+[Theorem 8.2](https://janis-voigtlaender.eu/papers/TheImpactOfSeqOnFreeTheoremsBasedProgramTransformations.pdf#page=29)
+and [compiled observations](roadmap/R16-open-term-evaluator.md#the-optimized-client-of-the-composed-proof).
