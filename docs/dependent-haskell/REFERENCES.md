@@ -6931,6 +6931,20 @@ The one-step kind lookup is an implementation choice.
 [proposal 242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html)
 and [checked source](roadmap/R23-unsaturated-type-families.md#applying-a-type-at-a-family-defined-arrow-kind).
 
+### Inferring the matchability of a bare promoted constructor
+
+Agda can use an expected type to infer an omitted argument. Proposal
+#242 specifies when Haskell infers matchability and when it defaults an
+unsolved index. In `Pure1 'Endo`, the promoted constructor has no supplied
+field. Its expected kind carries the constraints from the enclosing
+family application. The fork checks those constraints before defaulting
+the constructor's omitted indices. The migrated `first-class-families`
+package still declares the indices on `Endo`; this change removes the
+explicit `@M @M` at the use.
+[Proposal #242, higher-order arguments](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#higher-order-arguments),
+[Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
+and [package check](roadmap/R23-unsaturated-type-families.md#one-constructor-for-term-and-promoted-callbacks).
+
 ### Inferring nested applications and exporting pair equations
 
 Agda inserts implicit arguments during elaboration. A type or another
