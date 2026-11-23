@@ -7455,6 +7455,21 @@ same position. In `lengthAppend`, that position holds the right list.
 This argument check gives no evidence about which compiler rules can fire.
 [Lean's fixed-parameter analysis](https://leanprover-community.github.io/mathlib4_docs/Lean/Elab/PreDefinition/FixedParams.html#Lean.Elab.FixedParams.Info).
 
+### Map length after filter and build
+
+Agda's `length-map` uses reflexivity for the empty list and lifts the
+inductive equality through successor for a cons. HaskLib uses the
+same induction. Johann and Voigtländer's Theorem 8.2 gives sufficient
+conditions for replacing a fold of a built list with its producer.
+The step must return a defined result on two bottom arguments, and
+the seed must be defined. For `filterFB (:) (const False)` the step
+returns its second argument, so this instance fails the first condition.
+Jobs 1468 and 1471 observed different counts at two optimized call
+sites. The shared-input control kept the counts equal.
+[Agda standard library 2.4, Data.List.Properties](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html),
+[Johann and Voigtländer, §8.2](https://janis-voigtlaender.eu/papers/TheImpactOfSeqOnFreeTheoremsBasedProgramTransformations.pdf#page=30)
+and [R16 observations](roadmap/R16-open-term-evaluator.md#map-length-and-sharing-under-stock-fusion).
+
 ## Right fold after map
 
 The Agda standard library proves `foldr-map` by induction on the input

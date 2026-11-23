@@ -83,6 +83,13 @@ statements. On the current fork a client can import a rewrite rule that
 changes `map` and still use an already compiled `lengthMap` witness.
 [R16 example and measured outputs](roadmap/R16-open-term-evaluator.md#an-imported-proof-and-a-client-rewrite-rule).
 
+The stock optimization rules can also distinguish the two sides of
+`lengthMap`. On a filtered input, a mapper that captures the producer
+kept the mapped count at `Zero`. At an independent call site the plain
+count raised an exception. The published proof returned `Refl`. When
+both counts shared one filtered list they both returned `Zero`.
+[Runnable map example and optimization modes](roadmap/R16-open-term-evaluator.md#map-length-and-sharing-under-stock-fusion).
+
 Stock `-O2` rules can also change the result for append. If a list
 producer forces its seed and the right list is undefined, only the
 addition side of `lengthAppend` yields an outer `Succ`.

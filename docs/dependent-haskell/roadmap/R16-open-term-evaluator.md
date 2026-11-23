@@ -2554,3 +2554,63 @@ caused the unchanged client to recompile. It then retained only the
 seed position. A strict successor, an unrelated function with the same
 name, and an arbitrary outer fold supplied no count evidence.
 The rule guard still rejects a default-`-O2` proof call.
+
+### Map length and sharing under stock fusion
+
+HaskLib proves `size (map f xs) :~: size xs` by induction on the
+source list. A client can distinguish the two compiled counts with
+the stock rewrite rules. The producer in this example inspects the
+outer constructor that its first step would return.
+
+```haskell
+producer cons nil = cons undefined undefined `seq` cons False nil
+
+mappedCount p =
+    let source = build producer
+    in size (map (mapper source) (filter p source))
+
+plainCount p = size (filter p (build producer))
+```
+
+The mapper captures `source`. Counting a list never needs the
+mapper's result. With `p = const False`, the unfused producer emits
+one cell and the filter removes it. Both counts then return `Zero`.
+At default `-O2`, the plain count passes `filterFB (:) p` as the
+step to `producer`. Applying that step to two undefined arguments
+returns the undefined tail. The producer's `seq` forces it. The mapped
+path retains the producer applied to `(:)`, which constructs a cell
+without inspecting either field.
+
+| Client observation | Native `-O0` | Native `-O2` | `-O2 -fno-enable-rewrite-rules` |
+| --- | --- | --- | --- |
+| Independent mapped and plain calls | `Zero / Zero` | `Zero / bottom` | `Zero / Zero` |
+| Both counts use one filtered list binding | `Zero / Zero` | `Zero / Zero` | `Zero / Zero` |
+| Published HaskLib witness | `Refl` | `Refl` | `Refl` |
+
+Job 1468 checked the ordinary counts on stock GHC 9.14.1 with the same
+list-count equations. Job 1471 compiled the actual HaskLib source
+separately on the published 555 compiler and checked the witness
+with its callback and list bound to local names. Job 1473 put the
+two counts in separate modules. With an `INLINE` producer exported to
+both callers, one executable reported `Zero / bottom / Refl`. With a
+`NOINLINE` producer the same program reported `Zero / Zero / Refl`.
+The calls declare no rewrite rules.
+
+The guarded compiler at `4d10fdc35f` rejects an imported `lengthMap`
+proof under default optimization. Job 1460 also changed the plain count
+with a client rule on `filter`. Checking only rules on `map` and `size`
+cannot justify lifting the guard.
+
+Run the example from the repository root with the published compiler.
+
+```sh
+examples=docs/dependent-haskell/examples/open-evaluation
+out=$(mktemp -d)
+ghc -O2 -idocs/dependent-haskell/hasklib -i"$examples" -outputdir "$out" \
+    -main-is MapLengthFusionWitness "$examples/MapLengthFusionWitness.hs" -o "$out/observe"
+"$out/observe"
+```
+
+[Count expressions](../examples/open-evaluation/MapLengthFusionDemand.hs),
+[proof client](../examples/open-evaluation/MapLengthFusionWitness.hs)
+and [source law and fusion theorem](../REFERENCES.md#map-length-after-filter-and-build).

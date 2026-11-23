@@ -157,6 +157,13 @@ name of the count after checking its recursive equations in final Core.
 Stock fusion can introduce stricter intermediate folds. The guarded
 compiler still checks the active rules at the optimized proof use.
 
+Jobs 1468 and 1471 observed `Zero` from the mapped count and bottom
+from the plain count on stock GHC and the public compiler.
+Job 1473 reproduced the difference with two separate callers.
+The published `lengthMap` witness still returned `Refl`. Job 1477
+checked the runnable example in all three optimization modes.
+[Source, controls and proof boundary](roadmap/R16-open-term-evaluator.md#map-length-and-sharing-under-stock-fusion).
+
 The local archive refs `r19-r41-normal-552`, `r16-hasklib-tree-553`
 and `r27-legacy-transition-normal` are under
 `refs/archive/dependent-haskell/2026-11-22/`. The `normal-sources/`

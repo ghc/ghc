@@ -16,11 +16,22 @@ import PreludeMapLengthSize (Size(..), minSize, size)
 import PreludeZipRuntime (lengthZip, lengthZipMap, lengthZipWith)
 
 -- | Mapping a function preserves the number of list cells.
+-- See Note [Map fusion and length witnesses].
 lengthMap :: forall a b. foreach (f :: a -> b) -> foreach (xs :: [a])
           -> size (map f xs) :~: size xs
 lengthMap f = \case
     []     -> Refl
     _ : xs -> congSucc (lengthMap f xs)
+
+{- Note [Map fusion and length witnesses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The proof uses the source equations for size and map. Under default -O2
+an optimized client can observe Zero from the mapped count and bottom
+from the plain count. A producer passed to build can use seq to inspect
+its step. Fusion can supply a different step at each call site when the
+mapper captures the input. The published witness can still return Refl.
+See the MapLengthFusionWitness example and the R16 roadmap card.
+-}
 
 -- | The length of an append is the sum of the input lengths.
 -- See Note [Append fusion and length witnesses].
