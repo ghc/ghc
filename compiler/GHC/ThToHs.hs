@@ -764,7 +764,7 @@ cvtConstr _ parent_con do_con_name (RecGadtC c varstrtys ty) = case nonEmpty c o
     Nothing -> failWith RecGadtNoCons
     Just c -> do
         { c'       <- mapM do_con_name c
-        ; ty'      <- cvtType ty
+        ; ty'      <- cvtGadtType ty
         ; rec_flds <- mapM (cvt_id_arg parent_con) varstrtys
         ; lrec_flds <- returnLA rec_flds
         ; mk_gadt_decl c' [] (RecConGADT noAnn lrec_flds) ty' }

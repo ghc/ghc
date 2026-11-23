@@ -41,7 +41,7 @@ $( let parent = mkName "Spliced"
    in pure [DataD [] parent [] Nothing [con] []] )
 #elif defined(CHECK_TYPE_DATA)
 type data TypeOnly a where
-  TypeOnly :: forall a -> TypeOnly a
+  MkTypeOnly :: forall a -> TypeOnly a
 #elif defined(CHECK_TERM_REQUIRED)
 required :: forall a -> a -> a
 required t x = x :: t
@@ -53,4 +53,14 @@ capture = not
 
 implicitQuantification :: capture -> capture
 implicitQuantification = id
+#elif defined(CHECK_RECORD_SOURCE)
+data Record where
+  Record :: {field :: Bool} -> forall -> Record
+#elif defined(CHECK_RECORD_SPLICE)
+import Language.Haskell.TH
+
+$( let parent = mkName "Record"
+       field = (mkName "field", Bang NoSourceUnpackedness NoSourceStrictness, ConT ''Bool)
+       con = RecGadtC [mkName "Record"] [field] (ForallVisT [] (ConT parent))
+   in pure [DataD [] parent [] Nothing [con] []] )
 #endif

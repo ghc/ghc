@@ -29,6 +29,13 @@ check() {
                 check_location "$log" 19:33
                 check_location "$log" 20:39
                 ;;
+            RECORD_SOURCE)
+                check_location "$log" 58:32
+                test "$(grep -Fc "$vdq" "$log")" -eq 1
+                ;;
+            RECORD_SPLICE)
+                test "$(grep -Fc "$vdq" "$log")" -eq 1
+                ;;
         esac
     fi
 }
@@ -42,6 +49,12 @@ for shape in SOURCE QUOTE SPLICE_LEADING SPLICE_LATE SPLICE_STRUCTURED SPLICE_GA
     check "$shape" reverse '' "$off" "$implied"
 done
 
+# Record results cannot start a forall. Generated records obey the same rule.
+for shape in RECORD_SOURCE RECORD_SPLICE; do
+    check "$shape" default "$vdq"
+    check "$shape" explicit "$vdq" "$explicit"
+done
+
 # Preserve the ordinary term grammar and the extension's lexical capture rules.
 check TERM_EMPTY default ''
 check TERM_EMPTY override '' "$implied" "$off"
@@ -49,5 +62,5 @@ check SPLICE_FIELD default ''
 check SPLICE_FIELD override '' "$implied" "$off"
 check CAPTURE default ''
 check CAPTURE explicit 'term variables cannot be promoted' "$explicit"
-check CAPTURE implied 'term variables cannot be promoted' "$implied"
+check CAPTURE implied '[GHC-68947]' "$implied"
 check CAPTURE override '' "$implied" "$off"

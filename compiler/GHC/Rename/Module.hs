@@ -4788,7 +4788,9 @@ rnConDecl (ConDeclGADT { con_names   = names
         ; envs <- getRdrEnvs
         ; implicit_bndrs <- filterSourceTableNames envs free_vars
         ; let ctxt = ConDeclCtx (toList new_names)
-        ; checkEmptyGadtRequiredGroups ctxt inner_bndrs res_ty
+        ; case args of
+            PrefixConGADT{} -> checkEmptyGadtRequiredGroups ctxt inner_bndrs res_ty
+            RecConGADT{} -> pure () -- The record grammar rejects visible groups.
 
         ; bindHsOuterTyVarBndrs ctxt Nothing implicit_bndrs outer_bndrs $ \outer_bndrs' ->
           bindHsGadtTelescopes ctxt inner_bndrs $ \inner_bndrs' ->
@@ -4833,7 +4835,8 @@ binder, so check it on the parsed signature before the type checker removes
 it. The parser stores leading groups in the prefix and later groups on the
 right spine of the remaining type. Check both in the constructor renamer,
 which also handles Template Haskell constructors. Do not descend into field
-types or contexts. They use the ordinary rules for types.
+types or contexts. They use the ordinary rules for types. The record grammar
+already rejects visible groups, including empty groups.
 -}
 checkEmptyGadtRequiredGroups :: HsDocContext -> [LHsGadtTelescope GhcPs]
                              -> LHsType GhcPs -> RnM ()
