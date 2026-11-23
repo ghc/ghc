@@ -86,6 +86,60 @@ HS
         fi
     }
 
+    cat > MissingPayloads.hs <<'HS'
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+module Main where
+import Control.Exception (RecConError(..), evaluate, try)
+import Data.List (isInfixOf)
+import NamedSiblingColumns
+import PackedVecLibrary (Nat(..), Vec(..), natToInt, toList)
+
+letters :: NamedColumns -> [Char]
+letters p = toList (namedLetters p)
+
+flags :: NamedColumns -> [Bool]
+flags p = toList (namedFlags p)
+
+missingOne :: NamedColumns
+missingOne = NamedColumns { storedLength = S Z, namedFlags = VCons True VNil }
+
+missingBoth :: NamedColumns
+missingBoth = NamedColumns { storedLength = S Z }
+
+checkMissing :: String -> a -> IO ()
+checkMissing field value = do
+    result <- try (evaluate value >> pure ())
+    case result of
+        Left (RecConError msg) | field `isInfixOf` msg -> putStrLn field
+        _ -> fail ("expected the missing-field exception for " ++ field)
+
+main :: IO ()
+main = do
+    print (flags missingOne)
+    checkMissing "namedLetters" (letters missingOne)
+    print (natToInt (storedLength missingBoth))
+    checkMissing "namedLetters" (letters missingBoth)
+    checkMissing "namedFlags" (flags missingBoth)
+HS
+    "${ghc[@]}" "$opt" -Wmissing-fields -c MissingPayloads.hs > missing.log 2>&1 ||
+        { cat missing.log >&2; exit 1; }
+    test "$(grep -Fc -- '[-Wmissing-fields]' missing.log)" = 2
+    "${ghc[@]}" MissingPayloads.o ../provider/{PackedVecLibrary,NamedSiblingColumns}.o -o missing
+    timeout 15 ./missing > actual
+    printf '%s\n' '[True]' 'namedLetters' '1' 'namedLetters' 'namedFlags' | cmp - actual
+    reject 'GHC-20125.*-Werror=missing-fields' -fforce-recomp -Werror=missing-fields MissingPayloads.hs
+
+    cat > MissingWitness.hs <<'HS'
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+module MissingWitness where
+import NamedSiblingColumns
+import PackedVecLibrary (Vec(..))
+
+wrong :: NamedColumns
+wrong = NamedColumns { namedLetters = VNil, namedFlags = VNil }
+HS
+    reject 'Supply the witness field' MissingWitness.hs
+
     cat > BadConstruction.hs <<'HS'
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
 module BadConstruction where
