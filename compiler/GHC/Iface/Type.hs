@@ -3152,6 +3152,7 @@ data IfaceEvidence
   | ScopedSumDomainEvidence
   | ComposedScopedSumDomainEvidence
   | RetainedSiblingFieldsEvidence
+  | ScopedLambdaEtaEvidence
   | RetainedNamedRecordEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
@@ -3343,6 +3344,8 @@ instance Binary IfaceAxiomRule where
       requireIfaceEvidenceVersion bh ScopedSigmaEvidence
     when (ifLclNameFS n == scopedLambdaClosureName) $
       requireIfaceEvidenceVersion bh ScopedLambdaEvidence
+    when (ifLclNameFS n == scopedLambdaEtaName) $
+      requireIfaceEvidenceVersion bh ScopedLambdaEtaEvidence
     when (ifLclNameFS n == scopedEnumCaseName) $
       requireIfaceEvidenceVersion bh ScopedEnumCaseEvidence
     when (ifLclNameFS n == scopedConstructorCaseName) $

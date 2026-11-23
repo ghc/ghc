@@ -201,6 +201,27 @@ comparing their results on a fresh argument.
 [#242 review of arity and apartness](https://github.com/ghc-proposals/ghc-proposals/pull/242#issuecomment-503360362)
 and [GHC's partial synonym rule](../../../compiler/GHC/Core/Type.hs).
 
+When a lambda forwards its argument to a named unmatchable family, a
+checked conversion can use the family and the supplied arguments directly.
+In the following example, `xs` is still unknown at the call to `advance`.
+
+```haskell
+update :: forall tag xs. Batch (Map (Stamp tag) xs) -> Int
+update row = advance row
+  where
+    advance :: Batch (Map (\cell -> Stamp tag cell) xs) -> Int
+    advance (Batch n) = n + 2
+```
+
+The compiler checks the generated lambda's single equation. It verifies
+that the named family receives the same captured arguments and the final
+lambda parameter. The named family's equations stay opaque. Thus
+`\cell -> Discard tag cell` can share the callback `Discard tag`. A
+constant lambda `\cell -> tag` still cannot, even if `Discard` returns
+`tag` for every argument. The constructor synonym `WithError` above
+also remains a separate case.
+[Forwarding regression](../../../testsuite/tests/dependent/should_run/NativeTypeLambdaEta.hs).
+
 ## A lambda in a visible type argument
 
 ```haskell

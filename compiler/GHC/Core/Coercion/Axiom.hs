@@ -25,7 +25,7 @@ module GHC.Core.Coercion.Axiom (
        existsCoRuleName,
 
        CoAxiomRule(.., BuiltInEqRule), BuiltInFamRewrite(..), BuiltInFamInjectivity(..), TypeEqn,
-       scopedSigmaClosureName, scopedLambdaClosureName,
+       scopedSigmaClosureName, scopedLambdaClosureName, scopedLambdaEtaName,
        scopedEnumCaseName, scopedConstructorCaseName, scopedCaseResultName, scopedOrderedCaseName,
        matchableProjectionName, matchableProjectionDirection,
        coAxiomRuleArgRoles, coAxiomRuleRole,
@@ -667,6 +667,10 @@ scopedSigmaClosureName = fsLit "ScopedSigmaClosure"
 -- | The stable interface key for the scoped type-lambda proof rule.
 scopedLambdaClosureName :: FastString
 scopedLambdaClosureName = fsLit "ScopedLambdaClosure"
+
+-- | The stable interface key for equality of a lambda and its forwarded family.
+scopedLambdaEtaName :: FastString
+scopedLambdaEtaName = fsLit "ScopedLambdaEta"
 
 -- | The interface name of the equality for complete retained enumeration cases.
 scopedEnumCaseName :: FastString
