@@ -2911,6 +2911,10 @@ parameters. Check that the Core case returns its first field directly.
 The second field remains a variable in the checked alternative, even
 when its type depends on the witness. Check that the sole imported
 equation also returns the first variable of this same constructor.
+Only the package constructor occurs in the equation. Require the
+ordinary kind grammar for its fields and the result. Their types can
+hide their constructors because both fields are variables. Still
+check the exact field kinds against the promoted constructor telescope.
 -}
 
 -- | Check the retained constructor and its actual structural root domain.
@@ -4398,7 +4402,7 @@ checkedSpecConstrWorker bindings table owner = do
     guard (eqTypes (map varType fields) (map instantiate [mkTyVarTy a, left, right]) &&
            maybe True null (idCbvMarks_maybe worker))
     guard (lazySpecConstrFields (tidyCbvInfoTop emptyNameSet worker rhs))
-    rows <- checkedConstructorRows True (const True) (const Nothing)
+    rows <- checkedConstructorRows True (const True) Nothing (const Nothing)
               (checkedSpecializedCall worker other parameters)
               parameters (instantiate result) [pattern, CaseField other] other body
     axiom <- closedFamilyTyConCoAxiom_maybe table
@@ -4499,7 +4503,11 @@ checkedConstructorCaseWith specialized visible helper owner rhs = do
         public_domain ty = case caseArrow ty of
           Just (input, output) -> all (casePublicKind public kinds) [input, output]
           Nothing -> casePublicKind public kinds ty
-    guard (all public_domain (result : domains))
+        witness_root = fst <$> monomorphicRetainedWitnessType rhs_type
+        result_kind
+          | isJust witness_root = caseKind kinds result
+          | otherwise = public_domain result
+    guard (result_kind && all public_domain domains)
     let recursive patterns aliases expr =
           checkedSelfCall signature terms patterns aliases expr <|>
           checkedCallback signature patterns aliases expr <|>
@@ -4507,9 +4515,9 @@ checkedConstructorCaseWith specialized visible helper owner rhs = do
               [_, other] <- pure terms
               checkedSpecializedCall worker other (mkTyVarTys (binderVars telescope))
                                      patterns aliases expr)
-    rows <- checkedConstructorRows (multipleCaseOperands signature) public helper recursive
-                                  kinds result (map CaseField terms) scrutinee body
-    forM_ (monomorphicRetainedWitnessType rhs_type) $ \(con, _) -> do
+    rows <- checkedConstructorRows (multipleCaseOperands signature) public witness_root
+                                  helper recursive kinds result (map CaseField terms) scrutinee body
+    forM_ witness_root $ \con -> do
       [ConstructorCaseRow [CaseConstructor actual [] [CaseField witness, CaseField _]]
                           (CaseField value)] <- pure rows
       guard (actual == con && value == witness)
@@ -4566,11 +4574,11 @@ multipleCaseOperands signature =
     isTwoListCase signature || isTwoStructuralCase signature || isSizeListCase signature
 
 -- | Check the remaining cases from the supplied operand patterns.
-checkedConstructorRows :: Bool -> (TyCon -> Bool) -> (Id -> Maybe TyCon)
+checkedConstructorRows :: Bool -> (TyCon -> Bool) -> Maybe DataCon -> (Id -> Maybe TyCon)
                        -> ([ConstructorCaseTree] -> [(Id, Id)] -> Core.CoreExpr -> Maybe ConstructorCaseTree)
                        -> [Type] -> Type -> [ConstructorCaseTree] -> Id -> Core.CoreExpr
                        -> Maybe [ConstructorCaseRow]
-checkedConstructorRows bind_aliases public helper recursive parameters result patterns scrutinee =
+checkedConstructorRows bind_aliases public witness_root helper recursive parameters result patterns scrutinee =
     checkBody patterns [] (Just scrutinee)
   where
     checkCase patterns aliases scrutinee
@@ -4596,7 +4604,7 @@ checkedConstructorRows bind_aliases public helper recursive parameters result pa
       if isRetainedCaseRoot domain tc then
         do { guard (all isNativeOpaqueValueId fields)
            ; guard (Core.nativeIndexArgKinds dc args (map TermVarTy fields))
-           ; guard (all (publicFieldKind parameters (map TermVarTy fields)) kinds) }
+           ; guard (all (publicFieldKind dc parameters (map TermVarTy fields)) kinds) }
       else
         do { expected <- openDataConFieldTypes dc args
            ; guard (all isId fields && eqTypes kinds expected)
@@ -4614,10 +4622,12 @@ checkedConstructorRows bind_aliases public helper recursive parameters result pa
       pure (dc, rows)
     checkAlt _ _ _ _ _ _ = Nothing
 
-    publicFieldKind parameters fields kind
+    publicFieldKind dc parameters fields kind
       | Just (family, index) <- splitAppTy_maybe kind
       , any (eqType family) parameters, any (eqType index) fields
       = True
+      -- See Note [Retained field kinds in source equations].
+      | Just dc == witness_root = caseKind (parameters ++ fields) kind
       | otherwise = casePublicKind public (parameters ++ fields) kind
 
     checkBody patterns aliases first_case body = case body of

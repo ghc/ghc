@@ -2,8 +2,7 @@
 -- | Define the two projections in the same declaration group.
 module RetainedCharLocal (localLength, localCells) where
 
-import GHC.Exts (Char(..))
-import PackedVecLibrary (Nat(..), Vec(..))
+import PackedVecLibrary (Nat, Vec)
 import RetainedCharVector (CharVector(..))
 
 -- | Read the witness without demanding the vector.

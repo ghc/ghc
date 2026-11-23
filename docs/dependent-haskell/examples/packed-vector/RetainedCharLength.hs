@@ -1,8 +1,7 @@
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
 module RetainedCharLength (storedLength) where
 
-import GHC.Exts (Char(..))
-import PackedVecLibrary (Nat(..), Vec(..))
+import PackedVecLibrary (Nat)
 import RetainedCharVector (CharVector(..))
 
 -- | Read the witness without demanding the vector.
