@@ -40,17 +40,25 @@ if "${g[@]}" -c Termination.hs >termination.log 2>&1 ||
     exit 1
 fi
 
-sed -e 's/^module TypeLambda$/module MissingCaptureKind/' \
+sed -e 's/^module TypeLambda$/module InferredCaptureKind/' \
     -e 's/^withScopedErrors :: forall (e :: Type) xs[.]$/withScopedErrors :: forall e xs./' \
-    TypeLambda.hs >MissingCaptureKind.hs
-capture_line=$(grep -nFx '    go :: Fields xs -> Fields (Map (\cell -> Either e cell) xs)' MissingCaptureKind.hs |
-    cut -d: -f1)
-if "${g[@]}" -c MissingCaptureKind.hs >capture-kind.log 2>&1 ||
-   ! grep -Fq "MissingCaptureKind.hs:$capture_line:37: error: [GHC-27185]" capture-kind.log ||
-   ! grep -Fq "Add a kind annotation for \`e'." capture-kind.log; then
-    cat capture-kind.log >&2
-    exit 1
-fi
+    TypeLambda.hs >InferredCaptureKind.hs
+"${g[@]}" -Werror=unused-type-patterns -fomit-interface-pragmas -c InferredCaptureKind.hs
+# The lambda can be stored in Proxy without applying its family. Its body
+# must still check against the real kinds of these unannotated captures.
+cp "$src/NativeTypeLambdaFormation.hs" .
+for form in ASCRIPTION CONSTRUCTOR FAMILY; do
+    "${g[@]}" -fno-code -fforce-recomp -D"$form" -c NativeTypeLambdaFormation.hs
+    if "${g[@]}" -fno-code -fforce-recomp -D"$form" -DSHADOW \
+        -c NativeTypeLambdaFormation.hs >formation.log 2>&1 ||
+        ! grep -Eq '^NativeTypeLambdaFormation.hs:(23|25|27):[0-9]+: error: \[GHC-25897\]' formation.log ||
+        ! grep -Fq 'has kind' formation.log; then
+        cat formation.log >&2
+        exit 1
+    fi
+done
+"${g[@]}" -fomit-interface-pragmas -c NativeTypeLambdaFormation.hs
+cp NativeTypeLambdaFormation.{hi,o} "$out/client/"
 cp TypeLambda.hi SchemaColumns.hi OpenTypeLambda.hi NativeTypeLambdaScope.hi RepeatedProvider.hi "$out/client/"
 cd "$out/client"
 test ! -e TypeLambda.hs
@@ -175,6 +183,8 @@ HS
 cat >RowsMain.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, TypeOperators #-}
 module Main where
+import Control.Monad (unless)
+import NativeTypeLambdaFormation (formed)
 import Data.Type.Equality ((:~:)(Refl))
 import Ordinary (capturedRow, independentRow, rankedSignature, rankedSynonym, scopedRow)
 import Data.Proxy (Proxy(..))
@@ -197,6 +207,7 @@ callable = Field wrap End
 main :: IO ()
 main = case (capturedRow, independentRow, withError, withoutError) of
   (Refl, Refl, Field a (Field b End), Field c (Field d End)) -> do
+    unless (formed Proxy) $ fail "local type lambda formation"
     print (a, b, c, d)
     let row :: Fields (ScopedRow Char '[Bool])
         row = case scopedRow of Refl -> Field (Just 'x', Right True) End
@@ -220,7 +231,7 @@ main = case (capturedRow, independentRow, withError, withoutError) of
 HS
 "${g[@]}" -c RowsMain.hs
 "${g[@]}" RowsMain.o Ordinary.o TypeLambdaClient.o ../provider/TypeLambda.o \
-    ../provider/SchemaColumns.o ../provider/NativeTypeLambdaScope.o -o rows
+    ../provider/SchemaColumns.o ../provider/NativeTypeLambdaScope.o NativeTypeLambdaFormation.o -o rows
 printf '%s\n' "(Left GT,Right True,Just 'a',Just True)" "(Just 'x',Right True)" "Right 'x'" \
     "Right 'x'" '(Just 42,Left "missing")' "Right True" "('r','s')" >rows.expected
 ./rows >rows.actual
@@ -505,7 +516,7 @@ outer = witness where
 HS
 if "${g[@]}" -c Signature.hs >context.log 2>&1 ||
    ! grep -Eq '^Signature[.]hs:5:38: error: \[GHC-27185\]' context.log ||
-   ! grep -Fq 'Local value signatures can use a type lambda during ordinary compilation' context.log; then
+   ! grep -Fq 'A local value signature can use a type lambda during ordinary compilation' context.log; then
     cat context.log >&2
     exit 1
 fi
