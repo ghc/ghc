@@ -261,3 +261,24 @@ abstract on the published 561 compiler. It compiled in a value
 signature, a datatype field, a GADT result index, a type synonym,
 a closed family equation and an open family instance.
 [Six-context regression](../../../testsuite/tests/dependent/should_run/NativeTypeLetContexts.hs).
+
+### An intervening abbreviation
+
+Component job 1610 compared this synonym with the version obtained by
+removing `saved = width` and using `width` in the `Nothing` branch.
+
+```haskell
+type Width (flag :: Bool) (override :: Maybe Nat) =
+  let width = case flag of { True -> 3; False -> 2 }
+      saved = width
+      result = case override of { Nothing -> saved; Just n -> n }
+  in result
+```
+
+Both spellings should give `7` for a `'Just 7` override with `flag`
+still abstract. On component `437cc2779a`, the direct spelling
+compiled. Adding `saved` gave GHC-97233 at a case expression.
+The same difference occurred in a value signature. Introducing a name
+for an existing result must preserve its scope across the later case.
+This open check concerns R18 itself. Both cases already work in the
+same positions when the branch refers directly to `width`.
