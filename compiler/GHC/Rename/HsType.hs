@@ -48,7 +48,8 @@ module GHC.Rename.HsType (
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Rename.Splice( rnSpliceType, checkThLocalTyName, checkThLocalNameNoLift )
+import {-# SOURCE #-} GHC.Rename.Splice( rnSpliceType, rnSpliceTypeWith,
+                                        checkThLocalTyName, checkThLocalNameNoLift )
 
 import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
 import GHC.Core.TyCon    ( isKindName )
@@ -207,17 +208,27 @@ rnHsTypeApp ty@(HsWC { hswc_body = hs_ty })
          else rnHsWcType HsTypeCtx ty }
   where
     rn_argument
-      | not (hasParsedRetainedPi hs_ty)
-      = do
-          -- See Note [Type lambdas in visible type arguments].
-          let wrapper = HsWC noExtField
-                          (L (l2l (getLoc hs_ty)) (mkHsExplicitSigType noAnn [] hs_ty))
-          lifted <- tryLiftLocalTypeLambdas HsTypeCtx wrapper
-          case lifted of
-            Just (HsWC { hswc_ext = wcs, hswc_body = L _ HsSig { sig_body = body } }, fvs)
-              -> pure (HsWC wcs body, fvs)
-            Nothing -> rnHsWcType HsTypeCtx ty
-      | otherwise = rnHsWcType HsTypeCtx ty
+      | hasParsedRetainedPi hs_ty = rnHsWcType HsTypeCtx ty
+      | otherwise = do
+          lifted <- try_lift_argument hs_ty
+          maybe (rnHsWcTypeWithSplice rn_argument_splice HsTypeCtx ty) pure lifted
+
+    rn_argument_splice = rnSpliceTypeWith [] $ \raw -> do
+      lifted <- if hasParsedRetainedPi raw then pure Nothing else try_lift_argument raw
+      case lifted of
+        Just (HsWC { hswc_body = body }, fvs) -> pure (body, fvs)
+        Nothing -> rnLHsType (SpliceTypeCtx raw) raw
+
+    try_lift_argument :: LHsType GhcPs -> RnM (Maybe (LHsWcType GhcRn, FreeNames))
+    try_lift_argument body = do
+      -- See Note [Type lambdas in visible type arguments].
+      let wrapper = HsWC noExtField
+                      (L (l2l (getLoc body)) (mkHsExplicitSigType noAnn [] body))
+      lifted <- tryLiftLocalTypeLambdas HsTypeCtx wrapper
+      pure $ case lifted of
+        Just (HsWC { hswc_ext = wcs, hswc_body = L _ HsSig { sig_body = result } }, fvs)
+          -> Just (HsWC wcs result, fvs)
+        Nothing -> Nothing
 
 {- Note [Type lambdas in visible type arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -233,6 +244,11 @@ rename the original argument with rnHsWcType. Ordinary wildcards and the
 checks for retained Pi arguments use their existing visible argument path.
 In an untyped quote, leave the lambda in the quoted syntax. The lifter
 runs when the argument is spliced into the ordinary declaration group.
+
+In rowFor @($([t| \err cell -> Either err cell |]) e), the renamer
+first runs the type splice. Use its normal continuation to try lifting
+the resulting type. The splice runs once and retains its finalizers.
+If lifting fails, rename the result in the ordinary SpliceTypeCtx.
 -}
 
 -- | Scope aliases for complete types that capture lexical runtime Names.
@@ -558,18 +574,20 @@ rnHsPatSigTyKi level scoping ctx sig_ty thing_inside
     pat_sig_ty = hsPatSigType sig_ty
 
 rnHsWcType :: HsDocContext -> LHsWcType GhcPs -> RnM (LHsWcType GhcRn, FreeNames)
-rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
+rnHsWcType = rnHsWcTypeWithSplice rnSpliceType
+
+-- | Rename wildcards and use the caller's continuation for type splices.
+rnHsWcTypeWithSplice :: RenameTypeSplice -> HsDocContext -> LHsWcType GhcPs
+                    -> RnM (LHsWcType GhcRn, FreeNames)
+rnHsWcTypeWithSplice rename_splice ctxt (HsWC { hswc_body = hs_ty })
   = do { free_vars <- filterInScopeM (extractHsTyRdrTyVars hs_ty)
        ; (nwc_rdrs', _) <- partition_nwcs free_vars
        ; let nwc_rdrs = nubL nwc_rdrs'
-       ; (wcs, hs_ty', fvs) <- rnWcBodyType ctxt nwc_rdrs hs_ty
+       ; (wcs, hs_ty', fvs) <- rnWcBodyTyKiWithSplice (const rename_splice)
+                                TypeLevel ctxt nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = hs_ty' }
        ; return (sig_ty', fvs) }
 
-
-rnWcBodyType :: HsDocContext -> [LocatedN RdrName] -> LHsType GhcPs
-  -> RnM ([Name], LHsType GhcRn, FreeNames)
-rnWcBodyType = rnWcBodyTyKi TypeLevel
 
 rnWcBodyTyKi :: TypeOrKind -> HsDocContext -> [LocatedN RdrName] -> LHsType GhcPs
          -> RnM ([Name], LHsType GhcRn, FreeNames)

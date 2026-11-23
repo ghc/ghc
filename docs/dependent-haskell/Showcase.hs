@@ -1733,6 +1733,12 @@ main = do
     case reported of
         TypeLambda.Field count (TypeLambda.Field flag TypeLambda.End) ->
             observe "pass a row schema as a visible type argument" (count, flag)
+    let quotedReport :: TypeLambda.Fields '[Either String Int, Either String Bool]
+        quotedReport = TypeLambdaArgument.rowFor @($([t| \err cell -> Either err cell |]) String)
+            Proxy (Right 42) (Left "missing flag")
+    case quotedReport of
+        TypeLambda.Field count (TypeLambda.Field flag TypeLambda.End) ->
+            observe "splice a two-binder row schema into a visible type argument" (count, flag)
     let lazyFields = TypeLambda.Field 'x' (TypeLambda.Field (error "unused field" :: Bool) TypeLambda.End)
     case TypeLambdaClient.forwardErrors (Proxy @String) lazyFields of
         TypeLambda.Field first _ ->

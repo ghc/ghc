@@ -474,6 +474,7 @@ tag a row cell with a local type lambda that infers the capture kind: True
 splice a column schema and attach a caller-supplied label: (Right 42,Left "missing flag",("column",True))
 read two named sensors with a missing slot: (21,(),54)
 pass a row schema as a visible type argument: (Right 42,Left LT)
+splice a two-binder row schema into a visible type argument: (Right 42,Left "missing flag")
 forward a row with the same callback across modules: Right 'x'
 use column schemas defined in separate modules: (Just 42,Left "missing")
 map a type lambda with a constructor case: Refl

@@ -223,6 +223,27 @@ explicit argument. [GHC TypeApplications](https://downloads.haskell.org/ghc/9.14
 [Agda lambda expressions](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#lambda-expressions)
 and [Agda application of implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html).
 
+### A type splice in a visible argument
+
+```haskell
+messageCells :: forall (e :: Type). e -> Fields '[Either e Int, Either e Bool]
+messageCells msg =
+    rowFor @($([t| \err cell -> Either err cell |]) e)
+        Proxy (Right 42) (Left msg)
+```
+
+The quote binds `err` and `cell` in that order. The visible argument
+applies the resulting lambda to `e` and passes the remaining function
+to `rowFor`. The splice runs once and keeps its finalizer. An unknown
+name in the quote is reported there. An ill-kinded body is reported at
+the splice. [Source-hidden regression](../../../testsuite/tests/dependent/should_run/NativeTypeLambdaTypeApp.sh).
+
+Proposal #242 supplies the unmatchable arrows for partial application.
+Proposal #378 supplies the lexical scoping principle. The two-binder
+lambda itself is experimental syntax from the roadmap. [GHC proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html),
+[GHC proposal #378](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html)
+and [Serokell's type-level lambda card](https://ghc.serokell.io/dh#type-level-lambdas).
+
 ## Rows under an erased forall
 
 ```haskell
