@@ -86,10 +86,16 @@ Job 1284 passed all 16 selected registrations on the component,
 including the matrix of source, quotation, splice and flag-order cases.
 Records still reject a quantified result under either setting.
 The evidence is in `r41-required-flag-20261123/POLICY-EVIDENCE.md`.
-Job 1285 builds both normal stages at `71e5215115`. Its dependent job
-1286 checks 84 registered tests, 553 Showcase outputs in three modes,
-interface readers and the guide. Resume these jobs from
+Job 1285 built both normal stages at `71e5215115`. Job 1286 matched
+all 553 Showcase outputs at native `-O0`, default `-O2` and in GHCi.
+It also checks 84 registered tests, interface readers and the guide.
+Resume these jobs from
 `r41-required-normal-553-20261123` and the local `r41-required-normal` ref.
+Job 1290 checks the other registrations that use the experimental extension.
+Two existing TH printer tests now include their required-binder example.
+The published 552 compiler rejected it with GHC-65904. Both tests passed
+on the R41 component. Job 1291 repeats them on the normal compiler.
+Their test-only revision is `57e02189b9`, archived as `r41-printer-tests`.
 The `r41-only-normal` and `r16-r41-review-normal` source refs are
 under `refs/archive/dependent-haskell/2026-11-23/`.
 
@@ -98,14 +104,34 @@ The next combined source is `4d10fdc35f` in
 single interface feature for a named callback as a value or in an
 application. It also includes inferred proof bindings at `4a119b07e1`.
 The 32 component cases passed at `-O0` and `-O2`. Job 1267 built
-both normal stages. Job 1269 checks 59 registrations, proof
-upgrades and the Showcase. It reports the package archive, list-law
-test and installed tree client independently.
+both normal stages. Job 1269 passed all 59 registrations, proof upgrades,
+mixed interfaces, the HaskLib archive and its installed tree client.
+The Showcase failed Core Lint in `ConstructorCallClient` at `-O0`
+and in GHCi. CorePrep substituted the global `trueConstructor` for a
+local callback. Lint could no longer reconstruct its case equality.
+Default `-O2` still rejected the filter proofs. The HaskLib list test
+still rejected the `map` and `(++)` proofs. Keep this compiler private.
+The R03 correction at `808230436c` checks the named call or its
+certified source equation after CorePrep. Job 1300 matched all 17 lines
+from the original callback client at native `-O0`, default `-O2` and
+in GHCi. Job 1303 passed the new `NativeStrictNamedCase` regression.
 
 The separate R16 prototype in `r16-length-observation-20261123` records
 the `size (map f xs)` observation on the installed `lengthMap` proof.
 Job 1279 installed HaskLib. Its client compiler crashed, so this
 prototype stays private.
+
+The keyed-tree series ends at `3f82769e48` in
+`r21-two-parameter-tree-20261123/source`. Job 1295 passed both
+declaration orders, both legal splice boundaries and the negative
+controls. Job 1299 matched the 556-line Showcase at native `-O0`
+and in GHCi on this component. The keyed-tree regression also passed
+at `-O2`. The combined checkout at `08b54eee13` in
+`r03-r21-r41-integration-20261123/source` includes the tree series,
+the R03 CorePrep correction and the R41 flag and printer tests.
+Job 1304 builds both stages after R41 job 1286. Job 1305 checks 95
+registrations, the 556-line Showcase, proof clients and interface readers.
+The local source ref is `r03-r21-r41-normal-556` under the 23 November archive.
 
 The local archive refs `r19-r41-normal-552`, `r16-hasklib-tree-553`
 and `r27-legacy-transition-normal` are under

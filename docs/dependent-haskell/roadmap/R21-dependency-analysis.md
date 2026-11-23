@@ -466,3 +466,36 @@ workers separately exposed an equation for `mapValues`, but none for
 `nodes`. The client then rejected `nodes (mapValues f t)` with GHC-70565.
 Changing declaration order alone cannot make this proof work. The 12
 results are in `r21-two-parameter-tree-20261123/results.tsv`.
+
+The private compiler component at `b47ced68c5` can export the missing
+equations. The branch pattern uses the datatype's parameter order.
+Recursive calls use the measure's `forall` order. For example,
+`nodes :: forall a k. Tree k a -> Size` matches `Branch @k @a`
+and calls `nodes @a @k` on each subtree. The checker verifies that
+each call preserves its type arguments.
+
+With the datatype and workers compiled separately, job 1287 checked
+this proof using only their interfaces.
+
+```haskell
+nodesMap :: forall k a b. foreach (f :: a -> b) -> foreach (t :: Tree k a)
+         -> nodes (mapValues f t) :~: nodes t
+nodesMap f = \case
+    Tip _ -> Refl
+    Branch _ l r -> withEquality (nodesMap f l) (withEquality (nodesMap f r) Refl)
+```
+
+All four clients returned a branch count of two and the proof `Refl`.
+They covered inferred and explicitly reordered type arguments at `-O0`
+and ordinary `-O2`. A claim with one extra branch failed to type-check.
+Agda's corresponding proof specializes `#nodes-map` to a map on leaf payloads.
+[Tree proof references](../REFERENCES.md#map-preserves-the-number-of-internal-nodes).
+
+Private revision `489927cedb` lets the same module define the datatype,
+workers and proof. Job 1295 passed the eight keyed-tree clients in
+`NativeLocalTree`. This includes both declaration orders and a splice
+after the datatype or after the workers. A worker after a splice stays
+out of scope for an earlier proof. The checker rejected a mapper that
+changed the key type and a proof with one extra branch. Ordinary workers
+over a dependent kind still compiled. The tests also cover a recursive
+call on a reconstructed tree instead of a direct subtree.

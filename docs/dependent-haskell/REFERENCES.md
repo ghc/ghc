@@ -8276,6 +8276,11 @@ children to the same counting expression. The leaf-only map theorem
 R16 use this theorem to test promotion of an ordinary Haskell function
 that passes two recursive results to addition. The Haskell proof can
 inspect both subtrees while leaving their leaf payloads unevaluated.
+R21 uses the two-parameter version of the same example. The Haskell
+datatype stores a key at each branch and a value at each leaf.
+Its leaf map preserves the keys. The checker must preserve the order
+of both type arguments even when the measure quantifies them in
+the opposite order.
 [Agda standard library v2.3, Data.Tree.Binary.Properties](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Tree/Binary/Properties.agda#L31-L40).
 
 Agda's treatment of case trees also distinguishes which argument is
