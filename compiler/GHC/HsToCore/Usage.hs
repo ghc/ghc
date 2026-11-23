@@ -205,7 +205,7 @@ mkObjectUsage plugins fc th_links_needed th_pkgs_needed = do
               , usg_bytecode_hash = bclu_hash
               }
 
-    fing mmsg fn = UsageFile (mkFastString fn) <$> lookupFileCache fc fn <*> pure mmsg
+    fing mmsg fn = let fs = mkFastString fn in UsageFile fs <$> lookupFileCache fc fs <*> pure mmsg
 
     librarySpecToUsage :: LibrarySpec -> IO [Usage]
     librarySpecToUsage (Objects os) = traverse (fing Nothing) os

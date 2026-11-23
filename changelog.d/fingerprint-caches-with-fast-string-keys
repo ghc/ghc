@@ -1,0 +1,9 @@
+section: compiler
+synopsis: Switch fingerprint caches to ``FastString`` keys
+issues: #28139
+mrs: !17042
+description: {
+    The caches of file and directory fingerprints now use ``FastString``
+    keys instead of ``FilePath`` keys, to avoid certain allocations
+    within the compiler.
+}

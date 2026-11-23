@@ -55,6 +55,8 @@ import GHC.Platform.Ways
 import GHC.Data.IOEnv (IOEnv, runIOEnv, getEnv)
 import GHC.Data.OsPath
 import qualified GHC.Data.ShortText as ST
+import GHC.Data.FastString (FastString, unpackFS)
+import GHC.Data.FastString.Env (emptyFsEnv, lookupFsEnv, extendFsEnv)
 
 import GHC.Driver.Env
 import GHC.Driver.Config.Finder
@@ -92,7 +94,6 @@ import Data.IORef
 import qualified Data.List as L(sort)
 import Data.List.NonEmpty ( NonEmpty (..) )
 import qualified Data.List.NonEmpty as NE
-import qualified Data.Map as M
 import Data.Set (Set)
 import qualified Data.Set as Set (empty, intersection, difference, null, toList)
 import GHC.Fingerprint
@@ -119,30 +120,30 @@ type BaseName = OsPath  -- Basename of file
 initFinderCache :: IO FinderCache
 initFinderCache = do
   home_cache <- newHomeFinderCache
-  file_cache <- newIORef M.empty
-  dir_cache <- newIORef M.empty
+  file_cache <- newIORef emptyFsEnv
+  dir_cache <- newIORef emptyFsEnv
   let flushFinderCaches :: IO ()
       flushFinderCaches = do
         clearHomeFinderCache home_cache
-        atomicModifyIORef' file_cache $ \_ -> (M.empty, ())
-        atomicModifyIORef' dir_cache  $ \_ -> (M.empty, ())
+        atomicModifyIORef' file_cache $ \_ -> (emptyFsEnv, ())
+        atomicModifyIORef' dir_cache  $ \_ -> (emptyFsEnv, ())
 
-      lookupFileCache :: FilePath -> IO Fingerprint
+      lookupFileCache :: FastString -> IO Fingerprint
       lookupFileCache key = do
          c <- readIORef file_cache
-         case M.lookup key c of
+         case lookupFsEnv c key of
            Nothing -> do
-             hash <- getFileHash key
-             atomicModifyIORef' file_cache $ \c -> (M.insert key hash c, ())
+             hash <- getFileHash (unpackFS key)
+             atomicModifyIORef' file_cache $ \c -> (extendFsEnv c key hash, ())
              return hash
            Just fp -> return fp
-      lookupDirCache :: FilePath -> IO Fingerprint
+      lookupDirCache :: FastString -> IO Fingerprint
       lookupDirCache key = do
          c <- readIORef dir_cache
-         case M.lookup key c of
+         case lookupFsEnv c key of
            Nothing -> do
-             hash <- getDirHash key
-             atomicModifyIORef' dir_cache $ \c -> (M.insert key hash c, ())
+             hash <- getDirHash (unpackFS key)
+             atomicModifyIORef' dir_cache $ \c -> (extendFsEnv c key hash, ())
              return hash
            Just fp -> return fp
   return $

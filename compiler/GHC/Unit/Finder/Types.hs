@@ -48,10 +48,10 @@ data FinderCache =
   , flushFinderCaches :: IO ()
     -- ^ Flush all home-module search caches, and also flush the file and
     -- directory hash caches.
-  , lookupFileCache   :: FilePath -> IO Fingerprint
+  , lookupFileCache   :: FastString -> IO Fingerprint
     -- ^ Look for the hash of a file in the cache. This should add it to the
     -- cache. If the file doesn't exist, raise an IOException.
-  , lookupDirCache    :: FilePath -> IO Fingerprint
+  , lookupDirCache    :: FastString -> IO Fingerprint
     -- ^ Like 'lookupFileCache', but for a directory.
   }
 
