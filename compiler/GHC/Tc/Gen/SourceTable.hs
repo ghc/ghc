@@ -446,13 +446,26 @@ constructorArg view = go
       | otherwise = SourceProofUnknown
 
 -- | Prove that the application and rule differ at the same saturated path.
+-- See Note [Constructor apartness in source proof rules].
 sourceProofArgsApart :: SourceProofArgs -> SourceProofArgs -> Bool
 sourceProofArgsApart checked rule =
     lengthIs rule (length checked) && or (zipWith apart checked rule)
   where
     apart (SourceProofCon a as) (SourceProofCon b bs)
-      | lengthIs bs (length as) = a /= b || or (zipWith apart as bs)
+      | a /= b = True
+      | lengthIs bs (length as) = or (zipWith apart as bs)
     apart _ _ = False
+
+{- Note [Constructor apartness in source proof rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The recorded argument and the rule pattern can use constructors of
+different arities. For example, a rule on fmap f Nothing cannot match
+fmap not (Just True). Compare constructor Names first. Only compare
+fields at corresponding positions under the same constructor.
+
+Both readers use constructorArg to record saturated constructors.
+An unknown argument gives no evidence of a constructor clash.
+-}
 
 -- | Read a local rule before desugaring. Only application wrappers
 -- preserve the value positions used by the constructor check.
