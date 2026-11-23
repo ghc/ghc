@@ -185,6 +185,11 @@ only enclosing variables written in the family pattern. The splice's
 source does not show which variables its result uses. A class default has
 only the scope of its own equation.
 
+Both operands of a function arrow use the enclosing scope. Visit
+the domain before the result so their lambda helpers have distinct
+names. Keep the arrow and its modifiers at the written occurrence.
+This step lifts lambdas. The existing sum positions stay the same.
+
 A type let binds a name only in its body. Lift callbacks in the RHS
 with the outer captures. A callback in the body can capture the checked
 let result as another argument. Give this argument a fresh family
@@ -300,6 +305,10 @@ liftTypeLambdas sigma group = do
     liftRhs lift_sum scoped owner captures (L loc (HsKindSig ann body kind)) salt =
       let (body', families, next) = liftRhs lift_sum scoped owner captures body salt
       in (L loc (HsKindSig ann body' kind), families, next)
+    liftRhs _ scoped owner captures (L loc (HsFunTy ann arrow domain result)) salt =
+      let (domain', domain_families, next) = liftRhs False scoped owner captures domain salt
+          (result', result_families, end) = liftRhs False scoped owner captures result next
+      in (L loc (HsFunTy ann arrow domain' result'), domain_families ++ result_families, end)
     liftRhs _ scoped owner captures (L loc (XHsType let_ty@(HsTypeLet ann _ _ binds result_ty))) salt =
       let (binder, rhs, body) = splitHsTypeLet binds result_ty
           (rhs', rhs_families, next) = liftRhs False scoped owner captures rhs salt

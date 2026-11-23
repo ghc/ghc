@@ -148,8 +148,7 @@ The first callback captures `e` from its equation's constructor pattern.
 The second equation has its own scope. Its lambda binds a fresh `e`.
 `Map` receives an unmatchable callback and applies it to each element.
 Normal type family termination checks still apply. This use of `Map`
-requires `UndecidableInstances`. Writing this callback directly in the
-right-hand side of an open or associated instance still reports GHC-27185.
+requires `UndecidableInstances`.
 
 The [provider](../examples/open-evaluation/TypeLambda.hs) and
 [interface client](../../../testsuite/tests/dependent/should_run/NativeTypeLambda.sh)
@@ -158,7 +157,7 @@ absent and constructs fields whose types depend on the mapped list.
 The scope test rejects a reference to another equation's pattern binder at
 the written occurrence.
 
-## Open family instances
+## Open and associated family instances
 
 A library can declare an open `Columns` family. A different module can
 define its own schema and map a lambda over the field types.
@@ -171,6 +170,14 @@ type instance Columns (Checked e) fields = Map (\a -> Either e a) fields
 The instance pattern binds `e`. The lambda binds `a`. A client that imports
 only the interfaces can construct a row with type `Columns (Checked String) '[Bool]`.
 Another instance maps `Maybe` over the fields of an optional row.
+An associated equation can use a capture from its enclosing instance
+when its left-hand side binds that variable. For example, under
+`instance forall e. Associated (Schema e)`, the equation
+`type forall xs. AMapped (Schema e) xs = Map (\a -> Either e a) xs`
+captures `e` from the instance and binds `xs` in the equation.
+An arrow in an instance RHS gives both operands the same lexical scope.
+The `Callable` schema uses this to store a function whose result maps
+the callback over a row. An ordinary source-hidden client can call it.
 GHC still rejects an overlapping instance with a different result.
 [Schema library](../examples/open-evaluation/TypeLambda.hs),
 [instance module](../examples/open-evaluation/SchemaColumns.hs) and
