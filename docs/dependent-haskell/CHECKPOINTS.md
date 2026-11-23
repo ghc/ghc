@@ -117,7 +117,7 @@ manifests remain in the active build tree.
 ## Local build capacity
 
 On the shared WSL host, schedule GHC builds and compiler verification
-in the `ghc` group on the usual Pueue daemon. The group has three slots
+in the `ghc` group on the usual Pueue daemon. The group has two slots
 across all worktrees. Its jobs share sixteen logical CPUs and a memory
 limit of 64,000,000,000 bytes in `ghcbuild.slice`. Use up to five Hadrian
 workers per job. A private compiler link or a separate test job also uses
@@ -180,11 +180,12 @@ after its checkout or process has gone.
        --setenv="DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" \
        /usr/bin/python3 "$PWD/docs/dependent-haskell/tools/ghc-build-priority.py"
    systemctl --user show ghcbuild.slice -p CPUQuotaPerSecUSec -p MemoryMax -p MemorySwapMax
+   env -u XDG_RUNTIME_DIR pueue parallel 2 --group ghc
    env -u XDG_RUNTIME_DIR pueue group
    ```
 
    The expected values are `16s`, `64000000000` and `0` respectively.
-   The `ghc` group has three slots. Each Hadrian invocation uses at most five
+   The `ghc` group has two slots. Each Hadrian invocation uses at most five
    workers. Runnable work in another group takes priority. The watcher
    pauses GHC admissions and freezes the GHC slice until that work finishes.
    When another job has priority, leave GHC paused. Use

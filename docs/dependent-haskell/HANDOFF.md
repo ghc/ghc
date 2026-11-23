@@ -60,24 +60,27 @@ reification fixes from `39dccda474`, the boxed equality fix and
 `NativeOpenProofRules`. Job 1207 passed the source-hidden proof and
 forwarding cases. Job 1222 passed the three incremental builds for an
 ordinary home proof, including a proof that uses installed definitions.
-An old installed *proof* still needs a source rebuild. The early gates
-in job 1229 passed the list and tree rule checks and all three incremental
-upgrade cases from normal 554. The job also checks 55 registrations,
-the Showcase and HaskLib. Inferred proof bindings have separate checks. See the
+An old installed *proof* still needs a source rebuild. Job 1229 passed all 55 registered tests, the list and tree rule checks,
+three upgrades from normal 554, mixed interfaces and the Showcase at
+`-O0` and in GHCi. The default `-O2` Showcase and HaskLib list tests
+still failed at imported proof uses. Inferred proof bindings have separate checks. See the
 [ordinary proof upgrade](roadmap/R16-open-term-evaluator.md#upgrading-a-proof-whose-type-hides-the-equality).
 
 R41 has a separate release candidate at `acd48e3f3f` in
-`r41-only-normal-553-20261123`. Job 1242 builds it directly from the
+`r41-only-normal-553-20261123`. Job 1242 built both normal stages from the
 published branch plus the ordered GADT changes and their Showcase
 example. It includes the extension guard on the new empty visible
 suffix. Check its own tests and guide render before updating R41.
 Job 1246 checks 66 registered cases, the default optimized Showcase,
 constructor permutations and older interface readers. The two edited
-guide pages rendered with all six new internal links resolved. Use the
-guide-only descendant `a3d61239a2` when publishing. It corrects the
+guide pages rendered with all six new internal links resolved. The next R41 change starts from
+the guide-only descendant `a3d61239a2`. It corrects the
 grammar for an inferred binder with a kind annotation and an unparenthesized
 function type in a record field. Job 1266 checks both examples and the
-guide render on the exact release compiler.
+guide render on that compiler. Before publishing R41, extend the
+`RequiredTypeArguments` check to the leading empty visible GADT forall,
+and make `ExperimentalDependentTypes` imply `RequiredTypeArguments`.
+A later explicit `NoRequiredTypeArguments` overrides the implication.
 The `r41-only-normal` and `r16-r41-review-normal` source refs are
 under `refs/archive/dependent-haskell/2026-11-23/`.
 
@@ -319,7 +322,9 @@ and an open decision on legacy language defaults.
    The earlier WSL restart erased `/tmp` while Git and Pueue retained
    records for its old paths. Keep active builds under `_build/on-demand/`.
 3. Restore the [shared WSL build queue](CHECKPOINTS.md#restore-the-shared-wsl-build-queue)
-   before submitting work. The group has three slots. All GHC jobs share
+   before submitting work. Use two subagents, one on R41 and one on R16,
+   with the coordinator handling review and integration. R21 is on hold.
+   The group has two slots. All GHC jobs share
    16 logical CPUs, 64,000,000,000 bytes of memory and zero swap.
    Higher-priority jobs pause the queue and freeze the GHC slice.
 

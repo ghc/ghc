@@ -137,6 +137,19 @@ source examples. General promotion remains open.
 
 ## Current work queue
 
+| Card | Next result | Acceptance check |
+| --- | --- | --- |
+| [R41 Ordered GADT signatures](roadmap/R41-nested-quantification-in-gadts.md) | Publish the remaining prefix forms, including empty groups and ordered `type data`. | Build both compiler stages from the independent R41 source. Check construction and matching through a compiled interface, declaration quotation and reification, extension diagnostics, guide examples and the optimized Showcase. Check that `ExperimentalDependentTypes` implies `RequiredTypeArguments` and that an explicit override rejects a leading or trailing visible `forall`. |
+| [R16 Open evaluation](roadmap/R16-open-term-evaluator.md#optimized-clients-of-the-filter-proof) | Use HaskLib's `lengthMap` proof with default optimization. | Check the specific observation `size (map f xs)` against the installed rules. A client must still reject a rule that drops a cell or changes the observer. Verify that a separately compiled forwarder preserves the check. |
+| [R03 Dependent products](roadmap/R03-dependent-products.md#private-check-for-an-imported-function-in-an-index) | Export a retained index that names an ordinary imported function, either alone or applied to an argument. | Run the normal compiler with a source-hidden client. A re-export must preserve identity. A lexical binder and a same-spelled function in a different unit must remain distinct. Check old readers on changed and unaffected interfaces. |
+| [R21 Declaration dependencies](roadmap/R21-dependency-analysis.md#a-datatype-its-workers-and-their-proof-in-one-group) (on hold) | Check whether the one-module tree proof also works for a recursive datatype with two type parameters. | Compare the same-group and imported-datatype cases. Reorder independent declarations and verify both the result and the scope error when a splice separates a required worker from its proof. |
+
+R41 and R16 have one subagent each. The coordinator tracks the R03
+build and reviews both agents’ changes. The [handoff](HANDOFF.md#current-checkpoint)
+lists the pinned compilers and test jobs.
+
+### Earlier integration checks
+
 The following changes entered the fork before the shared R11/R16 rebuild.
 They remain regression checks for subsequent changes. Reuse one normal build
 for all cards that change the same checker or interface format.
