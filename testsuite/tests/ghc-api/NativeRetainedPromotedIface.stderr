@@ -1,10 +1,19 @@
 probe:
   Invalid retained constructor fields in interface: 'PackVec
+  Expected argument kind: *
+  Actual argument kind: Bool
 probe:
   Invalid retained constructor fields in interface: 'PackVec
+  Expected argument kind: Nat
+  Actual argument kind: Bool
 probe:
   Invalid retained constructor fields in interface: 'PackVec
+  Expected argument kind: Vec Int ('S 'Z)
+  Actual argument kind: Vec Int 'Z
 probe:
   Invalid retained constructor fields in interface: 'PackVec
+  Expected argument kind: Vec Int ('S 'Z)
+  Actual argument kind: Vec Int 'Z
 probe:
   Invalid retained constructor fields in interface: 'PackVec
+  The type has no binder for this argument.
