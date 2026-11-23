@@ -16,7 +16,8 @@ module GHC.Core.FVs (
         exprFreeIds,      exprsFreeIds,
         exprFreeIdsDSet,  exprsFreeIdsDSet,
         exprFreeIdsList,  exprsFreeIdsList,
-        bindFreeVars, hasFreeVarInCoreAnnotations, exprAnnotationFreeVars,
+        bindFreeVars, hasFreeVarInCoreAnnotations, hasFreeVarInCoreAnnotationsWith,
+        exprAnnotationFreeVars, coreAnnotationVarSets,
         bindsAnnotationFreeVars, bindsAnnotationVars, bindsAnnotationVarsWith,
 
         -- * Selective free variables of expressions
@@ -283,20 +284,24 @@ exprFVs (Let (Rec pairs) body)
 -- A term occurrence contributes its type and multiplicity, but not its Id.
 -- Inspect stable unfolding templates and skip ordinary duplicates of RHSs.
 hasFreeVarInCoreAnnotations :: Var -> CoreExpr -> Bool
-hasFreeVarInCoreAnnotations target = getAny . expr
+hasFreeVarInCoreAnnotations = hasFreeVarInCoreAnnotationsWith (\_ _ -> False)
+
+-- | Also check the selected application operands during the same traversal.
+hasFreeVarInCoreAnnotationsWith :: (CoreExpr -> CoreExpr -> Bool) -> Var -> CoreExpr -> Bool
+hasFreeVarInCoreAnnotationsWith app target = getAny . expr
   where
-    (expr, _) = coreAnnotationFVs (\_ _ -> mempty) (Any . anyFreeVarsOfType (== target))
+    (expr, _) = coreAnnotationFVs (\fun arg -> Any (app fun arg)) (Any . anyFreeVarsOfType (== target))
                                   (Any . anyFreeVarsOfCo (== target))
                                   (\b uses -> if b == target then mempty else uses)
 
 -- | Collect the free variables of an expression's Core annotations.
 exprAnnotationFreeVars :: CoreExpr -> VarSet
-exprAnnotationFreeVars = fst coreAnnotationVarSets
+exprAnnotationFreeVars = fst (coreAnnotationVarSets (\_ _ -> emptyVarSet))
 
 -- | Collect references from binder annotations, RHSs and stable unfoldings.
 -- Include references between the supplied bindings.
 bindsAnnotationFreeVars :: CoreProgram -> VarSet
-bindsAnnotationFreeVars = foldMap (snd coreAnnotationVarSets)
+bindsAnnotationFreeVars = foldMap (snd (coreAnnotationVarSets (\_ _ -> emptyVarSet)))
 
 -- | Collect every variable named in annotations, even under its binder.
 -- This protects binder identities in a single traversal of a Core program.
@@ -309,9 +314,11 @@ bindsAnnotationVarsWith app = foldMap bind
   where
     (_, bind) = coreAnnotationFVs app tyCoVarsOfType tyCoVarsOfCo (const id)
 
-coreAnnotationVarSets :: (CoreExpr -> VarSet, CoreBind -> VarSet)
-coreAnnotationVarSets =
-    coreAnnotationFVs (\_ _ -> emptyVarSet) tyCoVarsOfType tyCoVarsOfCo (flip delVarSet)
+-- | Collect free annotation variables and the selected application operands.
+coreAnnotationVarSets :: (CoreExpr -> CoreExpr -> VarSet)
+                      -> (CoreExpr -> VarSet, CoreBind -> VarSet)
+coreAnnotationVarSets app =
+    coreAnnotationFVs app tyCoVarsOfType tyCoVarsOfCo (flip delVarSet)
 
 coreAnnotationFVs
     :: Monoid refs

@@ -455,6 +455,12 @@ test('NativeNamedCallback',
                    open_eval_dir + 'PreludeZipRuntime.hs'])],
      run_command, ['bash NativeNamedCallback.sh "{compiler}" "{libdir}"'])
 
+test('NativeOpaqueCallbackAlias',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeOpaqueCallbackAliasBridge.hs', 'NativeOpaqueCallbackAliasClient.hs',
+                   'NativeOpaqueCallbackAliasProvider.hs', 'NativeOpaqueCallbackAliasProof.hs'])],
+     run_command, ['bash NativeOpaqueCallbackAlias.sh "{compiler}" "{libdir}"'])
+
 test('NativeRetainedMatchability',
      [req_host_target_ghc, only_ways(['normal'])],
      run_command, ['bash NativeRetainedMatchability.sh "{compiler}" "{libdir}"'])

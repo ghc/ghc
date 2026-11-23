@@ -44,8 +44,7 @@ import GHC.Core.Opt.Arity ( ArityType, exprArity, arityTypeBotSigs_maybe
                           , typeArity, arityTypeArity, etaExpandAT )
 import GHC.Core.SimpleOpt ( exprIsConAppFor_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
 import qualified GHC.Core.Subst as CoreSubst
-import GHC.Core.FVs     ( mkRuleInfo, hasFreeVarInCoreAnnotations, exprAnnotationFreeVars
-                        , bindsAnnotationFreeVars )
+import GHC.Core.FVs     ( mkRuleInfo, hasFreeVarInCoreAnnotationsWith, coreAnnotationVarSets )
 import GHC.Core.Rules   ( lookupRule, getRules )
 import GHC.Core.Multiplicity
 
@@ -245,7 +244,7 @@ simplTopBinds env0 binds0
     -- level. Collect its annotation uses before reintroducing unfoldings.
     top_annotation_refs
       | sm_core_mode (seMode env0) == RetainedCore
-      = bindsAnnotationFreeVars binds0
+      = foldMap (snd retainedAnnotationVars) binds0
       | otherwise = emptyVarSet
 
 {-
@@ -2140,6 +2139,12 @@ Leave the binding in scope and do not install an unfolding for it.
 A private class selector type can also refer to its evidence variable.
 Keep that dictionary binder under the same condition.
 
+An application can need its local callback even if no written annotation
+mentions it. For example, in `let f = imported in accepts f x (token f x)`,
+the index `f x` is computed from the application spine. Substituting the
+imported function for `f` would lose the eligible local callback. Keep the
+binding if a non-vacuous retained function operand refers to it.
+
 The same restriction applies to known constructor elimination. It creates
 auxiliary bindings for the case binder and payload fields. Do not enter
 that path if the selected RHS has annotations that refer to one of those
@@ -2154,7 +2159,24 @@ retainedAnnotationUse :: SimplEnv -> InId -> InExpr -> Bool
 retainedAnnotationUse env bndr body =
   sm_core_mode (seMode env) == RetainedCore
   && (isNativeOpaqueValueId bndr || isNativeClassDictionaryId bndr)
-  && hasFreeVarInCoreAnnotations bndr body
+  && hasFreeVarInCoreAnnotationsWith callback_use bndr body
+  where
+    callback_use fun arg = isNativeIndexFunctionId bndr
+                         && bndr `elemVarSet` retainedCallbackOperandVars fun arg
+
+-- | Track callback operands after a previous pass has floated their bindings.
+retainedAnnotationVars :: (InExpr -> VarSet, InBind -> VarSet)
+retainedAnnotationVars = coreAnnotationVarSets retainedCallbackOperandVars
+
+-- | A callback operand can determine the type of later arguments in its spine.
+retainedCallbackOperandVars :: InExpr -> InExpr -> VarSet
+retainedCallbackOperandVars fun arg
+  | Just index <- nativeLocalFunctionArgIndex arg
+  , DepFunTy _ callback result <- coreFullView (exprType fun)
+  , isNativeIndexFunctionId callback
+  , not (isVacuousRetainedBinder callback result)
+  = tyCoVarsOfType index
+  | otherwise = emptyVarSet
 
 simplNonRecE :: HasDebugCallStack
              => SimplEnv
@@ -2232,7 +2254,7 @@ simplRecE env pairs body cont
   where
     annotation_refs
       | sm_core_mode (seMode env) == RetainedCore
-      = bindsAnnotationFreeVars [Rec pairs] `unionVarSet` exprAnnotationFreeVars body
+      = snd retainedAnnotationVars (Rec pairs) `unionVarSet` fst retainedAnnotationVars body
       | otherwise = emptyVarSet
 
 {- Note [Dark corner with representation polymorphism]
