@@ -49,6 +49,14 @@ Job 1972 built both stages of the earlier 581 candidate. Sixteen of 17
 registrations passed. The capture test expected the wrong error code.
 GHC reported GHC-25897 at `Captured.hs:14:17` for the rigid type variable.
 Job 1982 replays the corrected test with the same compiler and libraries.
+All 581 Showcase results matched at `-O0`, default `-O2` and in GHCi.
+All 234 compatibility cases passed. The focused suite passed 136 of 138.
+It reported the known `MTrans` diagnostic and a regression in
+`NativeDependentCoreRun`. A localised source function lost its checked
+equation. The same test passed on 578. Hold both the 581 and 584
+candidates for this regression. Job 1985 tests `f821efb9cd` in
+`r04-localised-source-owner-20261123`. It checks an ordinary function,
+a retained record selector and a fresh binder with copied details.
 
 | Area | Verified result and next step |
 | --- | --- |
@@ -64,6 +72,10 @@ For R16, job 1981 compares the published HaskLib interface with a fresh
 interface for the same package source. Both clients use the private
 compiler at `8bed8f549b`. The inputs and results belong to
 `r16-proof-provenance-current-hasklib-20261123`.
+
+Jobs 1983 and 1984 compare local and imported rules on `Nothing` and
+`Just True` in `r16-constructor-arity-apartness-20261123`. The candidate
+at `7f56212d49` compares the constructor names before their fields.
 
 The GHC queue has two slots. Other benchmark jobs take priority and freeze
 the GHC slice. Jobs 1947 and 1949 were exploratory allocation measurements.
