@@ -173,7 +173,7 @@ proof = Refl
 EOF
         if "${ghc[@]}" -XNoExperimentalDependentTypes -c RawPrefix.hs >raw.log 2>&1 ||
            ! grep -Fq '[GHC-27346]' raw.log ||
-           ! grep -Fq 'ExperimentalDependentTypes' raw.log; then
+           ! grep -Fq 'UnsaturatedTypeFamilies' raw.log; then
             cat raw.log
             exit 1
         fi
@@ -186,7 +186,7 @@ EOF
     for mode in NoExperimentalDependentTypes ExperimentalDependentTypes; do
         if "${ghc[@]}" -X"$mode" -c WrongMatchability.hs >bad.log 2>&1 ||
            ! grep -Fq '[GHC-83865]' bad.log ||
-           grep -Fq ExperimentalDependentTypes bad.log; then
+           grep -Eq 'ExperimentalDependentTypes|UnsaturatedTypeFamilies' bad.log; then
             cat bad.log
             exit 1
         fi
@@ -213,7 +213,7 @@ EOF
     for file in BadArity BadPattern; do
         if "${ghc[@]}" -XNoExperimentalDependentTypes -c "$file.hs" >bad.log 2>&1 ||
            ! grep -Fq '[GHC-27346]' bad.log ||
-           grep -Fq ExperimentalDependentTypes bad.log; then
+           grep -Eq 'ExperimentalDependentTypes|UnsaturatedTypeFamilies' bad.log; then
             cat bad.log
             exit 1
         fi
@@ -234,7 +234,7 @@ checked = Refl
 HS
 if (cd client && "${ghc[@]}" -XNoExperimentalDependentTypes -c DirectCallback.hs) >direct.log 2>&1 ||
    ! grep -Fq 'DirectCallback.hs:8:37: error: [GHC-27346]' direct.log ||
-   ! grep -Fq 'ExperimentalDependentTypes' direct.log; then
+   ! grep -Fq 'UnsaturatedTypeFamilies' direct.log; then
     cat direct.log
     exit 1
 fi
@@ -245,7 +245,7 @@ sed -e 's/module DirectCallback/module DirectMismatch/' -e 's/@U/@M/' \
     client/DirectCallback.hs >client/DirectMismatch.hs
 if (cd client && "${ghc[@]}" -XNoExperimentalDependentTypes -c DirectMismatch.hs) >direct-m.log 2>&1 ||
    ! grep -Fq 'DirectMismatch.hs:8:37: error: [GHC-83865]' direct-m.log ||
-   grep -Fq 'ExperimentalDependentTypes' direct-m.log; then
+   grep -Eq 'ExperimentalDependentTypes|UnsaturatedTypeFamilies' direct-m.log; then
     cat direct-m.log
     exit 1
 fi
