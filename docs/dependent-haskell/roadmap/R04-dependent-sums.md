@@ -412,6 +412,11 @@ readable. Omitting the witness gives GHC-83605 at the constructor and
 names the required field.
 [Field omission and witness inference](../REFERENCES.md#omitted-fields-in-a-dependent-record).
 
+An ordinary client can also write
+`replicateNative (Named.storedLength p) '-'`. Its result is a vector at
+the same index as the two payloads of `p`. GHC checks the selector's
+source equations through its interface.
+
 An ordinary caller can replace one or more payloads at the original witness.
 The Showcase sets the first flag to `False` and keeps the rest of the
 vector. The update checks each replacement at `storedLength p` for

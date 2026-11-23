@@ -3005,15 +3005,14 @@ checkRetainedRecordWitness :: TcType -> FieldLabel -> LHsExpr GhcRn -> LHsExpr G
                            -> TcM (Maybe (LHsExpr GhcRn))
 checkRetainedRecordWitness domain field record_expr written
   | HsVar{} <- unLoc (stripParensLHsExpr record_expr)
-  , L loc (HsApp x selector argument) <- stripParensLHsExpr written
+  , HsApp _ selector _ <- unLoc (stripParensLHsExpr written)
   , XExpr (HsRecSelRn occurrence) <- unLoc (stripParensLHsExpr selector)
   , let field_name = flSelector field
   , unLoc (foLabel occurrence) == field_name
   = tryTcDiscardingErrs (pure Nothing) $ runMaybeT $ do
       let old = wrapGenSpan (genHsApps field_name [record_expr])
-          new = L loc (HsApp x (L (getLoc selector) (genHsVar field_name)) argument)
       (old_core, _) <- liftMaybeT (tcRetainedArg domain old)
-      (new_core, value) <- liftMaybeT (tcRetainedArg domain new)
+      (new_core, value) <- liftMaybeT (tcRetainedArg domain written)
       old_index <- MaybeT (pure (Core.retainedArgIndex old_core))
       new_index <- MaybeT (pure (Core.retainedArgIndex new_core))
       givens <- liftMaybeT getNativeGivens
