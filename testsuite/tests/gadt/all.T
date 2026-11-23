@@ -211,3 +211,14 @@ test('GadtOrderedNewtype',
      [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
       extra_files(['GadtOrderedNewtypeProvider.hs', 'TerminalGadtTh.sh'])],
      run_command, ['bash TerminalGadtTh.sh "{compiler}" "{libdir}" GadtOrderedNewtype GadtOrderedNewtypeProvider'])
+test('GadtOrderedTypeData',
+     [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
+      extra_files(['GadtOrderedTypeDataProvider.hs', 'TerminalGadtTh.sh'])],
+     run_command, ['bash TerminalGadtTh.sh "{compiler}" "{libdir}" GadtOrderedTypeData GadtOrderedTypeDataProvider'])
+test('GadtEmptyGroups',
+     [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
+      extra_files(['GadtEmptyGroupsProvider.hs', 'TerminalGadtTh.sh'])],
+     run_command, ['bash TerminalGadtTh.sh "{compiler}" "{libdir}" GadtEmptyGroups GadtEmptyGroupsProvider'])
+test('GadtEmptyRequiredOff',
+     [req_th, req_host_target_ghc, only_ways(['normal'])],
+     run_command, ['bash GadtEmptyRequiredOff.sh "{compiler}" "{libdir}"'])

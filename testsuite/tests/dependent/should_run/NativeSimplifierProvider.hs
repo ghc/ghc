@@ -91,7 +91,7 @@ scopeAnnotations source =
       keep = True
       recurse :: Ignored b -> Int
       recurse x = if x then 20 else recurse True
-  in case (if keep then False else True :: Ignored b) of
+  in case (if keep then False else True :: forall (index :: Bool). Ignored index) of
        False -> recurse False
        True -> 21
 

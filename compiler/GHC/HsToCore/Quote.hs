@@ -901,11 +901,27 @@ repC (L l (ConDeclGADT { con_names  = cons
           ((mkHsForAllInvisTele noAnn tvs) { hsf_matchability = ma })) : teles)
   where
     con nodes
-      | PrefixConGADT _ [] <- args
-      , Just (groups, result) <- HsDecls.splitGadtInterior args res_ty
-      = do names <- mapM lookupLOcc cons
-           repOrderedGadt (nonEmptyCoreList' names) result [] (map Left nodes ++ groups)
+      | PrefixConGADT _ fields <- args
+      = let nonempty = [g | g@(L _ group) <- nodes, not (HsDecls.isEmptyGadtGroup group)]
+        in if (null fields && isJust interior || any required nonempty) &&
+              not (hsHasForEachTy (unLoc res_ty))
+           then do names <- mapM lookupLOcc cons
+                   let groups = map Left nonempty ++ map Right fields ++ suffix
+                   repOrderedGadt (nonEmptyCoreList' names) result [] groups
+           else repConTelescope (locA l) nonempty (repGadtDataCons cons args res_ty)
       | otherwise = repConTelescope (locA l) nodes (repGadtDataCons cons args res_ty)
+
+    -- ForallC cannot carry a required binder. Use the explicit argument
+    -- list for all groups when a required binder precedes the fields.
+    required (L _ (HsGadtForAll _ HsForAllVis{})) = True
+    required _ = False
+
+    interior = HsDecls.splitGadtInterior args res_ty
+    (suffix, result) = case interior of
+      Just groups -> groups
+      Nothing -> case HsDecls.splitGadtTerminal args res_ty of
+        Just (groups, _, body) -> (map Left groups, body)
+        Nothing -> ([], res_ty)
 
 -- | Quote constructor prefix nodes in order. Combine only an adjacent
 -- forall and context. See Note [Constructor telescope contexts] in GHC.Hs.Decls.
@@ -3146,7 +3162,7 @@ repGadtDataCons cons details res_ty
          case details of
            PrefixConGADT _ ps
              | Just (groups, result) <- HsDecls.splitGadtInterior details res_ty
-             , any annotated_field groups -> do
+             , any needs_group groups -> do
                prefix <- mapM repGadtField ps
                repOrderedGadt (nonEmptyCoreList' cons') result (reverse prefix) groups
            PrefixConGADT _ ps
@@ -3165,9 +3181,9 @@ repGadtDataCons cons details res_ty
              rep2 recGadtCOcc [unC (nonEmptyCoreList' cons'), unC arg_vtys,
                                 unC res_ty']
   where
-    annotated_field (Right CDF { cdf_unpack, cdf_bang }) =
+    needs_group (Right CDF { cdf_unpack, cdf_bang }) =
       cdf_unpack /= NoSrcUnpack || cdf_bang /= NoSrcStrict
-    annotated_field (Left _) = False
+    needs_group (Left (L _ group)) = HsDecls.isEmptyGadtGroup group
 
 -- | Quote an ordered constructor telescope with explicit argument groups.
 repOrderedGadt :: Core [TH.Name] -> LHsType GhcRn -> [Core (M TH.RetainedGadtArg)]

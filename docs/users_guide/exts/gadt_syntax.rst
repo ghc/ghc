@@ -118,167 +118,120 @@ use existential quantification.
 Formal syntax for GADTs
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-To make more precise what is and what is not permitted inside of a GADT-style
-constructor, we provide a BNF-style grammar for GADT below. Note that this
-grammar is subject to change in the future.
+Prefix GADT constructor signatures follow the stable grammar from
+`GHC Proposal #402 <https://ghc-proposals.readthedocs.io/en/latest/proposals/0402-gadt-syntax.html>`_.
+Record GADT constructor signatures have a separate grammar.
 
 .. code-block:: none
 
-  gadt_con ::= conids '::' foralls gadt_body
+  gadt_con ::= conids '::' gadt_prefix_sig
+              | conids '::' gadt_record_sig
 
   conids ::= conid
-          |  conid ',' conids
+            | conid ',' conids
 
-  foralls ::= <empty>
-           | forall_telescope foralls
+  gadt_prefix_sig ::= btype
+                    |  quantifier gadt_prefix_sig
+                    |  '(' gadt_prefix_sig ')'
+
+  quantifier ::= forall_telescope
+               |  ctxt_arrow
+               |  fieldtype '->'
+               |  fieldtype '⊸'
+               |  fieldtype mult '->'
 
   forall_telescope ::= 'forall' tv_bndrs_spec '.'
-                    |  'forall' tv_bndrs      '->'   -- with RequiredTypeArguments
+                    |  'forall' tv_bndrs      '->'
 
   tv_bndrs      ::= <empty> | tv_bndr      tv_bndrs
   tv_bndrs_spec ::= <empty> | tv_bndr_spec tv_bndrs_spec
 
-  tv_bndr       ::= tyvar
-                 |  '(' tyvar '::' ctype ')'
-
-  tv_bndr_spec  ::= tv_bndr
-                 |  '{' tyvar '}'
-                 |  '{' tyvar '::' ctype '}'
-
-  opt_ctxt ::= <empty>
-            |  ctxt_arrow
+  tv_bndr      ::= tyvar | '(' tyvar '::' ctype ')'
+  tv_bndr_spec ::= tv_bndr | '{' tyvar '}' | '{' tyvar '::' ctype '}'
 
   ctxt_arrow ::= btype '=>'
                |  '(' ctxt ')' '=>'
 
-  ctxt ::= ctype
-        |  ctype ',' ctxt
+  ctxt ::= <empty> | predicates
+  predicates ::= ctype | ctype ',' predicates
 
-  gadt_body ::= prefix_gadt_contexts
-             |  opt_ctxt record_gadt_body
+  gadt_record_sig ::= opt_forall opt_ctxt '{' fielddecls '}' '->' btype
+  opt_forall ::= <empty> | 'forall' tv_bndrs_spec '.'
+  opt_ctxt ::= <empty> | ctxt_arrow
+  fielddecls ::= <empty> | fields
+  fields ::= fielddecl | fielddecl ',' fields
+  fielddecl ::= sig_vars '::' record_fieldtype
+              |  sig_vars mult '::' record_fieldtype
 
-  prefix_gadt_contexts ::= '(' prefix_gadt_contexts ')'
-                        |  ctxt_arrow prefix_gadt_contexts
-                        |  prefix_gadt_body
+  record_fieldtype ::= opt_unpack ctype
+                     |  opt_unpack strictness_sigil atype
 
-  prefix_gadt_body ::= '(' prefix_gadt_body ')'
-                    |  return_type
-                    |  opt_unpack btype '->' prefix_gadt_body
+  fieldtype ::= opt_unpack btype
+              |  opt_unpack strictness_sigil atype
+  opt_unpack ::= <empty> | {-# UNPACK #-} | {-# NOUNPACK #-}
+  strictness_sigil ::= '!' | '~'
 
-  record_gadt_body ::= '{' fieldtypes '}' '->' return_type
+In this simplified grammar, ``atype`` is an atomic type, ``btype`` is
+an application or infix type, and ``ctype`` also permits quantifiers,
+contexts, and arrows at the outermost level. Parentheses let an ``atype``
+contain a ``ctype``. For example, ``Int -> (forall a. a -> a) -> S``
+has two fields, the second of which has a polymorphic type. ``sig_vars``
+is a comma-separated list of field names. ``mult`` is a multiplicity
+annotation such as ``%1``. The same annotation syntax applies to record
+fields before ``::``. Braces mark inferred binders, for example
+``forall {k} {a :: k}.``.
 
-  fieldtypes ::= <empty>
-              |  fieldnames '::' opt_unpack ctype
-              |  fieldnames '::' opt_unpack ctype ',' fieldtypes
+Record braces delimit the field types. GHC preserves its existing
+acceptance of a ``ctype`` in a record field, including ``f :: a -> a``.
+Proposal #402 describes record field types with the narrower ``btype``
+production. Prefix field types use that narrower form because the
+outer arrow separates fields.
 
-  fieldnames ::= fieldname
-              |  fieldname ',' fieldnames
+- In a prefix signature, fields, foralls, and contexts may appear in any
+  order. A type binder scopes over the rest of the signature. A pattern
+  checks each field and type argument in source order. A context makes
+  its constraints available to the patterns that follow it and to the
+  branch body.
 
-  opt_unpack ::= opt_bang
-              |  {-# UNPACK #-} opt_bang
-              |  {-# NOUNPACK #-} opt_bang
-
-  opt_bang ::= <empty>
-            |  '!'
-            |  '~'
-
-Where:
-
-- ``btype`` is a type that is not allowed to have an outermost
-  ``forall``/``=>`` unless it is surrounded by parentheses. For example,
-  ``forall a. a`` and ``Eq a => a`` are not legal ``btype``\ s, but
-  ``(forall a. a)`` and ``(Eq a => a)`` are legal.
-- ``ctype`` is a ``btype`` that has no restrictions on an outermost
-  ``forall``/``=>``, so ``forall a. a`` and ``Eq a => a`` are legal ``ctype``\ s.
-- ``return_type`` is a type that is not allowed to have ``forall``\ s, ``=>``\ s,
-  or ``->``\ s.
-
-This is a simplified grammar that does not fully delve into all of the
-implementation details of GHC's parser (such as the placement of Haddock
-comments), but it is sufficient to attain an understanding of what is
-syntactically allowed. Some further various observations about this grammar:
-
-- In a prefix GADT constructor, write the quantifiers first, followed by
-  any constraints, then the fields. You can write consecutive contexts
-  as ``Eq a => Show a => a -> Packed`` or group the constraints as
-  ``(Eq a, Show a) => a -> Packed``. A record GADT constructor accepts a
-  single context.
-
-  With :extension:`RequiredTypeArguments`, an ordinary prefix constructor
-  can put a required forall after its last field. For example: ::
+  A visible forall at any position requires
+  :extension:`RequiredTypeArguments`. This includes the empty group
+  ``forall ->``, which adds no type arguments. For example: ::
 
     data G a b where
       After :: forall a. Int -> forall b -> G a b
 
-  Pass the integer first, then the required type, as in
-  ``After @Char 37 (type Bool)``. A pattern uses the same order, as in
-  ``After n (type b)``. This form applies to lifted data constructors whose
-  result is the parent applied to distinct type variables. A constructor
-  context can precede the fields and refer to earlier type variables.
-  Pattern matching makes those constraints available to the field patterns,
-  the terminal type patterns, and the right-hand side.
+  Pass the field before the required type, as in
+  ``After @Char 37 (type Bool)``. A pattern follows the same order,
+  as in ``After n (type b)``. See :ref:`visible-forall-in-gadts`.
 
-  Template Haskell can quote or reify this prefix declaration. Its
-  ``RetainedGadtC`` represents each field with its bang and multiplicity.
-  A ``ForallVisT`` in the result type represents the terminal type arguments.
-  This use of ``RetainedGadtC`` needs no named retained index field.
-
-  A prefix constructor can also use a specified forall followed by a
-  context after its fields. For example, under :extension:`RankNTypes`
-  define the constructor as follows. ::
+  A specified forall and its context can also follow a field. ::
 
     data T a where
       MkT :: Int -> forall a. Eq a => T a
 
-  Use a visible type application after the field, as in ``MkT 7 @Bool``.
-  The ``a`` binder does not scope over the earlier field. The constraint
-  is available after the earlier field and type patterns have been checked.
-  This form has a single context after the specified forall and no earlier
-  context. Template Haskell represents the final group as a ``ForallT``
-  with its context inside the result type.
+  Apply the type argument after the field, as in ``MkT 7 @Bool``.
+  The ``a`` binder scopes over ``Eq a`` and the result. Template
+  Haskell can represent ordered groups through ``RetainedGadtC``.
 
-  A higher-rank field has its own quantifiers or constraints inside
-  parentheses. For example, ``MkS :: Int -> (forall a. a -> a) -> S``
-  has a polymorphic second field.
+- Prefix signatures allow parentheses around the remaining groups or
+  around the whole signature. For example, ``MkU :: (forall a. a -> U)``
+  and ``MkV :: Int -> (forall a. !a -> V)`` are accepted. A record
+  signature allows one leading invisible forall and one context before
+  the record fields. Its braces and final arrow separate the fields from
+  the result.
 
-- GADT constructors permit outermost parentheses that surround the ``foralls``
-  or ``opt_ctxt``, as well as interleaved parentheses between multiple
-  ``foralls``. For example, ``MkU :: (forall a. a -> U)`` is accepted, as is
-  ``MkW :: forall a. (forall b. a -> b -> W)``.
+- Use infix ``->`` or the appropriate linear arrow between prefix
+  fields. For example, ``MkA :: (->) Int A`` does not declare an
+  ``Int`` field. GHC determines where the fields end before it expands
+  type synonyms. A result type synonym may expand to an instance of the
+  parent type. GHC does not reduce a type family application to establish
+  that result.
 
-  Note that it is also acceptable to use parentheses in a ``prefix_gadt_body``.
-  For instance, ``MkV1 :: forall a. (a) -> (V1)`` is acceptable, as is
-  ``MkV2 :: forall a. (a -> V2)``.
-
-- The function arrows in a ``prefix_gadt_body``, as well as the function
-  arrow in a ``record_gadt_body``, are required to be used infix. For
-  example, ``MkA :: (->) Int A`` would be rejected.
-
-- GHC uses the function arrows in a ``prefix_gadt_body`` and
-  ``prefix_gadt_body`` to syntactically demarcate the function and result
-  types. Note that GHC does not attempt to be clever about looking through
-  type synonyms here. If you attempt to do this, for instance: ::
-
-    type C = Int -> B
-
-    data B where
-      MkB :: C
-
-  Then GHC will interpret the return type of ``MkB`` to be ``C``, and since
-  GHC requires that the return type must be headed by ``B``, this will be
-  rejected. On the other hand, it is acceptable to use type synonyms within
-  the argument and result types themselves, so the following is permitted: ::
-
-    type B1 = Int
-    type B2 = B
-
-    data B where
-      MkB :: B1 -> B2
-
-- GHC will accept any combination of ``!``/``~`` and
-  ``{-# UNPACK #-}``/``{-# NOUNPACK #-}``, although GHC will ignore some
-  combinations. For example, GHC will produce a warning if you write
-  ``{-# UNPACK #-} ~Int`` and proceed as if you had written ``Int``.
+- With :extension:`UnicodeSyntax`, use ``∷``, ``→`` and ``⇒`` for the
+  corresponding ASCII punctuation. The linear arrow ``⊸`` also uses
+  :extension:`UnicodeSyntax`. A leading ``~`` on a field requires
+  :extension:`LazyFieldAnnotations`, which :extension:`StrictData`
+  implies. GHC may ignore an unpacking annotation on a lazy field.
 
 GADT syntax odds and ends
 ~~~~~~~~~~~~~~~~~~~~~~~~~

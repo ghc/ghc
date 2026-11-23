@@ -1,7 +1,11 @@
 data G_0 a_1 where
-    G1_2 :: forall a_3 b_4 . (a_3, b_4) -> G_0 a_3
-    G2_5 :: forall a_6 . forall b_7 . (a_6, b_7) -> G_0 a_6
-    G3_8 :: forall a_9 {b_10} .
-            forall c_11 d_12 .
-            forall e_13 {f_14} g_15 .
+    G1_2 :: forall a_3 b_4 . @('GHC.Internal.Types.Unmatchable)
+            (a_3, b_4) -> G_0 a_3
+    G2_5 :: forall a_6 . @('GHC.Internal.Types.Unmatchable)
+            forall b_7 . @('GHC.Internal.Types.Unmatchable)
+            (a_6, b_7) -> G_0 a_6
+    G3_8 :: forall a_9 {b_10} . @('GHC.Internal.Types.Unmatchable)
+            forall c_11 d_12 . @('GHC.Internal.Types.Unmatchable)
+            forall e_13 {f_14} g_15 . @('GHC.Internal.Types.Unmatchable)
             G_0 (a_9, b_10, c_11, d_12, e_13, f_14, g_15)
+    G4_16 :: forall a_17 -> @('GHC.Internal.Types.Unmatchable) G_0 a_17

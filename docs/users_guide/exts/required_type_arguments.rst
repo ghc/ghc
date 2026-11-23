@@ -489,31 +489,18 @@ restrictions on where the data constructor may occur.  Examples:
       type T2 = Typed Symbol "hello"
       type T3 = Typed (Type -> Constraint) Num
 
-At the moment, all foralls in the type of a data constructor (including visible
-foralls) must occur before constraints or value arguments: ::
+Prefix GADT signatures can place a required forall among fields and
+contexts. The extension is required for every visible forall in a
+constructor signature, including an empty ``forall ->``. An empty group
+adds no type arguments. For example: ::
 
   data D x where
-    -- OK (one forall at the front of the type)
-    MkD1 :: forall a b ->
-            a ->
-            b ->
-            D (a, b)
+    MkD :: forall a -> a -> forall b -> b -> D (a, b)
 
-    -- OK (multpile foralls at the front of the type)
-    MkD2 :: forall a.
-            forall b ->
-            a ->
-            b ->
-            D (a, b)
-
-    -- Rejected (forall after a value argument)
-    MkD3 :: forall a ->
-            a ->
-            forall b ->
-            b ->
-            D (a, b)
-
-This restriction is intended to be lifted in the future (:ghc-ticket:`18389`).
+Supply the arguments in the written order, as in
+``MkD (type Int) 3 (type Bool) True``. A pattern also follows that order,
+for example ``MkD (type a) x (type b) y``. See :ref:`formal-gadt-syntax`
+for the prefix and record grammars.
 
 The use of visible forall instead of invisible forall has no effect on how data
 is represented on the heap.

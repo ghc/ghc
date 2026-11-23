@@ -2953,6 +2953,10 @@ field directly. Older readers can decode the telescope, but the wrapper
 they build can fail at a use with a kind coercion. Mark this form separately
 and preserve the exact encodings for ordinary and fixed-representation
 ordered newtypes. See Note [Desugaring unlifted newtypes] in GHC.Core.SimpleOpt.
+
+A type data constructor has no wrapper, but its promoted kind uses the
+source order. Store that order when it differs from the original format.
+Older readers reject the marker instead of loading a different kind.
 -}
 
 instance Binary IfaceConDecls where
@@ -3022,7 +3026,14 @@ instance Binary IfaceConDecls where
         has_leading_context con =
           legacyConOrder (ifConSourceOrder con) > 0 &&
           not (null (ifConCtxt con)) && not (has_trailing_context con)
-    put_ bh (IfDataTyCon True cs) = putByte bh 2 >> put_ bh cs
+    put_ bh (IfDataTyCon True cs)
+      | any has_type_data_order orders = do
+          requireIfaceEvidenceVersion bh OrderedTypeDataTelescopeEvidence
+          putByte bh 8
+          put_ bh cs
+          put_ bh orders
+      | otherwise = putByte bh 2 >> put_ bh cs
+      where orders = map ifConSourceOrder cs
     put_ bh (IfNewTyCon rep_poly c)
       | order@OrderedConArgs{} <- ifConSourceOrder c = do
           requireIfaceEvidenceVersion bh OrderedNewtypeTelescopeEvidence
@@ -3055,6 +3066,12 @@ instance Binary IfaceConDecls where
                   else fail "Invalid constructor order in interface"
             6 -> get_ordered_newtype False
             7 -> get_ordered_newtype True
+            8 -> do
+                cons <- get bh
+                orders <- get bh
+                if cons `equalLength` orders && any has_type_data_order orders
+                  then return (IfDataTyCon True (zipWith set_order cons orders))
+                  else fail "Invalid type data constructor order in interface"
             _ -> error "Binary(IfaceConDecls).get: Invalid IfaceConDecls"
       where
         get_ordered_newtype rep_poly = do
@@ -3066,6 +3083,10 @@ instance Binary IfaceConDecls where
         set_order con order = con { ifConSourceOrder = order }
         ordered OrderedConArgs{} = True
         ordered _ = False
+
+has_type_data_order :: ConSourceOrder -> Bool
+has_type_data_order (LegacyConOrder 0) = False
+has_type_data_order _                  = True
 
 instance Binary ConSourceOrder where
     put_ bh (LegacyConOrder n) = putByte bh 0 >> put_ bh n

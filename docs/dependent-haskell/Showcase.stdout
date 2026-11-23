@@ -14,6 +14,7 @@ supply a required type between constructor fields: ((79,True),(83,'r'))
 read the dictionary supplied after a constructor field and its required type: ((89,"Bool"),(97,"Char"))
 duplicate the unrestricted field of a quoted constructor: (17,17)
 recover consecutive GADT constraints: (False,"True")
+choose a type after a field in a type-only constructor: 47
 use two ordered dictionaries in a quoted constructor: (True,"True")
 form an associated family type from its class evidence: (Refl,Refl,True)
 form an expression annotation with the matched dictionary: True

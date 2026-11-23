@@ -370,7 +370,7 @@ evidenceSuffix requirements
     || needs SourceProofRuleBranchesEvidence || needs ScopedEnumCaseEvidence
     || needs ScopedConstructorCaseEvidence || needs ScopedCaseResultEvidence
     || needs OrderedNewtypeTelescopeEvidence || needs ScopedOrderedCaseEvidence
-    || needs OrderedRepPolyNewtypeEvidence = feature_set
+    || needs OrderedRepPolyNewtypeEvidence || needs OrderedTypeDataTelescopeEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -393,6 +393,7 @@ legacyEvidenceSuffix ScopedCaseResultEvidence = featureSetPrefix ++ "scoped-case
 legacyEvidenceSuffix OrderedNewtypeTelescopeEvidence = featureSetPrefix ++ "ordered-newtype-telescope"
 legacyEvidenceSuffix ScopedOrderedCaseEvidence = featureSetPrefix ++ "scoped-ordered-case-v1"
 legacyEvidenceSuffix OrderedRepPolyNewtypeEvidence = featureSetPrefix ++ "ordered-rep-poly-newtype"
+legacyEvidenceSuffix OrderedTypeDataTelescopeEvidence = featureSetPrefix ++ "ordered-type-data-telescope"
 legacyEvidenceSuffix PartialSynonymEvidence = featureSetPrefix ++ "partial-synonym-v2"
 legacyEvidenceSuffix ErasedUserRuleEvidence = featureSetPrefix ++ "user-rule"
 legacyEvidenceSuffix LexicalPackageRuleEvidence = featureSetPrefix ++ "lexical-rule"
@@ -505,7 +506,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("scoped-case-result-v1", ScopedCaseResultEvidence)
                       , ("ordered-newtype-telescope", OrderedNewtypeTelescopeEvidence)
                       , ("scoped-ordered-case-v1", ScopedOrderedCaseEvidence)
-                      , ("ordered-rep-poly-newtype", OrderedRepPolyNewtypeEvidence) ]
+                      , ("ordered-rep-poly-newtype", OrderedRepPolyNewtypeEvidence)
+                      , ("ordered-type-data-telescope", OrderedTypeDataTelescopeEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion

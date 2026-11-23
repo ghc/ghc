@@ -2176,10 +2176,11 @@ runRecompilationChecks libdir = do
     void $ producer (table "flipBit False = False")
     wrong <- try (void (consumer False))
     GHC.runGhc (Just libdir) $ checkSourceRejection "changed source equation" 83865 "False" wrong
-    -- An absent table permits implicit quantification over the same spelling.
+    -- Under legacy scoping, an absent table permits implicit quantification
+    -- over the name that the consumer imports.
     void $ producer (withFlipBit "flipBit b = b")
     writeFile consumerSource $ unlines
-        [ "{-# LANGUAGE ExperimentalDependentTypes #-}"
+        [ "{-# LANGUAGE ExperimentalDependentTypes, NoRequiredTypeArguments #-}"
         , "module NativeRetainedUsage where"
         , "import NativeRetainedLibrary (flipBit)"
         , "p :: flipBit () -> flipBit ()"
@@ -4172,7 +4173,6 @@ runPackageSourceRejectChecks = do
         , ("PiOperandLinearOuterIndexCaptureRejected", 83605, "already-bound unrestricted local value", ["TypeFamilies", "FlexibleContexts", "LinearTypes"], [], ["consumeNat :: Nat %1 -> Int", "consumeNat Z = 42", "consumeNat (S rest) = consumeNat rest", "bad :: Nat %1 -> Int", "bad k = let { keep :: forall value. value ~ (foreach (n :: Nat) -> (Vec Int k, Vec Bool n)) => value -> value; keep f = f } in consumeNat k"])
         , ("PiOperandUnsupportedPiDomainRejected", 83605, "A retained value argument requires a lifted type parameter or a supported algebraic type.", ["TypeFamilies", "FlexibleContexts"], [], ["newtype Wrapped = Wrapped Int", "bad :: forall value. value ~ (foreach (n :: Wrapped) -> Int) => value -> Int -> Int", "bad f = f"])
         , ("PiOperandPartialPiOperandRejected", 83605, "complete type signature", ["TypeFamilies", "FlexibleContexts", "PartialTypeSignatures"], [], ["bad :: forall value. value ~ (foreach (n :: Nat) -> Vec _ n) => value -> (foreach (n :: Nat) -> Vec Int n)", "bad f = f"])
-        , ("PiOperandQuotedPiOperandCaptureRejected", 83605, "Template Haskell", ["TypeFamilies", "FlexibleContexts", "TemplateHaskell"], ["import Language.Haskell.TH (Q, Exp)"], ["bad :: Nat -> Q Exp", "bad k = [| let { keep :: forall value. value ~ (foreach (n :: Nat) -> (Vec Int k, Vec Bool n)) => value -> value; keep f = f } in (42 :: Int) |]"])
         , ("PiOperandEqualityOperandKindMismatch", 83865, "Expected kind", ["TypeFamilies", "FlexibleContexts"], [], ["bad :: forall (value :: Nat). value ~ (foreach (n :: Nat) -> Vec Int n) => Int", "bad = 42"])
         , ("PiOperandErasedForallArgumentUnchanged", 91510, "Illegal polymorphic type", ["TypeFamilies", "FlexibleContexts", "TypeApplications"], [], ["bad :: Maybe (forall a. a -> a) -> Int", "bad _ = 42"])
         , ("PiOperandPiKindUnchanged", 43582, "not supported in this type position", ["TypeFamilies", "FlexibleContexts", "TypeApplications"], ["import Data.Proxy (Proxy(..))"], ["bad :: forall (a :: foreach (n :: Nat) -> Vec Int n). Proxy a", "bad = Proxy"])
@@ -4187,23 +4187,14 @@ runPackageSourceRejectChecks = do
         , ("PiVTALexicalShadowRejectsOuter", 83865, "Couldn't match", ["TypeApplications"], [], localActions ++ ["bad :: Nat -> Nat -> Int", "bad k input = let { outer :: Vec Int k; outer = localVector k; apply :: Nat -> Int; apply k = length (toListLocal (id @(Vec Int k) outer)) } in apply input"])
         , ("PiVTASplicedWildcardCannotCaptureIndex", 83605, "must be complete", ["TypeApplications", "TemplateHaskell"], ["import Language.Haskell.TH (Type(WildCardT))"], localActions ++ ["bad :: Nat -> Int", "bad k = length (toListLocal (id @(Vec $(pure WildCardT) k) (localVector k)))"])
         , ("PiVTAWrongRuntimeIndexKind", 83865, "Expected kind", ["TypeApplications"], [], localActions ++ ["bad :: Int -> Int", "bad k = length (toListLocal (id @(Vec Int k) VNil))"])
-        , ("PiVTAGlobalTermIsNotCaptured", 76037, "globalIndex", ["TypeApplications"], [], localActions ++ ["globalIndex :: Nat", "globalIndex = Z", "bad :: Int", "bad = length (toListLocal (id @(Vec Int globalIndex) VNil))"])
         , ("PiVTAUnavailableTermIsNotCaptured", 76037, "unavailableIndex", ["TypeApplications"], [], localActions ++ ["bad :: Int", "bad = length (toListLocal (id @(Vec Int unavailableIndex) VNil))"])
         , ("PiVTAPartialNativeTypeArgument", 83605, "must be complete", ["TypeApplications"], [], localActions ++ ["bad :: Nat -> Int", "bad k = length (toListLocal (id @(Vec _ k) (localVector k)))"])
-        , ("PiVTANamedWildcardIsNotCaptured", 83865, "Couldn't match", ["TypeApplications", "NamedWildCards"], [], localActions ++ ["bad :: Nat -> Int", "bad _k = length (toListLocal (id @(Vec Int _k) (localVector _k)))"])
-        , ("PiVTAQuotationRuntimeCapture", 83605, "Template Haskell", ["TypeApplications", "TemplateHaskell"], ["import Language.Haskell.TH (Q, Exp)"], ["bad :: Nat -> Q Exp", "bad k = [| id @(Vec Int k) undefined |]"])
         , ("PiVTALinearRuntimeIndexRejected", 83605, "visible type argument", ["TypeApplications", "LinearTypes"], [], localActions ++ ["bad :: Nat %1 -> Int", "bad k = length (toListLocal (id @(Vec Int k) (localVector k)))"])
         , ("LocalSignatureWrongIndex", 83865, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> Nat -> PackedVec Int", "bad n m = let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
         , ("LocalSignatureAliasDistinctIndex", 5617, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> Nat -> PackedVec Int", "bad n other = let m = other in let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
         , ("LocalSignatureSameGroup", 83605, "already-bound unrestricted local value", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad outer = let { n :: Nat; n = outer; xs :: Vec Int n; xs = localVector n } in PackVec n xs"])
-        , ("LocalSignatureGlobalIndex", 25897, "localVector globalIndex", [], [], localSignatures ++ ["globalIndex :: Nat", "globalIndex = Z", "bad :: PackedVec Int", "bad = let { xs :: Vec Int globalIndex; xs = localVector globalIndex } in PackVec globalIndex xs"])
         , ("LocalSignatureWrongIndexKind", 83865, "Expected kind", [], [], localSignatures ++ ["bad :: Int -> PackedVec Int", "bad n = let { xs :: Vec Int n; xs = VNil } in PackVec Z xs"])
         , ("LocalSignatureLinearIndex", 83605, "already-bound unrestricted local value", ["LinearTypes"], [], localSignatures ++ ["bad :: Nat %1 -> PackedVec Int", "bad n = let { xs :: Vec Int n; xs = localVector n } in PackVec n xs"])
-        , ("LocalSignatureAnonymousPartial", 83605, "complete type signature", ["PartialTypeSignatures"], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad n = let { xs :: Vec _ n; xs = localVector n } in PackVec n xs"])
-        , ("LocalSignatureUnderscoreNamedHole", 83865, "localVector _n", ["NamedWildCards", "PartialTypeSignatures"], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad _n = let { xs :: Vec Int _n; xs = localVector _n } in PackVec _n xs"])
-        , ("LocalSignatureNamedPartial", 83605, "complete type signature", ["PartialTypeSignatures", "NamedWildCards"], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad n = let { xs :: Vec _element n; xs = localVector n } in PackVec n xs"])
-        , ("LocalSignatureTypedQuotation", 83605, "Template Haskell", ["TemplateHaskellQuotes"], ["import Language.Haskell.TH.Syntax (Code, Q)"], localSignatures ++ ["bad :: Nat -> Code Q (PackedVec Int)", "bad n = [|| let { xs :: Vec Int n; xs = localVector n } in PackVec n xs ||]"])
-        , ("LocalSignatureUntypedQuotation", 83605, "Template Haskell", ["TemplateHaskellQuotes"], ["import Language.Haskell.TH.Syntax (Exp, Q)"], localSignatures ++ ["bad :: Nat -> Q Exp", "bad n = [| let { xs :: Vec Int n; xs = localVector n } in PackVec n xs |]"])
         , ("MatrixFallbackPayloadMismatch", 83865, "xs", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> PackedVec Int", "bad Z Z xs ys = PackVec Z xs", "bad (S left) (S right) xs ys = PackVec (S left) xs", "bad first second xs ys = PackVec second xs"])
         , ("QualifiedPiMissingProof", 91028, "Cannot equate type variable", qualifiedPiExtensions, [], ["withoutQualifiedProof :: forall value. value -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "withoutQualifiedProof f = f"])
         , ("QualifiedPiRecursiveAssumption", 91028, "Cannot equate type variable", qualifiedPiExtensions, [], ["type family Cycle value (index :: Nat)", "wrongQualifiedCycle :: forall value. foreach (k :: Nat) -> value ~ (foreach (n :: Nat) -> Eq Int => Vec (Cycle value k) n) => value -> (foreach (n :: Nat) -> Eq Int => Vec Bool n)", "wrongQualifiedCycle k f = f"])
@@ -4235,22 +4226,24 @@ runPackageSourceRejectChecks = do
         ]
         $ \(name, code, fragment, extensions, imports, declarations) -> do
             let moduleName = "NativeSourcePackage" ++ name
-                source =
-                    unlines $
-                        [ "{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitForAll #-}"
-                        , "{-# LANGUAGE GADTs, KindSignatures, RankNTypes, ScopedTypeVariables #-}"
-                        , "{-# LANGUAGE TypeApplications, TypeOperators #-}"
-                        ]
-                            ++ map (\extension -> "{-# LANGUAGE " ++ extension ++ " #-}") extensions
-                            ++ ["module " ++ moduleName ++ " where"]
-                            ++ imports
-                            ++ [ "data Nat = Z | S Nat"
-                               , "data Vec a (n :: Nat) where"
-                               , "  VNil :: Vec a Z"
-                               , "  VCons :: a -> Vec a n -> Vec a (S n)"
-                               ]
-                            ++ declarations
-            sourceModuleRejects name code fragment moduleName source
+            sourceModuleRejects name code fragment moduleName
+                (packageModule moduleName extensions imports declarations)
+    -- RequiredTypeArguments resolves term names before implicit quantification.
+    -- Check the same source with both scoping rules.
+    forM_ flagSensitiveCases $ \(name, legacy, implied, extensions, imports, declarations) -> do
+        let check suffix flags diagnostic = do
+                let moduleName = "NativeSourcePackage" ++ name ++ suffix
+                    source = packageModule moduleName (extensions ++ flags) imports declarations
+                case diagnostic of
+                    Just (code, fragment) -> sourceModuleRejects name code fragment moduleName source
+                    Nothing -> do
+                        targets <- GHC.getTargets
+                        parsed <- parseSourceTarget moduleName source
+                        checked <- GHC.typecheckModule GHC.StartAndKeepRunningTcMPlugins parsed
+                        void (GHC.desugarModule checked)
+                        GHC.setTargets targets
+        check "Override" ["NoRequiredTypeArguments"] (Just legacy)
+        check "Implied" [] implied
     -- Check accepted source forms and immutable proof transport without adding output.
     forM_
         [ ("ConstructorEqualityContext", [], equalityImports, equalityPackage ++
@@ -4539,6 +4532,33 @@ runPackageSourceRejectChecks = do
         , ("KnownArgumentAppliedHeadBoundary", Just (83605, "Quick Look inference"), ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: QPi -> QPi", "via f = (id withQ) Refl f"])
         , ("KnownArgumentCacheOwnershipFailure", Just (83865, "Couldn't match type"), ["ImpredicativeTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["bad :: QPi -> (foreach (n :: Nat) -> Eq Int => Vec Bool n) -> QPi", "bad f wrong = bothQ Refl (prefixProbe f ()) wrong"])
         , ("KnownArgumentLinearDeclaredTwice", Just (18872, "multiplicity"), ["ImpredicativeTypes", "LinearTypes"], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["data LinearBox value where", "  LinearBox :: value %1 -> LinearBox value", "linearHold :: forall value. value %1 -> LinearBox value", "linearHold value = LinearBox value", "bad :: QPi %1 -> (QPi,QPi)", "bad f = (case linearHold f of LinearBox g -> g, f)"])
+        ]
+    packageModule moduleName extensions imports declarations =
+        unlines $
+            [ "{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitForAll #-}"
+            , "{-# LANGUAGE GADTs, KindSignatures, RankNTypes, ScopedTypeVariables #-}"
+            , "{-# LANGUAGE TypeApplications, TypeOperators #-}"
+            ]
+                ++ map (\extension -> "{-# LANGUAGE " ++ extension ++ " #-}") extensions
+                ++ ["module " ++ moduleName ++ " where"]
+                ++ imports
+                ++ [ "data Nat = Z | S Nat"
+                   , "data Vec a (n :: Nat) where"
+                   , "  VNil :: Vec a Z"
+                   , "  VCons :: a -> Vec a n -> Vec a (S n)"
+                   ]
+                ++ declarations
+    flagSensitiveCases =
+        [ ("PiOperandQuotedPiOperandCaptureRejected", (83605, "Template Haskell"), Just (28914, "bound at level 0"), ["TypeFamilies", "FlexibleContexts", "TemplateHaskell"], ["import Language.Haskell.TH (Q, Exp)"], ["bad :: Nat -> Q Exp", "bad k = [| let { keep :: forall value. value ~ (foreach (n :: Nat) -> (Vec Int k, Vec Bool n)) => value -> value; keep f = f } in (42 :: Int) |]"])
+        , ("PiVTAGlobalTermIsNotCaptured", (76037, "globalIndex"), Just (68947, "globalIndex"), ["TypeApplications"], [], localActions ++ ["globalIndex :: Nat", "globalIndex = Z", "bad :: Int", "bad = length (toListLocal (id @(Vec Int globalIndex) VNil))"])
+        , ("PiVTANamedWildcardIsNotCaptured", (83865, "Couldn't match"), Nothing, ["TypeApplications", "NamedWildCards"], [], localActions ++ ["bad :: Nat -> Int", "bad _k = length (toListLocal (id @(Vec Int _k) (localVector _k)))"])
+        , ("PiVTAQuotationRuntimeCapture", (83605, "Template Haskell"), Just (28914, "bound at level 0"), ["TypeApplications", "TemplateHaskell"], ["import Language.Haskell.TH (Q, Exp)"], ["bad :: Nat -> Q Exp", "bad k = [| id @(Vec Int k) undefined |]"])
+        , ("LocalSignatureGlobalIndex", (25897, "localVector globalIndex"), Just (68947, "globalIndex"), [], [], localSignatures ++ ["globalIndex :: Nat", "globalIndex = Z", "bad :: PackedVec Int", "bad = let { xs :: Vec Int globalIndex; xs = localVector globalIndex } in PackVec globalIndex xs"])
+        , ("LocalSignatureAnonymousPartial", (83605, "complete type signature"), Just (45510, "term variables cannot be promoted"), ["PartialTypeSignatures"], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad n = let { xs :: Vec _ n; xs = localVector n } in PackVec n xs"])
+        , ("LocalSignatureUnderscoreNamedHole", (83865, "localVector _n"), Nothing, ["NamedWildCards", "PartialTypeSignatures"], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad _n = let { xs :: Vec Int _n; xs = localVector _n } in PackVec _n xs"])
+        , ("LocalSignatureNamedPartial", (83605, "complete type signature"), Just (45510, "term variables cannot be promoted"), ["PartialTypeSignatures", "NamedWildCards"], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad n = let { xs :: Vec _element n; xs = localVector n } in PackVec n xs"])
+        , ("LocalSignatureTypedQuotation", (83605, "Template Haskell"), Just (28914, "bound at level 0"), ["TemplateHaskellQuotes"], ["import Language.Haskell.TH.Syntax (Code, Q)"], localSignatures ++ ["bad :: Nat -> Code Q (PackedVec Int)", "bad n = [|| let { xs :: Vec Int n; xs = localVector n } in PackVec n xs ||]"])
+        , ("LocalSignatureUntypedQuotation", (83605, "Template Haskell"), Just (28914, "bound at level 0"), ["TemplateHaskellQuotes"], ["import Language.Haskell.TH.Syntax (Exp, Q)"], localSignatures ++ ["bad :: Nat -> Q Exp", "bad n = [| let { xs :: Vec Int n; xs = localVector n } in PackVec n xs |]"])
         ]
     qualifiedPiExtensions = ["TypeFamilies", "FlexibleContexts", "ConstraintKinds", "AllowAmbiguousTypes", "ImpredicativeTypes"]
     declaration signature = ["data PackedVec a where", "  PackVec :: " ++ signature]

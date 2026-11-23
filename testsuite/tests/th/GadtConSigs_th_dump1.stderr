@@ -1,13 +1,25 @@
-GadtConSigs_th_dump1.hs:(10,2)-(15,7): Splicing declarations
+GadtConSigs_th_dump1.hs:(7,2)-(12,7): Splicing declarations
     [d| data G a
           where
             G1 :: forall a b. (a, b) -> G a
             G2 :: forall a. forall b. (a, b) -> G a
-            G3 :: forall a {b}. forall c d. forall e {f} g.
-                  G (a, b, c, d, e, f, g) |]
+            G3 :: forall a {b}.
+                  forall c d. forall e {f} g. G (a, b, c, d, e, f, g)
+            G4 :: forall a -> G a |]
   ======>
     data G a
       where
-        G1 :: forall a b. (a, b) -> G a
-        G2 :: forall a b. (a, b) -> G a
-        G3 :: forall a {b} c d e {f} g. G (a, b, c, d, e, f, g)
+        G1 :: forall a b. @'GHC.Internal.Types.Unmatchable (a, b) -> G a
+        G2 :: forall a. @'GHC.Internal.Types.Unmatchable
+              forall b. @'GHC.Internal.Types.Unmatchable (a, b) -> G a
+        G3 :: forall a {b}. @'GHC.Internal.Types.Unmatchable
+              forall c d. @'GHC.Internal.Types.Unmatchable forall e
+                                                                  {f}
+                                                                  g. @'GHC.Internal.Types.Unmatchable G (a,
+                                                                                                         b,
+                                                                                                         c,
+                                                                                                         d,
+                                                                                                         e,
+                                                                                                         f,
+                                                                                                         g)
+        G4 :: forall a -> @'GHC.Internal.Types.Unmatchable G a

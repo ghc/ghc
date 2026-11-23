@@ -6,4 +6,4 @@ T16326_Fail2.hs:6:37: error: [GHC-51580]
       When checking declaration:
         foreign import ccall safe "blah" blah :: forall a -> a -> IO ()
     Suggested fix:
-      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension (implied by ‘ExperimentalDependentTypes’)

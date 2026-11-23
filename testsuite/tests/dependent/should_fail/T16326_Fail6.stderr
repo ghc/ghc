@@ -4,5 +4,5 @@ T16326_Fail6.hs:9:3: error: [GHC-51580]
     • In the definition of data constructor ‘MkFoo’
       In the data type declaration for ‘Foo’
     Suggested fix:
-      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension (implied by ‘ExperimentalDependentTypes’)
 

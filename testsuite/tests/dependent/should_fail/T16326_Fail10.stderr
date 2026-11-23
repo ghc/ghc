@@ -5,4 +5,4 @@ T16326_Fail10.hs:12:18: error: [GHC-51580]
     • In the type signature for ‘x’: forall a -> a -> a
       When checking the rewrite rule "flurmp"
     Suggested fix:
-      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension (implied by ‘ExperimentalDependentTypes’)
