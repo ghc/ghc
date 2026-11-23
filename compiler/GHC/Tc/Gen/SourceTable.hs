@@ -68,7 +68,7 @@ import GHC.Tc.Errors.Types (RetainedQuantificationError(..), TcRnMessage(..))
 import GHC.Tc.Instance.Family (tcGetFamInstEnvs)
 import GHC.Tc.TyCl.Build (newImplicitBinder)
 import GHC.Tc.Types.ErrCtxt (HsCtxt(ExprCtxt))
-import GHC.Tc.Types.Evidence (HsWrapper(..), TcEvBinds(..), EvBindsState(..), isEmptyEvBindsMap)
+import GHC.Tc.Types.Evidence (HsWrapper(..), TcEvBinds(..), EvBindsState(..), collectHsWrapBinders, isEmptyEvBindsMap)
 import GHC.Tc.Types (TcGblEnv(..), SourceRuleUses(..), tcVisibleOrphanMods)
 import GHC.Tc.Utils.Instantiate (freshenTyVarBndrs)
 import GHC.Tc.Utils.Env (tcLookupGlobal, tcLookupId, tcLookupIdMaybe, tcGetInstEnvs)
@@ -1867,12 +1867,19 @@ Each branch keeps the source span of its equation.
 
 For sourceLength :: forall a. [a] -> Nat, tcPolyCheck binds the body
 skolem in a WpTyLam on the FunBind. The variable in the public type
-can have a different Unique. Check the public list type with its own
-binder. Check the constructor instantiations and the recursive type argument
-with the body skolem. An inferred application carries a WpTyApp. A written
-application carries the checked type in HsAppType. Give the family and each
-branch fresh Core binders for the element type. In the branch LHS and the
-recursive application, this element type precedes the list argument.
+can have a different Unique. Check the public input with its own
+binders. Substitute the body skolems into the input's type arguments
+before checking the constructor pattern. Check the recursive type
+arguments in forall order. An inferred application carries a WpTyApp.
+A written application carries the checked type in HsAppType.
+
+For nodes :: forall v k. Tree k v -> Size, the family quantifies v
+before k. The constructor pattern still takes k before v. Give the
+family and each branch fresh type variables in forall order. Use the
+datatype's argument order to instantiate its fields. Every recursive
+call keeps both type arguments and uses a field with the complete
+original input type. The same checks apply inside a call to a certified
+helper such as plus.
 
 A declaration splice can introduce a type that uses a function from an
 earlier group. At this boundary, simplifyTop has solved the constraints
@@ -2019,11 +2026,11 @@ sourceTableTyCons local binds = do
         guard (result `eqType` tyConResKind fam)
         pure (fam, args, result)
 
-    certify strict checked (fun, order, body_tv, evidence, rows) = do
+    certify strict checked (fun, order, body_tvs, evidence, rows) = do
       clean <- allM emptyEvidence evidence
       if clean then do
         ty <- liftZonkM (zonkTcType (varType fun))
-        case checkedDomains strict order body_tv ty rows of
+        case checkedDomains strict order body_tvs ty rows of
           Nothing -> pure Nothing
           Just (input, carried, result) -> do
             branches <- traverse (sourceBranch (lookupCall checked) order input carried result) rows
@@ -3999,7 +4006,7 @@ directListReverseWorker owner rhs = do
 -- See Note [Checked list reverse].
 localListReverseTable :: LHsBind GhcTc -> MaybeT TcM (Id, TyCon)
 localListReverseTable bind = do
-  (fun, _, Just _, evidence, matches) <- MaybeT (pure (sourceMatches (unLoc bind)))
+  (fun, _, [_], evidence, matches) <- MaybeT (pure (sourceMatches (unLoc bind)))
   guard (lengthIs matches 2)
   guard =<< lift (allM emptyEvidence evidence)
   ty <- lift (liftZonkM (zonkTcType (varType fun)))
@@ -5688,17 +5695,18 @@ sourceCalls (Construct _ args) = concatMap sourceCalls args
 sourceCalls (Recur _ _) = []
 sourceCalls (Call fun args) = fun : concatMap sourceCalls args
 
--- | The input type of a closed table, or the body skolem of a polymorphic list table.
-data SourceInput = ClosedInput Type [Type] | PolyList TyVar
+-- | A closed input, or a datatype applied to its lifted body skolems.
+-- See Note [Closed source tables].
+data SourceInput = ClosedInput Type [Type] | PolyInput TyCon [TyVar] [Type]
 
 -- | Collect the constructors and evidence for a candidate source function.
-sourceRows :: HsBind GhcTc -> Maybe (Id, LeftOrRight, Maybe TyVar, [TcEvBinds], [SourceRow])
+sourceRows :: HsBind GhcTc -> Maybe (Id, LeftOrRight, [TyVar], [TcEvBinds], [SourceRow])
 sourceRows binding = do
-    (fun, mono, body_tv, evidence, matches) <- sourceMatches binding
+    (fun, mono, body_tvs, evidence, matches) <- sourceMatches binding
     let self v = v == fun || v == mono
         read_rows order = (order,) . unzip <$> traverse (sourceRow order self) matches
     (order, (row_evidence, rows)) <- read_rows CLeft <|> read_rows CRight
-    pure (fun, order, body_tv, evidence ++ row_evidence, rows)
+    pure (fun, order, body_tvs, evidence ++ row_evidence, rows)
 
 -- | Put the scrutinized operand first for checking, or restore source order.
 -- The right-operand path checks only binary source functions.
@@ -5708,30 +5716,29 @@ sourceOperandOrder _ operands = operands
 
 -- | Read the original function clauses with the solver evidence in scope.
 sourceMatches :: HsBind GhcTc
-              -> Maybe (Id, Id, Maybe TyVar, [TcEvBinds], [LMatch GhcTc (LHsExpr GhcTc)])
+              -> Maybe (Id, Id, [TyVar], [TcEvBinds], [LMatch GhcTc (LHsExpr GhcTc)])
 sourceMatches binding = do
-    (fun, mono, body_tv, MG { mg_ext = MatchGroupTc { mg_origin = FromSource },
+    (fun, mono, body_tvs, MG { mg_ext = MatchGroupTc { mg_origin = FromSource },
                mg_alts = L _ matches }, evidence) <- case binding of
       XHsBindsLR (AbsBinds { abs_tvs = [], abs_ev_vars = [], abs_ev_binds = evs
                           , abs_exports = [ABE { abe_poly = fun, abe_mono = mono
                                               , abe_wrap = WpHole }]
                           , abs_binds = [L _ body], abs_sig = has_sig }) -> do
-        (bound, body_tv, matches) <- funBind body
+        (bound, body_tvs, matches) <- funBind body
         guard (bound == mono)
-        guard (isNothing body_tv || has_sig)
-        pure (fun, mono, body_tv, matches, evs)
+        guard (null body_tvs || has_sig)
+        pure (fun, mono, body_tvs, matches, evs)
       _ -> do
-        (fun, Nothing, matches) <- funBind binding
-        pure (fun, fun, Nothing, matches, [])
+        (fun, [], matches) <- funBind binding
+        pure (fun, fun, [], matches, [])
     guard (isExternalName (varName fun))
-    pure (fun, mono, body_tv, evidence, matches)
+    pure (fun, mono, body_tvs, evidence, matches)
   where
-    funBind :: HsBind GhcTc -> Maybe (Id, Maybe TyVar, MatchGroup GhcTc (LHsExpr GhcTc))
+    funBind :: HsBind GhcTc -> Maybe (Id, [TyVar], MatchGroup GhcTc (LHsExpr GhcTc))
     funBind (FunBind { fun_ext = (wrap, []), fun_id = L _ f, fun_matches = mg })
-      = case wrap of
-          WpHole -> Just (f, Nothing, mg)
-          WpTyLam tv | isTyVar tv, tcIsLiftedTypeKind (tyVarKind tv) -> Just (f, Just tv, mg)
-          _ -> Nothing
+      | (tvs, WpHole) <- collectHsWrapBinders wrap
+      , all (\tv -> isTyVar tv && tcIsLiftedTypeKind (tyVarKind tv)) tvs
+      = Just (f, tvs, mg)
     funBind _ = Nothing
 
 -- | Derive local structural equations before checking a dependent signature.
@@ -5747,7 +5754,7 @@ localStructuralTable binding = do
 checkedStructuralSource :: LeftOrRight -> HsBind GhcTc
                         -> MaybeT TcM (Id, ConstructorCaseType, [ConstructorCaseRow])
 checkedStructuralSource order binding = do
-    (fun, mono, Nothing, evidence, matches) <- MaybeT (pure (sourceMatches binding))
+    (fun, mono, [], evidence, matches) <- MaybeT (pure (sourceMatches binding))
     guard (lengthIs matches 3)
     guard =<< lift (allM emptyEvidence evidence)
     ty <- lift (liftZonkM (zonkTcType (varType fun)))
@@ -5869,15 +5876,12 @@ the definition for a local proof.
 -}
 
 -- | Check that the rows cover the domain of the solved function type.
-checkedDomains :: Bool -> LeftOrRight -> Maybe TyVar -> Type -> [SourceRow]
+checkedDomains :: Bool -> LeftOrRight -> [TyVar] -> Type -> [SourceRow]
                -> Maybe (SourceInput, [Type], Type)
-checkedDomains strict order body_tv ty rows = do
-    (element, tau) <- case body_tv of
-      Nothing -> pure (Nothing, ty)
-      Just sk -> do
-        (ma, Bndr tv (Invisible SpecifiedSpec), tau) <- splitForAllForAllTyBinder_maybe ty
-        guard (ma `eqType` unmatchableDataConTy && isTyVar tv && tcIsLiftedTypeKind (tyVarKind tv))
-        pure (Just (tv, sk), tau)
+checkedDomains strict order body_tvs ty rows = do
+    let (telescope, tau) = splitForAllForAllTyBinders ty
+    guard (equalLength telescope body_tvs)
+    tvs <- traverse ordinary_binder telescope
     (FTF_T_T, ma, mult, first_ty, rest_ty) <- splitFunTy_maybe tau
     guard (ma `eqType` unmatchableDataConTy && isManyTy mult)
     (arg_ty, carried, final_ty) <- case order of
@@ -5885,27 +5889,44 @@ checkedDomains strict order body_tv ty rows = do
         (carried, result) <- ordinaryArrows rest_ty
         pure (first_ty, carried, result)
       CRight -> do
-        guard (isNothing element)
+        guard (null tvs)
         _ <- ordinaryDataType first_ty
         (second_ty, result) <- caseArrow rest_ty
         pure (second_ty, [first_ty], result)
-    (domain, input) <- case element of
-      Nothing -> do
+    (domain, input) <- case tvs of
+      [] -> do
         (tc, params) <- ordinaryDataType arg_ty
         pure (tc, ClosedInput arg_ty params)
-      Just (tv, sk) -> do
-        guard (arg_ty `eqType` mkListTy (mkTyVarTy tv))
-        pure (listTyCon, PolyList sk)
+      _ -> do
+        (tc, args) <- caseDatatype arg_ty
+        params <- traverse getTyVar_maybe args
+        guard (equalLength params tvs && mkUniqSet params == mkUniqSet tvs)
+        unless (tc == listTyCon) $ do
+          guard (not strict && not (isGadtSyntaxTyCon tc) && null (tyConStupidTheta tc))
+          let ordinary con = do
+                guard (isVanillaDataCon con && dataConUserTyVars con == dataConUnivTyVars con)
+                fields <- openDataConFieldTypes con args
+                guard (all (caseKind args) fields)
+          mapM_ ordinary (tyConDataCons tc)
+        let params_in_body = map (substTyWith tvs (mkTyVarTys body_tvs)) args
+        pure (tc, PolyInput tc body_tvs params_in_body)
     -- See Note [Carried arguments of a source equation].
-    guard (null carried || (isNothing element && not strict))
+    guard (null carried || (null tvs && not strict))
     (result, result_params) <- ordinaryDataType final_ty
     guard (null result_params ||
-           (result == listTyCon && null carried && isNothing element &&
+           (result == listTyCon && null carried && null tvs &&
             eqTypes result_params [arg_ty] && isStructuralSize domain arg_ty))
     let expected = tyConDataCons domain
         actual   = [con | SourceRow _ con _ _ _ _ <- rows]
     guard (length actual == length expected && mkUniqSet actual == mkUniqSet expected)
     pure (input, carried, mkTyConApp result result_params)
+
+  where
+    ordinary_binder (ma, Bndr tv (Invisible SpecifiedSpec))
+      | ma `eqType` unmatchableDataConTy
+      , isTyVar tv, tcIsLiftedTypeKind (tyVarKind tv)
+      = Just tv
+    ordinary_binder _ = Nothing
 
 {- Note [Ordinary constructors in GADT syntax]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -5989,12 +6010,22 @@ sourceRhs order self carried = go []
       | dc == nilDataCon || dc == consDataCon = go args con
     go args (XExpr (ConLikeTc (RealDataCon con))) = Construct con <$> traverse (go []) args
     go [] (HsVar _ (L _ v)) = Just (Field v)
-    go args (HsVar _ (L _ f)) | self f = call [] args
+    go args expr | Just tys <- selfTypeArgs expr = call tys args
     go args (HsVar _ (L _ f)) | isExternalName (idName f) = Call f <$> traverse (go []) args
-    go args (XExpr (WrapExpr (WpTyApp ty) (HsVar _ (L _ f)))) | self f = call [ty] args
-    go args (HsAppType ty fun _)
-      | HsVar _ (L _ f) <- unLoc (stripParensLHsExpr fun), self f = call [ty] args
     go _ _ = Nothing
+
+    selfTypeArgs :: HsExpr GhcTc -> Maybe [Type]
+    selfTypeArgs (HsPar _ e) = selfTypeArgs (unLoc e)
+    selfTypeArgs (HsVar _ (L _ f)) | self f = Just []
+    selfTypeArgs (HsAppType ty fun _) = (++ [ty]) <$> selfTypeArgs (unLoc fun)
+    selfTypeArgs (XExpr (WrapExpr wrap fun)) = (++) <$> selfTypeArgs fun <*> typeApps wrap
+    selfTypeArgs _ = Nothing
+
+    typeApps :: HsWrapper -> Maybe [Type]
+    typeApps WpHole = Just []
+    typeApps (WpTyApp ty) = Just [ty]
+    typeApps (WpCompose outer inner) = (++) <$> typeApps inner <*> typeApps outer
+    typeApps _ = Nothing
 
     call tys args = do
       arg : rest <- pure (sourceOperandOrder order args)
@@ -6012,11 +6043,12 @@ emptyEvidence (TcEvBinds var) = isEmptyEvBindsMap <$> getTcEvBindsMap var
 -- | Instantiate the input with fresh Core binders for one family header or equation.
 freshInput :: SourceInput -> TcM ([TyVar], Type, [Type])
 freshInput (ClosedInput domain params) = pure ([], domain, params)
-freshInput (PolyList sk) = do
-    name <- newSysName (nameOccName (varName sk))
-    let a = mkTyVar name liftedTypeKind
-        ty = mkTyVarTy a
-    pure ([a], mkListTy ty, [ty])
+freshInput (PolyInput root skolems args) = do
+    vars <- forM skolems $ \sk -> do
+      name <- newSysName (nameOccName (varName sk))
+      pure (mkTyVar name liftedTypeKind)
+    let params = map (substTyWith skolems (mkTyVarTys vars)) args
+    pure (vars, mkTyConApp root params, params)
 
 -- | Check a branch before supplying the family at its recursive calls.
 sourceBranch :: (Id -> TcM (Maybe (TyCon, [Type], Type)))
@@ -6047,7 +6079,7 @@ sourceBranch lookup_call order input carried_types result (SourceRow loc con pat
   where
     (call_args, pattern_args) = case input of
       ClosedInput _ params -> ([], params)
-      PolyList sk -> ([mkTyVarTy sk], [mkTyVarTy sk])
+      PolyInput _ skolems params -> (mkTyVarTys skolems, params)
 
     checkCalls (Field _) = pure True
     checkCalls (Construct _ args) = allM checkCalls args
