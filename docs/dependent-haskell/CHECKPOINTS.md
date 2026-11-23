@@ -6,6 +6,40 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## A vector projection indexed by an ordinary length function
+
+The R04/R21 candidate `3d95b04b27` checks the following two definitions
+in the same module. The package datatype comes from another module.
+
+```haskell
+localLength :: CharVector -> Nat
+localLength (CharVector n _) = n
+
+localCells :: foreach (r :: CharVector) -> Vec Char (localLength r)
+localCells (CharVector _ xs) = xs
+```
+
+In the Showcase, reading the length leaves the vector unevaluated.
+Reading the vector from a package with two undefined fields reports
+the error in the vector field. The combined observation is
+`(1,"r",True)`. The test also checks the length of a known package
+with `Refl`. Job 1752 checked that the 571 reader could use the new
+equation from the stripped interface. It rejected a result at the
+successor index with GHC-05617.
+[Definitions](examples/packed-vector/RetainedCharLocal.hs),
+[ordinary consumer](examples/packed-vector/RetainedCharClient.hs)
+and [declaration order](roadmap/R21-dependency-analysis.md#stage-a-retained-witness-projection).
+
+An ordinary client compares two runtime lengths with `sameNat`.
+In the branch that matches `Just Refl`, it can substitute one package's
+vector for the other's. Job 1763 compiled this client against the
+component under test with the provider source hidden and interface
+pragmas omitted. Native runs at `-O0` and `-O2` returned `Just "b"`
+for equal lengths and `Nothing` for unequal lengths with undefined
+payloads. GHC-83865 points to `localCells source` when the client
+omits the equality check.
+[Client and expected diagnostic](roadmap/R04-dependent-sums.md#replace-a-vector-after-checking-its-runtime-length).
+
 ## Local row callbacks and composed dependent pair payloads
 
 The Showcase uses a local lambda to map error handling over a row.

@@ -141,13 +141,21 @@ that changes the returned length also prevents its use.
   mismatched index and the two independent field-demand examples.
 - [x] Use the ordinary imported first projection in the result signature.
 
-The same projection works for a package with no type parameters.
-The ordinary length worker exports an equation for the direct first
-field. An interface-only module can use that equation to check the
-vector's result type. The qualified reader accepts the valid signature
-and rejects a result at the successor index. Reading the stored length
-leaves the payload unevaluated. Demanding the vector can encounter an
-exception in that field while the witness remains unevaluated.
+A package can also have no type parameters. Each value stores its own
+length. The constructor takes a runtime `n` and a vector of that length.
+
+```haskell
+data CharVector where
+    CharVector :: foreach (n :: Nat) -> Vec Char n -> CharVector
+
+sample :: CharVector
+sample = CharVector (S Z) (VCons 'r' VNil)
+```
+
+An interface-only reader can use the length function in the vector's
+result type. GHC rejects a result at the successor of that length.
+Reading the length leaves the payload unevaluated. Demanding the vector
+can reach an error in that field while the length remains unevaluated.
 [Package](../examples/packed-vector/RetainedCharVector.hs).
 [Length worker](../examples/packed-vector/RetainedCharLength.hs).
 [Dependent projection](../examples/packed-vector/RetainedCharProjection.hs).
@@ -180,6 +188,43 @@ The upgrade checks rebuild an eligible old witness worker once, then
 reuse both the worker and the unchanged consumer. An interface-only
 old worker cannot supply the missing equation.
 [Upgrade runner](../examples/closed-evaluation/check-readback-upgrade.sh).
+
+## Replace a vector after checking its runtime length
+
+An ordinary module can combine the two projections. This function
+keeps the target's length and takes its characters from the source.
+It enables `GADTs` to match the equality witness. Its signature uses
+ordinary arrows.
+
+```haskell
+replaceCells :: CharVector -> CharVector -> Maybe CharVector
+replaceCells target source =
+  case sameNat (localLength target) (localLength source) of
+    Nothing   -> Nothing
+    Just Refl -> Just (CharVector (localLength target) (localCells source))
+```
+
+When GHC compiles the function, it checks that the replacement's type
+is `Vec Char (localLength target)`. The source field has type
+`Vec Char (localLength source)`. Comparing the two lengths at runtime
+can produce `Refl`, which makes these types interchangeable in the
+successful branch. A caller can get its input from `readIORef`.
+Different lengths return `Nothing` without reading either payload.
+
+If the function omits the comparison and always constructs the result,
+GHC-83865 points to `localCells source`:
+
+```text
+Couldn't match type: localLength source
+               with: localLength target
+```
+
+To render a result, `fmap (\p -> toList (localCells p))` checks each
+projection at its own input. Using Prelude composition in `toList . localCells` requires
+one intermediate vector type for every input. GHC-83865 points to
+`localCells` in that expression.
+[Length comparison](../examples/packed-vector/PackedVecLibrary.hs)
+and [projections](../examples/packed-vector/RetainedCharLocal.hs).
 
 ## Separate named fields and dependent projections
 
@@ -219,6 +264,52 @@ remain open.
 [second projection](../examples/packed-vector/DependentProjection.hs),
 [Agda's built-in Sigma type](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type)
 and [Serokell dependent sums](https://ghc.serokell.io/dh#dependent-sums).
+
+### Keep the package constructor private
+
+A package can already expose one module that exports `CharVector`,
+a smart constructor and the two projections. Define the datatype and
+projections in separate hidden modules. Re-export the projection names
+through the public module. In job 1788 an ordinary client read a vector
+through this interface at `-O0` and `-O2`. Both runs printed `(1,"r")`.
+The client could neither name the hidden constructor nor import its
+module. A dependent client could return `Vec Char (witness p)` from
+`cells p`. Replacing the index with `Z` failed with GHC-83865.
+
+Still open is defining the datatype and both projections in a single
+module that hides the constructor. A caller needs only the signature
+`localCells :: foreach (r :: CharVector) -> Vec Char (localLength r)`.
+The implementation also needs the equation for
+`localLength (CharVector n xs)`. Check that the module can use this
+equation internally, that a source-hidden client can consume its public
+projection, and that an incorrect result index still fails. Repeat with
+interface pragmas omitted and with a provider of ordinary eliminators.
+Haskell defines constructor visibility through export lists. Agda
+distinguishes the places where an abstract function may reduce.
+[Haskell 2010 exports](https://www.haskell.org/onlinereport/haskell2010/haskellch5.html)
+and [Agda abstract definitions](https://agda.readthedocs.io/en/v2.8.0/language/abstract-definitions.html).
+
+### What record dot would need
+
+With the standard GHC interpretation, `packet.cells` uses `getField`.
+In `HasField label record field | label record -> field`, the field
+label and the record's type determine the result type.
+For a fixed `CharVector` type, different record values can store
+different lengths. A selector for the vector alone needs the type
+`foreach (r :: CharVector) -> Vec Char (storedLength r)`.
+The current `HasField` method cannot give its result that dependency
+on its argument. Dot selection of a field that returns an entire
+dependent pair can still use one fixed result type.
+[GHC record field selector polymorphism](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/hasfield.html)
+and [proposal #282](https://ghc-proposals.readthedocs.io/en/latest/proposals/0282-record-dot-syntax.html).
+
+Agda binds record fields in order. A later field can use an earlier
+field's value in its type. That gives the second projection a result
+indexed by the first projection on the same record. The handwritten
+Haskell projections establish that relationship before a choice of
+named-field syntax or overloading is needed.
+[Agda record types](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html)
+and [the Serokell card](https://ghc.serokell.io/dh#dependent-sums).
 
 ## Sums in constructor fields
 

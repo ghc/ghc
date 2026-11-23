@@ -23,12 +23,23 @@ If a warm build stops during package registration, check the exact
 package DB path. The 571 recovery configured the affected packages with
 `-j1` and resumed the same build tree. [Release evidence](CHECKPOINTS.md#local-row-callbacks-and-composed-dependent-pair-payloads).
 
-The next R04/R21 candidate publishes a first projection for a
-monomorphic retained constructor. A handwritten second projection can
-then return a value at that index. R17 is investigating inferred local
-capture kinds. The attempted inference let an ill-kinded lambda form in
-`Proxy` until a caller demanded reduction. That prototype is excluded
-from the next build.
+Job 1756 is building candidate `3d95b04b27` in
+`_build/on-demand/r04-retained-projection-normal-572-20261123`.
+It checks two handwritten projections in either source order. The
+package datatype comes from an imported module. Check `build.exit`,
+`qualification/gates.tsv`, `cohorts/gates.tsv` and `run-all.exit`.
+A successful run writes `qualified.pass`. The GHC priority service can
+freeze an active job while another queue has work. Pueue continues to
+list that job as running. Check the slice's `cgroup.events` before
+diagnosing a stalled build. The ordinary replacement check records
+its job in `r04-projection-replacement-572-20261123/normal.pueue.id`.
+
+The next R17 candidate checks an unapplied lambda under its enclosing
+signature's type variables. The combined 573 runner in
+`r17-r04-combined-normal-573-20261123` also checks projections with
+opaque payload types. It requires the published 572 revision and the
+572 qualification results. The checked candidate for a package and its
+projections in one source group is a separate R04/R21 experiment.
 
 The preceding R04 compiler is `aba28b367f`. A dependent pair can select
 its payload type with an associated family. Reading the tag leaves

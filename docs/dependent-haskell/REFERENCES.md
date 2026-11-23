@@ -41,6 +41,15 @@ in kinds. The R24 card links the review questions to the interface test.
 [Disallow constraints in kinds](https://ghc-proposals.readthedocs.io/en/latest/proposals/0547-no-kind-equalities.html)
 and [R24 source syntax](roadmap/R24-constrained-type-families.md#source-syntax-and-separate-compilation).
 
+R04 also needs projections of an abstract package. Haskell permits
+exporting a datatype without its constructor. Agda allows an abstract
+definition to reduce inside an abstract implementation while checking
+a body. Its signature has stricter reduction rules. The R04 card uses
+this distinction to specify separate provider and client checks.
+[Haskell 2010 exports](https://www.haskell.org/onlinereport/haskell2010/haskellch5.html),
+[Agda abstract definitions](https://agda.readthedocs.io/en/v2.8.0/language/abstract-definitions.html)
+and [the abstract package test](roadmap/R04-dependent-sums.md#keep-the-package-constructor-private).
+
 For R17, a local type lambda uses the enclosing signature's scoped type
 variables. Two checked lambda bodies can agree after a binder renaming.
 Agda also identifies a function with its eta expansion. In the #242
@@ -51,6 +60,14 @@ named and inline case stuck when it has no nominal equality.
 [Agda function equality](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#lambda-expressions),
 [#242 review](https://github.com/ghc-proposals/ghc-proposals/pull/242#issuecomment-503360362)
 and [the two callback spellings](roadmap/R17-type-level-lambdas.md#forwarding-the-same-callback).
+
+Agda lets a field's type use earlier field values in the same record.
+GHC record dot uses `HasField` with a result determined by the label
+and record type. This distinction motivates testing a handwritten
+dependent projection before designing dot selection for it.
+[Agda record types](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html),
+[GHC field selector polymorphism](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/hasfield.html)
+and [R04 record projections](roadmap/R04-dependent-sums.md#what-record-dot-would-need).
 
 R04 uses Serokell's dependent sum syntax. In
 `some (tag :: Bool) | Body a tag`, an associated family selects the payload type. Agda's built-in sum gives
