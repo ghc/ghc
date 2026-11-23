@@ -2440,3 +2440,54 @@ default `-O2`. It counted two forks in a tree read from an `IORef`.
 The proof ignored a bottom-valued mapper and leaf payload and forced
 a missing subtree. The list-law package test remains red at default
 optimization.
+
+### Append fusion and an undefined right list
+
+The two sides of `lengthAppend` are observably different in an ordinary
+optimized Haskell program. This example uses a producer whose first
+action is to inspect its seed.
+
+```haskell
+producer cons seed = seed `seq` cons () seed
+
+appendCount ys = size (build producer ++ ys)
+addCounts   ys = plus (size (build producer)) (size ys)
+```
+
+When GHC builds the list first, `producer` sees `[]` and returns one
+cell. At default `-O2`, append and fold/build fusion pass `ys` directly
+to the producer. Demanding the first constructor of `appendCount` then
+forces `ys`. The first constructor of `addCounts` needs only the left
+cell.
+
+| Input and compilation mode | `appendCount` | `addCounts` |
+| --- | --- | --- |
+| Undefined right list, `-O0` | `Succ` with an undefined tail | Same |
+| Undefined right list, default `-O2` | Undefined before any constructor | `Succ` with an undefined tail |
+| Undefined right list, `-O2 -fno-enable-rewrite-rules` | `Succ` with an undefined tail | Same |
+| One defined right cons with an undefined tail, all three modes | Two `Succ` constructors before the undefined tail | Same |
+
+Job 1328 observed these results on stock GHC 9.14.1 and on the published
+fork with HaskLib compiled separately. The fork's `lengthAppend`
+returned `Refl` for this finite left spine and undefined right operand.
+Job 1334 repeated the comparison in one source file on stock GHC.
+Job 1335 then linked a client against the installed HaskLib on private
+compiler `4d10fdc35f`. Default `-O2` reported GHC-83605 at
+`lengthAppend` in the expression `case lengthAppend xs ys of Refl -> True`.
+The corresponding proof clients passed at `-O0` and with rewrite rules
+disabled. The ordinary `-O2` client without the proof compiled and
+reproduced the demand difference. Accepting the append equation in
+more clients requires checking the actual producer and seed.
+[Standalone program](../examples/open-evaluation/AppendFusionDemand.hs)
+and [fusion theorem and source equations](../REFERENCES.md#append-fusion-with-a-strict-producer).
+
+Appending a singleton supplies a defined seed even if its element is
+bottom. This discharges the seed condition for the observed stock rules.
+It does not identify the seed in an imported proof. For example, a
+function of `xs` and `ys` can forward them as `lengthAppend ys xs`.
+The compiler must track the operand from the equation actually used.
+It must also account for client rules on `(++)`, `size` and `augment`.
+Job 1347 changed the observed count with a rule on each of those names.
+On guarded compiler `4d10fdc35f`, a direct singleton client and a
+client of a separate re-export both rejected at the proof use under
+default `-O2`. Both passed with rewriting disabled.

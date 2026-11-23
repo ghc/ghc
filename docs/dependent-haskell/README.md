@@ -83,6 +83,12 @@ statements. On the current fork a client can import a rewrite rule that
 changes `map` and still use an already compiled `lengthMap` witness.
 [R16 example and measured outputs](roadmap/R16-open-term-evaluator.md#an-imported-proof-and-a-client-rewrite-rule).
 
+Stock `-O2` rules can also change the result for append. If a list
+producer forces its seed and the right list is undefined, only the
+addition side of `lengthAppend` yields an outer `Succ`.
+The published proof returns `Refl` on this input.
+[Append example and compiler results](roadmap/R16-open-term-evaluator.md#append-fusion-and-an-undefined-right-list).
+
 ### Compose equality proofs
 
 Use `trans` from `HaskLib` to join two proofs with a shared endpoint.

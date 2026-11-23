@@ -7413,6 +7413,27 @@ See Note [List interpretation of zipper fusion] in GHC.Tc.Gen.SourceTable.
 [Johann and Voigtländer, Theorem 8.2](https://janis-voigtlaender.eu/JV06.html)
 and [zipper rule and demand checks](../../testsuite/tests/dependent/should_run/NativeOpenPreludeZipWith.sh).
 
+### Append fusion with a strict producer
+
+Agda's `length-++` uses induction on the left list. HaskLib follows
+the same proof for the source definitions of `size`, `(++)` and `plus`.
+Haskell's `seq` can also inspect the seed of a producer passed to
+`build`. Johann and Voigtländer's Theorem 8.2 gives sufficient
+conditions for the two sides of foldr/build fusion to be equal in the
+presence of `seq`. The seed must differ from bottom, and applying the
+step to two bottom arguments must differ from bottom.
+[Agda standard library, list properties](https://agda.github.io/agda-stdlib/v2.4/Data.List.Properties.html)
+and [Johann and Voigtländer, §8.2](https://janis-voigtlaender.eu/papers/TheImpactOfSeqOnFreeTheoremsBasedProgramTransformations.pdf#page=30).
+
+For append the list constructor satisfies the step condition. The right
+list supplies the seed. Job 1328 found an undefined right list for
+which stock GHC's optimization changes the first observable result of
+`size (xs ++ ys)`. The private compiler therefore keeps the imported
+proof check for append. An ordinary optimized computation can still use
+`(++)`.
+[GHC list fusion rules](../../libraries/ghc-internal/src/GHC/Internal/Base.hs)
+and [measured append observations](roadmap/R16-open-term-evaluator.md#append-fusion-and-an-undefined-right-list).
+
 ## Right fold after map
 
 The Agda standard library proves `foldr-map` by induction on the input

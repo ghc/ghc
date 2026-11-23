@@ -23,10 +23,22 @@ lengthMap f = \case
     _ : xs -> congSucc (lengthMap f xs)
 
 -- | The length of an append is the sum of the input lengths.
+-- See Note [Append fusion and length witnesses].
 lengthAppend :: forall a. foreach (xs :: [a]) -> foreach (ys :: [a])
              -> size (xs ++ ys) :~: plus (size xs) (size ys)
 lengthAppend [] _ = Refl
 lengthAppend (_ : xs) ys = congSucc (lengthAppend xs ys)
+
+{- Note [Append fusion and length witnesses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The proof uses the source equations for (++). A client can observe
+different demands after foldr/build fusion. Suppose a producer forces
+its seed before it returns its first cell. Building the list gives it
+[] as the seed. Fusing append can give it the right operand instead.
+If that operand is bottom, size can lose its first Succ. The proof
+still returns Refl for the one-cell left list. See AppendFusionDemand.hs
+in docs/dependent-haskell/examples/open-evaluation.
+-}
 
 -- | Count the result of the reverse worker with any accumulator.
 lengthReverseOnto :: forall a. foreach (xs :: [a]) -> foreach (acc :: [a])
