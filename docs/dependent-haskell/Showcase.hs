@@ -140,6 +140,7 @@ import qualified SchemaColumns
 import qualified TypeLambda
 import qualified TypeLambdaClient
 import qualified TypeLambdaQuote
+import qualified QuotedSensorRow
 import qualified TypeLet
 import qualified FamilyCasePayload as FamilyCase
 import qualified NativeCase
@@ -1723,6 +1724,7 @@ main = do
         (TypeLambda.Field count (TypeLambda.Field flag TypeLambda.End),
          TypeLambda.Field label TypeLambda.End) ->
             observe "splice a column schema and attach a caller-supplied label" (count, flag, label)
+    observe "read two named sensors with a missing slot" QuotedSensorRow.readings
     let lazyFields = TypeLambda.Field 'x' (TypeLambda.Field (error "unused field" :: Bool) TypeLambda.End)
     case TypeLambdaClient.forwardErrors (Proxy @String) lazyFields of
         TypeLambda.Field first _ ->
