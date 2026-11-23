@@ -2250,6 +2250,32 @@ tcHsType mode (XHsType (HsGadtFieldRn field)) exp_kind =
 tcHsType _ (XHsType HsTypeCaseAliasRn{}) _ = failWithTc TcRnTypeCaseContext
 tcHsType _ (XHsType HsTypeCaseRn{}) _ = failWithTc TcRnTypeCaseContext
 
+tcHsType mode src@(XHsType (HsTypeLetProductCheckRn (L loc name) arity rhs)) exp_kind = do
+  parent <- setSrcSpanA loc $ do
+    thing <- tcLookup name
+    con <- case thing of
+      AGlobal (AConLike (RealDataCon con)) -> pure con
+      APromotionErr err -> promotionErr name err
+      _ -> wrongThingErr WrongThingDataCon thing name
+    let parent = dataConTyCon con
+    unless (isVanillaAlgTyCon parent
+            && not (isNewTyCon parent || isTypeDataTyCon parent)
+            && isVanillaDataCon con
+            && null (dataConRepArgBinders con)
+            && tyConSingleDataCon_maybe parent == Just con) $
+      failWithTc (mkTcRnUnknownMessage (mkPlainError []
+        (quotes (ppr name) <+> text "must be the sole constructor of a regular datatype in this type let pattern.")))
+    let expected = dataConSourceArity con
+    unless (arity == expected) $
+      failWithTc (mkTcRnUnknownMessage (mkPlainError []
+        (text "Wrong number of fields in the type let pattern for" <+> quotes (ppr name) <> dot
+         $$ text "Expected" <+> int expected <> comma <+> text "found" <+> int arity <> dot)))
+    pure parent
+  (_, params) <- newMetaTyVars (tyConTyVars parent)
+  let product_kind = mkTyConApp parent (mkTyVarTys params)
+  rhs' <- tcLHsType mode rhs (Check product_kind)
+  checkExpKind mode src rhs' product_kind exp_kind
+
 -- See Note [Typechecking type lets].
 tcHsType mode (XHsType (HsTypeLetRn _ (L _ binder) rhs body)) exp_kind = do
   (rhs_ty, rhs_kind) <- tcInferTypeLetRhs mode rhs

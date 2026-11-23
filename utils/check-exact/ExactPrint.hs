@@ -49,7 +49,7 @@ import GHC.Data.FastString
 import qualified GHC.Data.Strict as Strict
 import GHC.Hs.Decls.Overlap (OverlapMode(..))
 import GHC.Hs.Type
-  ( HsTypeGhcPsExt(HsTypeLambda, HsTypeLet, HsTypeCase, HsTypeCaseAlias, HsTypeCaseHead, HsTypeExists, HsTypeSome)
+  ( HsTypeGhcPsExt(HsTypeLambda, HsTypeLet, HsTypeCase, HsTypeCaseAlias, HsTypeCaseHead, HsTypeExists, HsTypeSome, HsTypeLetProductCheck)
   , HsTypeCaseAlt(..), HsTypeLetBind(..), HsTypeLetPair(..), HsTypeLetPat(..)
   )
 import GHC.TypeLits
@@ -4155,6 +4155,8 @@ instance ExactPrint (HsType GhcPs) where
     return (XHsType (HsTypeSome (some', open', signature', close', bar') binder' domain' body'))
   exact (XHsType (HsTypeCaseAlias generated alias body)) =
     XHsType . HsTypeCaseAlias generated alias <$> markAnnotated body
+  exact (XHsType (HsTypeLetProductCheck con arity body)) =
+    XHsType <$> (HsTypeLetProductCheck <$> markAnnotated con <*> pure arity <*> markAnnotated body)
   exact (XHsType (HsTypeExists (exists, sep_tok) binder body)) = do
     exists' <- markEpToken exists
     binder' <- markAnnotated binder
@@ -4354,6 +4356,9 @@ instance ExactPrint HsTypeLetBind where
         (,,,) <$> markAnnotated name <*> markEpUniToken colon <*> markAnnotated kind <*> markEpToken semi
   exact (HsTypeLetPairBind pair eq rhs) =
     HsTypeLetPairBind <$> markAnnotated pair <*> markEpToken eq <*> markAnnotated rhs
+  exact (HsTypeLetProductBind con fields eq rhs) =
+    HsTypeLetProductBind <$> markAnnotated con <*> traverse markAnnotated fields
+                         <*> markEpToken eq <*> markAnnotated rhs
 
 instance ExactPrint HsTypeLetPair where
   getAnnotationEntry = const NoEntryVal

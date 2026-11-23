@@ -2416,15 +2416,26 @@ typelet_bind :: { LocatedA HsTypeLetBind }
         | typelet_pair '=' ctype          {% do { checkTypeLetPairBinders (unLoc $1)
                                                ; amsA' (sLL $1 $> (HsTypeLetPairBind
                                                    (unLoc $1) (epTok $2) $3)) } }
+        | qconid typelet_fields '=' ctype
+                                         {% do { checkTypeLetBinders (NE.toList $2)
+                                               ; amsA' (sLL $1 $> (HsTypeLetProductBind
+                                                   $1 $2 (epTok $3) $4)) } }
 
 typelet_pair :: { Located HsTypeLetPair }
         : '(' typelet_pair_field ',' typelet_pair_field ')'
                                          { sLL $1 $> (HsTypeLetPair (epTok $1, epTok $3, epTok $5) $2 $4) }
 
 typelet_pair_field :: { HsTypeLetPat }
+        : typelet_field                  { $1 }
+        | typelet_pair                   { HsTypeLetPatPair $1 }
+
+typelet_field :: { HsTypeLetPat }
         : tyvar                          { HsTypeLetPatVar $1 }
         | '_'                            { HsTypeLetPatWild (epTok $1) }
-        | typelet_pair                   { HsTypeLetPatPair $1 }
+
+typelet_fields :: { NonEmpty HsTypeLetPat }
+        : typelet_field                  { NE.singleton $1 }
+        | typelet_field typelet_fields   { $1 NE.<| $2 }
 
 typecase_alts :: { Located [LocatedA HsTypeCaseAlt] }
         : typecase_alt                   { sL1 $1 [$1] }
@@ -4618,7 +4629,10 @@ fileSrcSpan = do
 
 -- | Check the simultaneous binders in one type let pattern.
 checkTypeLetPairBinders :: HsTypeLetPair -> P ()
-checkTypeLetPairBinders (HsTypeLetPair _ left right) = check emptyOccSet [left, right]
+checkTypeLetPairBinders (HsTypeLetPair _ left right) = checkTypeLetBinders [left, right]
+
+checkTypeLetBinders :: [HsTypeLetPat] -> P ()
+checkTypeLetBinders = check emptyOccSet
   where
     check _ [] = pure ()
     check seen (field : rest) = case field of

@@ -114,11 +114,11 @@ import GHC.Base ( Multiplicity(..) )
 import GHC.Types.Fixity ( LexicalFixity(..) )
 import GHC.Types.SourceText
 import GHC.Types.Name
-import GHC.Types.Name.Reader ( RdrName, WithUserRdr(..), mkOrig, mkRdrUnqual )
+import GHC.Types.Name.Reader ( RdrName, WithUserRdr(..), getRdrName, mkOrig, mkRdrUnqual )
 import GHC.Types.Var ( DepFunTyFlag(..), ExistsTyFlag(..), VarBndr, visArgTypeLike, pprExistsTy )
 import GHC.Core.TyCo.Rep ( Type(..) )
 import GHC.Builtin.Modules ( mkGhcInternalModule )
-import GHC.Builtin.WiredIn.Types( mkTupleStr )
+import GHC.Builtin.WiredIn.Types( anyTyCon, mkTupleStr )
 import GHC.Core.Ppr ( pprOccWithTick)
 import GHC.Core.Type
 import GHC.Core.Multiplicity( pprArrowWithModifiers )
@@ -551,6 +551,7 @@ data HsTypeGhcRnExt
   | HsTypeCaseAliasRn (Name, Int, Maybe (LocatedN Name)) (LHsType GhcRn)
   | HsTypeCaseRn (LHsType GhcRn) [([Name], LHsType GhcRn, LHsType GhcRn)]
     -- Quoted case. Each row carries its pattern binders, pattern and result.
+  | HsTypeLetProductCheckRn (LocatedN Name) !Int (LHsType GhcRn)
 
 -- Extension of HsType during parsing.
 -- see Note [Trees That Grow] in Language.Haskell.Syntax.Extension
@@ -591,6 +592,7 @@ data HsTypeGhcPsExt
 
   | HsTypeSome (EpToken "some", EpToken "(", EpUniToken "::" "∷", EpToken ")", EpToken "|")
                (LocatedN RdrName) (LHsType GhcPs) (LHsType GhcPs)
+  | HsTypeLetProductCheck (LocatedN RdrName) !Int (LHsType GhcPs)
 
 -- | One abbreviation in a source type let.
 data HsTypeLetBind
@@ -598,6 +600,8 @@ data HsTypeLetBind
       (Maybe (LocatedN RdrName, TokDcolon, LHsKind GhcPs, EpToken ";"))
       (LocatedN RdrName) (EpToken "=") (LHsType GhcPs)
   | HsTypeLetPairBind HsTypeLetPair (EpToken "=") (LHsType GhcPs)
+  | HsTypeLetProductBind (LocatedN RdrName) (NonEmpty HsTypeLetPat)
+                        (EpToken "=") (LHsType GhcPs)
 
 -- | One boxed pair in a type let pattern.
 data HsTypeLetPair = HsTypeLetPair (EpToken "(", EpToken ",", EpToken ")")
@@ -628,10 +632,11 @@ typeLetSource :: HsTypeGhcPsExt -> Maybe HsTypeLetSource
 typeLetSource (HsTypeLet _ _ source@(Just _) _ _) = source
 typeLetSource source@(HsTypeLet (let_kw, _) _ Nothing binds _)
   | isGoodSrcSpan (getEpTokenSrcSpan let_kw)
-  , any is_pair binds = Just (HsTypeLetSource (XHsType source))
+  , any is_pattern binds = Just (HsTypeLetSource (XHsType source))
   where
-    is_pair (L _ HsTypeLetPairBind{}) = True
-    is_pair _ = False
+    is_pattern (L _ HsTypeLetPairBind{}) = True
+    is_pattern (L _ HsTypeLetProductBind{}) = True
+    is_pattern _ = False
 typeLetSource _ = Nothing
 
 -- | Preserve the source when lifting a type case or lambda through a pair let.
@@ -654,6 +659,40 @@ splitHsTypeLet :: NonEmpty (LocatedA HsTypeLetBind) -> LHsType GhcPs
 splitHsTypeLet (first :| binds) body = case unLoc first of
   HsTypeLetBind signature name _ rhs ->
     (name, ascribe signature rhs, rest)
+  HsTypeLetProductBind con fields _ rhs ->
+    (product_name, checked_rhs, foldr bind rest bindings)
+    where
+      loc = getLoc rhs
+      product_name = L (l2l loc) (mkRdrUnqual (mkTyVarOcc "$type-let-product"))
+      arity = NE.length fields
+      checked_rhs = L loc (XHsType (HsTypeLetProductCheck con arity rhs))
+
+      bindings
+        | null field_binds = []
+        | otherwise = witness_binds ++ split_binds ++ field_binds
+      field_binds =
+        [ (name, project "ProductField"
+            [type_var (witness 0), first_split 0, project "PairSecond" [type_var (split i)]])
+        | (i, HsTypeLetPatVar name) <- zip [0 ..] (NE.toList fields) ]
+      witness_binds =
+        (witness 0, L loc (HsTyVar noAnn IsPromoted con)) :
+        [ (witness i, app (type_var (witness (i - 1))) any_argument)
+        | i <- [1 .. arity - 1] ]
+      split_binds =
+        [ (split i, project "ProductUnapply" [type_var (witness i), receiver i])
+        | i <- [arity - 1, arity - 2 .. 0] ]
+      receiver i
+        | i == arity - 1 = type_var product_name
+        | otherwise = first_split (i + 1)
+      first_split i = project "PairFirst" [type_var (split i)]
+      any_argument = type_var (L (l2l loc) (getRdrName anyTyCon))
+      witness = private "$type-let-witness:"
+      split = private "$type-let-split:"
+      private prefix i = L (l2l loc) (mkRdrUnqual (mkTyVarOcc (prefix ++ show i)))
+      project selector = foldl app (type_var (L (l2l loc) (mkOrig projection_module (mkTcOcc selector))))
+      app f x = L loc (HsAppTy noExtField f x)
+      type_var name = L loc (HsTyVar noAnn NotPromoted name)
+      bind (name, rhs') result = L loc (XHsType (mkHsSingleTypeLet noAnn name rhs' result))
   HsTypeLetPairBind pair_pat _ rhs ->
     (pair, rhs, bind_fields rest)
     where
@@ -661,7 +700,6 @@ splitHsTypeLet (first :| binds) body = case unLoc first of
       pair = pairName 0 loc
       (bind_fields, _) = bindPair pair 1 loc pair_pat
 
-      projection_module = mkGhcInternalModule (fsLit "GHC.Internal.TupleProjection")
       first_field = mkOrig projection_module (mkTcOcc "PairFirst")
       second_field = mkOrig projection_module (mkTcOcc "PairSecond")
 
@@ -694,6 +732,7 @@ splitHsTypeLet (first :| binds) body = case unLoc first of
             projected = L field_loc (HsAppTy noExtField (tyvar (L (l2l field_loc) selector)) (tyvar saved))
         in L field_loc (XHsType (mkHsSingleTypeLet noAnn name projected result))
   where
+    projection_module = mkGhcInternalModule (fsLit "GHC.Internal.TupleProjection")
     rest = case binds of
       [] -> body
       b : bs -> L (noAnnSrcSpan (getLocA b `combineSrcSpans` getLocA body))
@@ -729,6 +768,16 @@ The internal closed families select fields only when they see the promoted
 pair constructor. An unknown pair can remain in the type. With two
 wildcards, keep a private projection. It checks the pair kind when
 Template Haskell splices the ordinary LetT binders.
+
+For a named product pattern, keep the constructor and field count on the
+RHS until kind checking. Check the datatype and the scrutinee kind even
+when all fields are wildcards. Split the scrutinee application from right
+to left with ProductUnapply and the pair selectors. Each partial constructor
+supplies the input and field kinds of one split. Any supplies the kinds of
+its already applied arguments and is never selected as a field. ProductField
+checks that the actual head is the written constructor. This needs no product
+eta rule or equality for a stuck selector. Reject the pattern in a quotation
+because LetT cannot represent the constructor check.
 
 Keep the written group when lifting a type case or lambda through a pair
 let. These passes can replace the pattern with private bindings before
@@ -1881,6 +1930,7 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
       text "some" <+> parens (ppr binder <+> dcolon <+> ppr_mono_lty domain)
         <+> char '|' <+> ppr_mono_lty body
     HsTypeCaseAlias _ _ body -> ppr_mono_lty body
+    HsTypeLetProductCheck _ _ body -> ppr_mono_lty body
     HsTypeExists (_, sep_tok) b body -> pprExistsTy (hsExistsTyFlag sep_tok) (ppr b) (ppr_mono_lty body)
     HsTypeLet _ brackets _ binds body ->
       let binding (L _ (HsTypeLetBind signature v _ rhs)) =
@@ -1888,6 +1938,8 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
               ++ [ppr v <+> equals <+> ppr_typelet_rhs rhs]
           binding (L _ (HsTypeLetPairBind pair_pat _ rhs)) =
             [pair pair_pat <+> equals <+> ppr_typelet_rhs rhs]
+          binding (L _ (HsTypeLetProductBind con fields _ rhs)) =
+            [hsep (ppr con : map field (NE.toList fields)) <+> equals <+> ppr_typelet_rhs rhs]
           pair (HsTypeLetPair _ left right) = parens (pprWithCommas field [left, right])
           field (HsTypeLetPatVar name) = ppr name
           field HsTypeLetPatWild{} = char '_'
@@ -1901,6 +1953,7 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
     HsCoreTyRn ty -> ppr ty
     HsGadtFieldRn field -> pprHsConDeclFieldNoMult field
     HsTypeCaseAliasRn _ body -> ppr_mono_lty body
+    HsTypeLetProductCheckRn _ _ body -> ppr_mono_lty body
     HsTypeCaseRn scrutinee rows ->
       text "case" <+> ppr_mono_lty scrutinee <+> text "of"
         <+> braces (sep (punctuate semi [ppr_mono_lty pat <+> arrow <+> ppr_mono_lty rhs
@@ -1990,6 +2043,7 @@ hsTypeNeedsParens p = go_hs_ty
         HsTypeCaseHead{} -> False
         HsTypeSome{} -> p >= topPrec
         HsTypeCaseAlias{} -> p >= topPrec
+        HsTypeLetProductCheck _ _ body -> hsTypeNeedsParens p (unLoc body)
         HsTypeExists{} -> p >= funPrec
         HsTypeLet{} -> p >= topPrec
         HsTypeCase{} -> p >= topPrec
@@ -1997,6 +2051,7 @@ hsTypeNeedsParens p = go_hs_ty
         HsCoreTyRn ty -> go_core_ty ty
         HsGadtFieldRn{} -> False
         HsTypeCaseAliasRn{} -> p >= topPrec
+        HsTypeLetProductCheckRn _ _ body -> hsTypeNeedsParens p (unLoc body)
         HsTypeCaseRn{} -> p >= topPrec
         HsTypeExistsRn{} -> p >= funPrec
         HsTypeLetRn{} -> p >= topPrec

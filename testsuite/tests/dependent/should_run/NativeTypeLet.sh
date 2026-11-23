@@ -48,7 +48,9 @@ cp TypeLet.hi PackedVecLibrary.hi SignatureLet.hi SignedLets.hi "$out/client/"
 cat >PairBindings.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitNamespaces, KindSignatures, TypeFamilies, TypeOperators #-}
 module PairBindings (AliasCount, Held, KnownPrefix, Rebuild, ShadowCount,
-                     NestedCount, NestedRight, NestedHeight) where
+                     NestedCount, NestedRight, NestedHeight,
+                     Axis(..), AxisLength, Volume(..), VolumeRows, VolumeFields,
+                     Grid(..), GridTotal, GridRows, GridHeld, OpaqueGrid, OpaqueColumn) where
 
 import GHC.TypeNats (Nat, type (+))
 
@@ -79,6 +81,28 @@ type family OpaquePair (n :: Nat) :: (Nat, Bool)
 type NestedHeight (n :: Nat) =
   let ((_, _), height) = '(OpaquePair n, 3)
   in height
+
+data Grid = Grid Nat Nat
+data Axis = Axis Nat
+data Volume = Volume Nat Bool Nat
+
+type AxisLength (axis :: Axis) = let Axis len = axis in len
+type VolumeRows (volume :: Volume) = let Volume rows _ _ = volume in rows
+type VolumeFields (volume :: Volume) =
+  let Volume rows solid depth = volume
+  in '(rows, solid, depth)
+
+type GridTotal (dimensions :: Grid) =
+  let Grid rows cols = dimensions
+  in rows + cols
+
+type GridRows (dimensions :: Grid) =
+  let Grid rows _ = dimensions
+  in rows
+
+type family OpaqueGrid :: Grid
+type family OpaqueColumn :: Nat
+type GridHeld = let Grid _ _ = OpaqueGrid in Bool
 HS
 "${g[@]}" -fomit-interface-pragmas -ddump-parsed -c PairBindings.hs >pair-parsed.txt
 {
@@ -92,9 +116,11 @@ cat >OrdinaryLet.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
 module OrdinaryLet where
 import Data.Type.Equality ((:~:)(Refl))
-import Data.Proxy (Proxy)
+import Data.Proxy (Proxy(..))
 import PairBindings (AliasCount, Held, KnownPrefix, ShadowCount,
-                     NestedCount, NestedRight, NestedHeight)
+                     NestedCount, NestedRight, NestedHeight,
+                     Axis(..), AxisLength, Volume(..), VolumeRows, VolumeFields,
+                     Grid(..), GridTotal, GridRows, GridHeld, OpaqueGrid, OpaqueColumn)
 import qualified SignatureLet
 import SignedLets (Braced, Layout, CaseChain)
 import TypeLet
@@ -131,6 +157,27 @@ caseChain = Refl
 
 knownPair :: DimensionSum '(2, 3) :~: 5
 knownPair = Refl
+
+knownProduct :: GridTotal ('Grid 2 3) :~: 5
+knownProduct = Refl
+
+oneField :: AxisLength ('Axis 2) :~: 2
+oneField = Refl
+
+threeFields :: VolumeRows ('Volume 2 'False OpaqueColumn) :~: 2
+threeFields = Refl
+
+allFields :: VolumeFields ('Volume 2 'True 4) :~: '(2, 'True, 4)
+allFields = Refl
+
+lazyProduct :: GridRows ('Grid 2 OpaqueColumn) :~: 2
+lazyProduct = Refl
+
+unknownProduct :: Proxy (GridRows OpaqueGrid)
+unknownProduct = Proxy
+
+unusedProduct :: GridHeld :~: Bool
+unusedProduct = Refl
 
 nestedLeftPair :: NestedCount 7 :~: 10
 nestedLeftPair = Refl
@@ -171,6 +218,29 @@ reject() {
         exit 1
     fi
 }
+
+cat >RefutableProduct.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
+module RefutableProduct where
+import GHC.TypeNats (Nat)
+data Choice = Some Nat Nat | None
+type Bad = let Some _ _ = 'Some 2 3 in Bool
+HS
+status=0
+"${g[@]}" -c RefutableProduct.hs >error.log 2>&1 || status=$?
+test "$status" = 1
+grep -Fq 'must be the sole constructor of a regular datatype' error.log
+
+cat >WrongProductArity.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
+module WrongProductArity where
+import PairBindings (Grid(..))
+type Bad = let Grid _ = 'Grid 2 3 in Bool
+HS
+status=0
+"${g[@]}" -c WrongProductArity.hs >error.log 2>&1 || status=$?
+test "$status" = 1
+grep -Fq 'Expected 2, found 1.' error.log
 
 cat >UnusedCase.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeFamilies #-}

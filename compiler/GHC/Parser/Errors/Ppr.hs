@@ -276,7 +276,7 @@ instance Diagnostic PsMessage where
            $$ text "The next binding is for" <+> quotes (ppr binder) <> dot
     PsErrTypeLetDuplicatePairField field
       -> mkSimpleDecorated $
-           text "The pair pattern in this type let binds" <+> quotes (ppr field) <+> text "twice."
+           text "The pattern in this type let binds" <+> quotes (ppr field) <+> text "twice."
     PsErrIllegalExplicitNamespace kw
       -> mkSimpleDecorated $
            text "Illegal keyword" <+> quotes kw_doc

@@ -37,3 +37,15 @@ type NestedPairLayout dimensions =
 type NestedPairBraced dimensions =
   let { (width, {- next pair -} (_, height)) = dimensions }
   in H width height
+
+type ProductLayout dimensions =
+  let Grid {- constructor -} rows cols = dimensions
+  in H rows cols
+
+type ProductBraced dimensions =
+  let { Grid rows _ {- equation -} = dimensions; cols = G rows }
+  in H rows cols
+
+type ProductThree volume =
+  let Volume rows _ {- final field -} depth = volume
+  in H rows depth

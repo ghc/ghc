@@ -55,7 +55,7 @@ import GHC.Driver.Flags
 import GHC.Data.List.SetOps (findDupsEq)
 import GHC.Parser.PostProcess (setRdrNameSpace)
 
-import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLet, HsTypeCase, HsTypeCaseAlias, HsTypeCaseHead, HsTypeSome), HsTypeGhcRnExt(..), HsTypeCaseAlt(..), splitHsTypeLet, typeLetSource)
+import GHC.Hs.Type (HsTypeGhcPsExt(HsTypeLet, HsTypeCase, HsTypeCaseAlias, HsTypeCaseHead, HsTypeSome, HsTypeLetProductCheck), HsTypeGhcRnExt(..), HsTypeCaseAlt(..), splitHsTypeLet, typeLetSource)
 import GHC.Hs
 
 import GHC.Rename.Env
@@ -1127,6 +1127,17 @@ rnHsTyKi env (XHsType let_ty@(HsTypeLet (let_kw, _) _ _ binds result)) = do
   (body', body_fvs) <- bindLocalNamesFV [name] (rnLHsTyKi env body)
   return (XHsType (HsTypeLetRn (typeLetSource let_ty) (fmap (const name) binder) rhs' body'),
           rhs_fvs `plusFN` body_fvs)
+
+rnHsTyKi env (XHsType (HsTypeLetProductCheck con arity rhs)) = do
+  level <- getThLevel
+  case level of
+    UntypedBrack{} -> setSrcSpanA (getLoc con) $
+      failWithTc (mkTcRnUnknownMessage (mkPlainError []
+        (text "Constructor patterns in type lets are not supported in quotations.")))
+    _ -> pure ()
+  con' <- lookupLocatedOccRn WL_Constructor con
+  (rhs', rhs_fvs) <- rnLHsTyKi env rhs
+  pure (XHsType (HsTypeLetProductCheckRn con' arity rhs'), extendNameSet rhs_fvs (unLoc con'))
 
 rnHsTyKi env (XHsType (HsTypeCase (case_kw, _) _ scrutinee alts)) = do
   enabled <- xoptM LangExt.ExperimentalDependentTypes
@@ -2852,6 +2863,7 @@ extract_lty (L _ ty) acc
       XHsType (HsTypeLet _ _ _ binds result) ->
         let (binder, rhs, body) = splitHsTypeLet binds result
         in extract_lty rhs (extract_body [unLoc binder] body acc)
+      XHsType (HsTypeLetProductCheck _ _ rhs) -> extract_lty rhs acc
       XHsType (HsTypeSome _ binder domain body)
                                   -> extract_lty domain (extract_body [unLoc binder] body acc)
       XHsType (HsTypeCase _ _ scrutinee alts)

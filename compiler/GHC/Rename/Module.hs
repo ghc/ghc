@@ -23,7 +23,7 @@ import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls, rnSpli
 
 import GHC.Hs
 import qualified GHC.Hs.Decls as HsDecls
-import GHC.Hs.Type (mkHsImplicitSigType, HsTypeGhcPsExt(HsTypeCase, HsTypeCaseAlias, HsTypeLet, HsTypeSome), HsTypeCaseAlt(..), mkHsSingleTypeLet, splitHsTypeLet, preserveTypeLetSource)
+import GHC.Hs.Type (mkHsImplicitSigType, HsTypeGhcPsExt(HsTypeCase, HsTypeCaseAlias, HsTypeLet, HsTypeSome, HsTypeLetProductCheck), HsTypeCaseAlt(..), mkHsSingleTypeLet, splitHsTypeLet, preserveTypeLetSource)
 import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 import GHC.Iface.Env ( lookupOrig )
 
@@ -1598,6 +1598,7 @@ liftTypeChildren visit ty@(L loc node) salt = case node of
   HsTupleTy ann sort ts -> many (HsTupleTy ann sort) ts
   HsExplicitListTy ann promoted ts -> many (HsExplicitListTy ann promoted) ts
   HsExplicitTupleTy ann promoted ts -> many (HsExplicitTupleTy ann promoted) ts
+  XHsType (HsTypeLetProductCheck con arity body) -> one (XHsType . HsTypeLetProductCheck con arity) body
   _ -> (ty, [], salt)
   where
     one rebuild t =
