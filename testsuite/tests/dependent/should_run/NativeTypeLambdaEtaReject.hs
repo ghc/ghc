@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures #-}
+{-# LANGUAGE StandaloneKindSignatures, UndecidableInstances #-}
 {-# LANGUAGE Modifiers, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
 module NativeTypeLambdaEtaReject where
 
@@ -23,7 +24,7 @@ bad = Refl
 bad :: Maybe :~: (\cell -> Maybe cell)
 bad = Refl
 #elif defined(FALLBACK)
-type Same (f :: Type %U -> Type) (g :: Type %U -> Type) :: Bool
+type Same :: (Type %U -> Type) %U -> (Type %U -> Type) %U -> Bool
 type family Same f g where
   Same f f = 'True
   Same _ _ = 'False

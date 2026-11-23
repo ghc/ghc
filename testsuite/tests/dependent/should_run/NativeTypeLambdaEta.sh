@@ -30,25 +30,42 @@ for opt in O0 O2; do
         printf '%s\tmixed\t%s\n' "$opt" "$status" >>"$result"
         if [[ "$mode" == baseline ]]; then
             test "$status" = 1
-            rg -q '^NativeTypeLambdaEta.hs:[0-9]+:[0-9]+: error: \[GHC-83865\]' mixed.log
+            grep -Eq '^NativeTypeLambdaEta.hs:[0-9]+:[0-9]+: error: \[GHC-83865\]' mixed.log
         else
             test "$status" = 0
             "${run[@]}" --show-iface NativeTypeLambdaEta.hi >mixed.iface
             if [[ "$opt" == O2 ]]; then
                 grep -Fq scoped-lambda-eta-v1 mixed.iface
+                grep -Fq ScopedLambdaEta mixed.iface
             fi
             mkdir reader
             cp ./*.{hi,o} ../provider/*.o reader/
             (
                 cd reader
                 cat >Main.hs <<'HS'
-{-# LANGUAGE NoExperimentalDependentTypes #-}
+{-# LANGUAGE DataKinds, GADTs, KindSignatures, NoExperimentalDependentTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 module Main where
-import NativeTypeLambdaEta (visible)
+
+import Data.Kind (Type)
+import Data.Proxy (Proxy(..))
+import Data.Type.Equality ((:~:)(Refl))
+import NativeTypeLambdaEta (reverseMap, visible)
+
+fromImportedProof :: forall (xs :: [Type]). Proxy xs -> Int
+fromImportedProof witness =
+  case reverseMap @Int @xs witness of
+    Refl -> visible
+
 main :: IO ()
-main = print visible
+main = print (fromImportedProof (Proxy @'[Bool]))
 HS
-                "${run[@]}" "-$opt" -c Main.hs
+                test ! -e NativeTypeLambdaEta.hs
+                "${run[@]}" "-$opt" -ddump-inlinings -dsuppress-uniques -c Main.hs >reader.log 2>&1
+                if [[ "$opt" == O2 ]]; then
+                    grep -Eq 'Inlining done: (NativeTypeLambdaEta\.)?reverseMap' reader.log
+                fi
                 "${run[@]}" "-$opt" Main.o NativeTypeLambdaEta.o NativeTypeLambdaEtaLib.o -o eta
                 printf '42\n' | cmp - <(./eta)
             )
@@ -60,7 +77,9 @@ HS
             "${run[@]}" "-$opt" "-D$reject" -c NativeTypeLambdaEtaReject.hs >"$reject.log" 2>&1 || status=$?
             printf '%s\t%s\t%s\n' "$opt" "$reject" "$status" >>"$result"
             test "$status" = 1
-            rg -q '^NativeTypeLambdaEtaReject.hs:[0-9]+:[0-9]+: error: \[GHC-83865\]' "$reject.log"
+            code=83865
+            if [[ "$reject" == INVERSE ]]; then code=25897; fi
+            grep -Eq "^NativeTypeLambdaEtaReject.hs:[0-9]+:[0-9]+: error: \[GHC-$code\]" "$reject.log"
         done
     )
 done

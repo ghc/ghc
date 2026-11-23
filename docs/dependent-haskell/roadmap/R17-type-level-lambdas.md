@@ -220,7 +220,15 @@ lambda parameter. The named family's equations stay opaque. Thus
 constant lambda `\cell -> tag` still cannot, even if `Discard` returns
 `tag` for every argument. The constructor synonym `WithError` above
 also remains a separate case.
+The example enables `UndecidableInstances` because the generated family
+calls `Stamp` with arguments the same size as its own.
 [Forwarding regression](../../../testsuite/tests/dependent/should_run/NativeTypeLambdaEta.hs).
+
+At `-O0` and `-O2`, the source-hidden reader prints `42`. The optimized
+reader also inlines the imported equality proof. Interfaces that contain
+that proof require `scoped-lambda-eta-v1`. An older reader still accepts
+the ordinary family provider. It rejects the proof-bearing interface at
+the version header.
 
 ## A lambda in a visible type argument
 

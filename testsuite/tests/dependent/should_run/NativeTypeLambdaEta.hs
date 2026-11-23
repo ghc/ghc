@@ -1,9 +1,11 @@
 {-# LANGUAGE AllowAmbiguousTypes, CPP, DataKinds, ExperimentalDependentTypes #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE GADTs, Modifiers, ScopedTypeVariables, StandaloneKindSignatures #-}
 {-# LANGUAGE TypeApplications, TypeFamilies, TypeOperators #-}
 module NativeTypeLambdaEta where
 
 import Data.Kind (Type)
+import Data.Proxy (Proxy)
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Matchability (U)
 import NativeTypeLambdaEtaLib
@@ -33,7 +35,7 @@ matched = Refl
 discardForward :: (Discard Int) :~: (\cell -> Discard Int cell)
 discardForward = Refl
 
-reverseMap :: forall tag xs. Map (Stamp tag) xs :~: Map (\cell -> Stamp tag cell) xs
+reverseMap :: forall tag xs. Proxy xs -> Map (Stamp tag) xs :~: Map (\cell -> Stamp tag cell) xs
 {-# INLINE reverseMap #-}
-reverseMap = Refl
+reverseMap _ = Refl
 #endif
