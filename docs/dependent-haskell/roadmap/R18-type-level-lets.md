@@ -155,6 +155,38 @@ fork design. [Agda](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where
 [Haskell 2010 §4.4](https://www.haskell.org/onlinereport/haskell2010/haskellch4.html#x10-780004.4),
 and [ExtendedLet](https://github.com/ghc-proposals/ghc-proposals/pull/523/files).
 
+### Sharing an arrow kind
+
+A local name also shares any matchability inferred for its right-hand
+side. Consider a synonym with two parameters and a standalone kind
+signature.
+
+```haskell
+type Higher :: let k = Type -> Type in k -> k
+type Higher f a = f a
+```
+
+The arrow for the synonym's second parameter must be unmatchable.
+That fixes the shared `k` to `Type %U -> Type` in both positions.
+An ordinary client gets GHC-83865 for `Higher Maybe Bool` because
+`Maybe` has a matchable arrow. In the following signature the input
+and result arrows are written separately. The input defaults to
+matchable, so the same client compiles.
+
+```haskell
+type Higher :: (Type -> Type) -> Type -> Type
+```
+
+Jobs 1629 and 1630 compared the compiled provider interfaces and
+compiled independent clients on 564. With two explicit `%U` arrows,
+the expanded and let-bound forms reject the same client. With two
+explicit `%M` arrows, both reject the two-parameter declaration.
+The one-parameter definition `type Higher f = f` also works with the
+original let-bound signature and `Maybe`. Its second arrow is in the
+result of the synonym, beyond its declared arity.
+[Proposal #242 on declaration kinds and defaults](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#inference)
+and [matchability syntax and provenance](../REFERENCES.md#matchability-and-multiplicity-on-arrows).
+
 ## A boxed pair binding
 
 ```haskell
