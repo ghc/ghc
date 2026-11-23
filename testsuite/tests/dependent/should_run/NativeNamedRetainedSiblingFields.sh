@@ -19,6 +19,7 @@ for opt in -O0 -O2; do
     cat > Main.hs <<'HS'
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes, OverloadedRecordDot #-}
 import Control.Exception (ErrorCall, evaluate, try)
+import Data.Char (toUpper)
 import NamedSiblingColumns
 import PackedVecLibrary (Nat(..), Vec(..), natToInt, toList, zipVec)
 
@@ -28,12 +29,20 @@ readPairs p = toList (zipVec (namedLetters p) (namedFlags p))
 readOnlyFlags :: NamedColumns -> [Bool]
 readOnlyFlags NamedColumns{namedFlags = xs} = toList xs
 
-negateVec :: Vec Bool n -> Vec Bool n
-negateVec VNil = VNil
-negateVec (VCons b bs) = VCons (not b) (negateVec bs)
+mapVector :: (a -> b) -> Vec a n -> Vec b n
+mapVector _ VNil = VNil
+mapVector f (VCons x xs) = VCons (f x) (mapVector f xs)
 
 negateFlags :: NamedColumns -> NamedColumns
-negateFlags p = p { namedFlags = negateVec (namedFlags p) }
+negateFlags p = p { namedFlags = mapVector not (namedFlags p) }
+
+updateBoth :: NamedColumns -> NamedColumns
+updateBoth p = p { namedFlags = mapVector not (namedFlags p)
+                 , namedLetters = mapVector toUpper (namedLetters p) }
+
+updateOnlyDemanded :: NamedColumns -> NamedColumns
+updateOnlyDemanded p = p { namedLetters = undefined
+                         , namedFlags = mapVector not (namedFlags p) }
 
 omitFlags :: NamedColumns -> NamedColumns
 omitFlags p = p { namedFlags = undefined }
@@ -56,6 +65,9 @@ main = do
     print (readOnlyFlags (negateFlags (NamedColumns (S Z) undefined (VCons True VNil))))
     let r = omitFlags p
     print (toList (namedLetters r))
+    let both = updateBoth p
+    print (natToInt (storedLength both), readPairs both)
+    print (readOnlyFlags (updateOnlyDemanded p))
     let empty = emptyRecord p
     print (natToInt (storedLength empty), readPairs empty)
     let noOldPayloads = emptyRecord (NamedColumns (S Z) undefined undefined)
@@ -67,7 +79,7 @@ HS
     "${ghc[@]}" Main.o ../provider/{PackedVecLibrary,NamedSiblingColumns}.o -o observe
     timeout 15 ./observe > actual
     printf '%s\n' "[('r',True)]" "0" '[True]' "(1,[('r',False)])" '[False]' '"r"' \
-        '(0,[])' '[]' 'True' | cmp - actual
+        "(1,[('R',False)])" '[False]' '(0,[])' '[]' 'True' | cmp - actual
 
     cat > ProjectionType.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes #-}
@@ -314,6 +326,18 @@ wrong :: NamedColumns -> NamedColumns -> NamedColumns
 wrong p q = p { namedFlags = namedFlags q }
 HS
     reject 'GHC-(05617|83865)' BadPayloadUpdate.hs
+
+    cat > BadSiblingUpdate.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module BadSiblingUpdate where
+import NamedSiblingColumns
+
+wrong :: NamedColumns -> NamedColumns -> NamedColumns
+wrong p q = p { namedLetters = namedLetters p
+              , namedFlags = namedFlags q }
+HS
+    reject 'GHC-(05617|83865)' BadSiblingUpdate.hs
+    grep -Fq 'BadSiblingUpdate.hs:7:30:' rejected.log
 
     cat > BadZip.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}

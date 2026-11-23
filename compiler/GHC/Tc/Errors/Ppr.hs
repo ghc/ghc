@@ -3966,8 +3966,7 @@ pprRetainedQuantificationError reason = case reason of
   RetainedRecordPatternOrder ->
     text "Match the fields of a retained record in declaration order."
   RetainedRecordUpdate ->
-    vcat [ text "Record update of a retained record can replace one payload field."
-         , text "To replace its witness, also replace every payload field." ]
+    text "Record update is unavailable for this retained record."
   RetainedRecordUpdateWitness con witness missing ->
     hang (fsep [ text "Updating witness field", quotes (ppr witness)
                , text "of constructor", quotes (ppr con) ]) 2 $

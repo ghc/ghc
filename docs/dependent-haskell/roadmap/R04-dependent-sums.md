@@ -412,14 +412,14 @@ readable. Omitting the witness gives GHC-83605 at the constructor and
 names the required field.
 [Field omission and witness inference](../REFERENCES.md#omitted-fields-in-a-dependent-record).
 
-An ordinary caller can replace one payload at the original witness.
+An ordinary caller can replace one or more payloads at the original witness.
 The Showcase sets the first flag to `False` and keeps the rest of the
-vector. The update checks the replacement at `storedLength p` for
+vector. The update checks each replacement at `storedLength p` for
 receiver `p`. Job 1968 passed the source-hidden test at `-O0` and `-O2`.
 It checked the unchanged length, the laziness of the fields, and the
 GHC-83865 error for a vector at a separate record's witness.
 The receiver must be a supported retained operand, such as a local
-variable. An update that keeps the witness can replace one payload.
+variable.
 [Record update in Haskell and Agda](../REFERENCES.md#updating-a-payload-at-its-stored-witness).
 
 To change the witness, supply a replacement for every payload. For
