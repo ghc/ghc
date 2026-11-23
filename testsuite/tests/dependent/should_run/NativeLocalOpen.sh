@@ -393,13 +393,28 @@ keep x = x
 SOURCE
 expect_rejection NativeLocalOpenSplice 5 '\[GHC-76037\]' 'NativeLocalOpenSplice.keep'
 
-# Publish checked equations only after the source workers' group has solved.
+# Check the same declarations on both sides of an optional splice boundary.
 mkdir "$out"/{char-provider,char-reader}
+cat >"$out/char-reader/ReadLocalChar.hs" <<'SOURCE'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
+module ReadLocalChar where
+import Data.Type.Equality ((:~:) (Refl))
+import NativeLocalCharSplice (Flag, Upper, witness)
+upper :: Upper 'x' :~: 'X'
+upper = Refl
+flag :: Flag '!' :~: 'False
+flag = Refl
+yes :: Flag 'x' :~: 'True
+yes = witness
+SOURCE
 (
     cd "$out/char-provider"
-    cat >NativeLocalCharSplice.hs <<'SOURCE'
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TemplateHaskell #-}
-module NativeLocalCharSplice (Upper, Flag) where
+    cat >header <<'SOURCE'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TemplateHaskell, TypeOperators #-}
+module NativeLocalCharSplice (Upper, Flag, witness) where
+import Data.Type.Equality ((:~:) (Refl))
+SOURCE
+    cat >workers <<'SOURCE'
 upper, forwarded :: Char -> Char
 forwarded = upper
 upper 'x' = 'X'
@@ -407,28 +422,31 @@ upper c = c
 flag :: Char -> Bool
 flag 'x' = True
 flag _ = False
-
-$(pure [])
-
+SOURCE
+    cat >proofs <<'SOURCE'
 type Upper c = forwarded c
 type Flag c = flag c
+witness :: Flag 'x' :~: 'True
+witness = Refl
 SOURCE
-    "${ghc[@]}" -fomit-interface-pragmas -fno-write-if-simplified-core -c NativeLocalCharSplice.hs
-    cp NativeLocalCharSplice.hi "$out/char-reader/"
-)
-(
-    cd "$out/char-reader"
-    cat >ReadLocalChar.hs <<'SOURCE'
-{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
-module ReadLocalChar where
-import Data.Type.Equality ((:~:) (Refl))
-import NativeLocalCharSplice (Flag, Upper)
-upper :: Upper 'x' :~: 'X'
-upper = Refl
-flag :: Flag '!' :~: 'False
-flag = Refl
-SOURCE
-    "${ghc[@]}" -i -i. -c ReadLocalChar.hs
+    for order in worker-first proof-first after-splice; do
+        {
+            cat header
+            case $order in
+                worker-first) cat workers proofs ;;
+                proof-first) cat proofs workers ;;
+                after-splice)
+                    cat workers
+                    printf '%s\n' '$(pure [])'
+                    cat proofs
+                    ;;
+            esac
+        } >NativeLocalCharSplice.hs
+        "${ghc[@]}" -fforce-recomp -fomit-interface-pragmas \
+            -fno-write-if-simplified-core -c NativeLocalCharSplice.hs
+        cp NativeLocalCharSplice.hi "$out/char-reader/"
+        ( cd "$out/char-reader"; "${ghc[@]}" -i -i. -fforce-recomp -c ReadLocalChar.hs )
+    done
 )
 
 cat > NativeLocalOpenStale.hs <<'SOURCE'

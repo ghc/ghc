@@ -1930,26 +1930,34 @@ tcTopSrcDeclsThen requests group finish = do
     if null previous then check_current else do
       -- tc_rn_src_decls has solved these bindings before running each splice.
       failIfErrsM
-      definitions@(cores, _) <- localOpenDefinitions previous (tcg_ev_binds env) (tcg_binds env)
-      -- See Note [Checked character cases after a splice].
-      let alias_target name = pure $ case lookupNameEnv cores name of
-            Just (_, Core.Var target) -> unitNameSet (idName target)
-            _ -> emptyNameSet
-      demanded <- closeLocalNames alias_target emptyNameSet (map fst previous)
-      let selected (owner, _) = idName owner `elemNameSet` demanded
-      tables <- sourceCharacterTables (filterNameEnv selected cores)
-      checked <- installSourceTables tables
-      setGblEnv checked (withLocalOpenDefinitions definitions check_current)
+      definitions <- localOpenDefinitions previous (tcg_ev_binds env) (tcg_binds env)
+      withLocalCharacterTables previous definitions check_current
 
-{- Note [Checked character cases after a splice]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The later group has already renamed its ordinary call to the term Name.
-localOpenDefinitions checks the source of that Name against the earlier
-group's solved bindings. It rejects pending typed splices before zonking.
+-- | Publish the demanded character cases inside the solved binding scope.
+-- See Note [Checked local character cases].
+withLocalCharacterTables :: [(Name, SrcSpan)] -> (NameEnv (Id, CoreExpr), NameEnv Id)
+                         -> TcM (TcGblEnv, TcLclEnv) -> TcM (TcGblEnv, TcLclEnv)
+withLocalCharacterTables demands definitions@(cores, _) check = do
+    let alias_target name = pure $ case lookupNameEnv cores name of
+          Just (_, Core.Var target) -> unitNameSet (idName target)
+          _ -> emptyNameSet
+    demanded <- closeLocalNames alias_target emptyNameSet (map fst demands)
+    let selected (owner, _) = idName owner `elemNameSet` demanded
+    tables <- sourceCharacterTables (filterNameEnv selected cores)
+    checked <- installSourceTables tables
+    setGblEnv checked (withLocalOpenDefinitions definitions check)
+
+{- Note [Checked local character cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Renaming resolves the call to the ordinary term Name. For a same-group
+demand, tcLocalOpenGroup checks its dependency closure in an early batch.
+For an earlier-group demand, the splice path has already solved the
+bindings. localOpenDefinitions checks the resolved bindings and rejects
+pending typed splices before zonking.
 
 Certify only demanded bindings and their exact alias targets. Give the
 type checker the installed family for the same owner. Checking stays
-in the later group and uses the terms already in scope. Record family
+inside the solved scope and uses the terms already in scope. Record family
 use through the usual rule checks so a later rule can invalidate the proof.
 -}
 
@@ -2546,9 +2554,10 @@ tcLocalOpenGroup demands group@HsGroup
         tcTopSrcDeclGroupWithMethods (not (null instances)) early
       restoreEnvs envs $ do
         evs <- checkNoErrs (simplifyTop wanted)
-        definitions <- localOpenDefinitions (reverse ready)
+        let checked_demands = reverse ready
+        definitions <- localOpenDefinitions checked_demands
                          (tcg_ev_binds early_env `unionBags` evs) (tcg_binds early_env)
-        addTopEvBinds evs $ withLocalOpenDefinitions definitions $
+        addTopEvBinds evs $ withLocalCharacterTables checked_demands definitions $
           tcTopSrcDeclsThen (map fst (reverse blocked)) rest $ \rest_envs ->
             case methods of
               Nothing -> finish rest_envs
