@@ -82,6 +82,30 @@ a type declaration separately. Mixed dependencies on same-group type
 declarations, local instances, nonempty deriving, defaults and deferred
 errors remain open.
 
+## Stage a retained witness projection
+
+A local ordinary projection can supply the witness in a dependent
+result signature. For a previously checked `CharVector` type, the
+producer and consumer may be written in either order.
+
+```haskell
+localLength :: CharVector -> Nat
+localLength (CharVector n _) = n
+
+localCells :: foreach (v :: CharVector) -> Vec Char (localLength v)
+localCells (CharVector _ cells) = cells
+```
+
+The early group solves the ordinary worker before checking the second
+signature. The same constructor and field checks apply as for a
+worker exported through an interface. A prior solved group can also
+supply the worker. The existing scheduler still rejects type and value
+cycles. A pending typed splice does not run while deriving the
+equation. A rewrite rule that changes the worker invalidates its use.
+The source-hidden ordinary client reads each field without forcing the
+other. This check uses a monomorphic worker and an independently
+checked package declaration.
+
 ## Local synonyms in a retained field worker
 
 A retained GADT field can call a local worker whose signature uses

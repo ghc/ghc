@@ -81,7 +81,8 @@ import GHC.Core (CoreExpr)
 import qualified GHC.Core as Core
 import GHC.Core.Utils (exprType)
 import GHC.Data.OrdList (fromOL)
-import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCaseTables, sourceCharacterTables, isStructuralSourceTable, isNominalStructuralSource, sourceRuleOwners, sourceRuleOwnersAt, visibleSourceMethodRules,
+import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCaseTables, sourceCharacterTables, sourceRetainedWitnessTables, isMonomorphicRetainedWitness,
+                               isStructuralSourceTable, isNominalStructuralSource, sourceRuleOwners, sourceRuleOwnersAt, visibleSourceMethodRules,
                                hasSourceMethodRule, hasSourceMethodRuleAt, sourceLiteralWorkers, checkSourceMethodUses,
                                checkOptionalSourceUses, checkAndInstallSourceProofs,
                                sourceMapSelector, sourceTableDependencies)
@@ -1915,11 +1916,7 @@ tcTopSrcDeclsThen requests group finish = do
           , name <- names]
         demands | experimental = filter (not . (`elemNameSet` selectors) . fst) requests
                 | otherwise = requests
-    defer <- goptM Opt_DeferTypeErrors
-    holes <- goptM Opt_DeferTypedHoles
-    not_in_scope <- goptM Opt_DeferOutOfScopeVariables
-    when (not (null demands) && (defer || holes || not_in_scope)) $
-      rejectLocalOpen demands "Disable deferred errors before observing a local definition."
+    checkLocalOpenDeferrals demands
     env <- getGblEnv
     let checked = mkNameSet
           [ idName owner | bind <- tcg_binds env
@@ -1932,20 +1929,32 @@ tcTopSrcDeclsThen requests group finish = do
       -- tc_rn_src_decls has solved these bindings before running each splice.
       failIfErrsM
       definitions <- localOpenDefinitions previous (tcg_ev_binds env) (tcg_binds env)
-      withLocalCharacterTables previous definitions check_current
+      withLocalCaseTables previous definitions check_current
 
--- | Publish the demanded character cases inside the solved binding scope.
+-- | Do not observe a solved definition whose errors may have been deferred.
+checkLocalOpenDeferrals :: [(Name, SrcSpan)] -> TcM ()
+checkLocalOpenDeferrals [] = pure ()
+checkLocalOpenDeferrals demands = do
+    defer <- goptM Opt_DeferTypeErrors
+    holes <- goptM Opt_DeferTypedHoles
+    not_in_scope <- goptM Opt_DeferOutOfScopeVariables
+    when (defer || holes || not_in_scope) $
+      rejectLocalOpen demands "Disable deferred errors before observing a local definition."
+
+-- | Publish the demanded cases inside the solved binding scope.
 -- See Note [Checked local character cases].
-withLocalCharacterTables :: [(Name, SrcSpan)] -> (NameEnv (Id, CoreExpr), NameEnv Id)
-                         -> TcM (TcGblEnv, TcLclEnv) -> TcM (TcGblEnv, TcLclEnv)
-withLocalCharacterTables demands definitions@(cores, _) check = do
+withLocalCaseTables :: [(Name, SrcSpan)] -> (NameEnv (Id, CoreExpr), NameEnv Id)
+                    -> TcM (TcGblEnv, TcLclEnv) -> TcM (TcGblEnv, TcLclEnv)
+withLocalCaseTables demands definitions@(cores, _) check = do
     let alias_target name = pure $ case lookupNameEnv cores name of
           Just (_, Core.Var target) -> unitNameSet (idName target)
           _ -> emptyNameSet
     demanded <- closeLocalNames alias_target emptyNameSet (map fst demands)
     let selected (owner, _) = idName owner `elemNameSet` demanded
-    tables <- sourceCharacterTables (filterNameEnv selected cores)
-    checked <- installSourceTables tables
+        cases = filterNameEnv selected cores
+    tables <- sourceCharacterTables cases
+    witnesses <- sourceRetainedWitnessTables cases
+    checked <- installSourceTables (tables ++ witnesses)
     setGblEnv checked (withLocalOpenDefinitions definitions check)
 
 {- Note [Checked local character cases]
@@ -2405,8 +2414,26 @@ tcTopSrcTables group = do
         restoreEnvs envs $ do
           evs <- simplifyTop wanteds
           let names = mkNameSet (collectHsValBinders CollNoDictBinders (hs_valds early))
-          tables <- sourceTablesFor True names early_env
-          let found = mkNameSet (map (tyConName . snd) tables)
+          structural <- sourceTablesFor True names early_env
+          let known = mkNameSet (map (tyConName . snd) structural)
+              witness_owners = mkNameSet
+                [idName owner | bind <- tcg_binds early_env
+                              , owner <- collectHsBindBinders CollNoDictBinders (unLoc bind)
+                              , idName owner `elemNameSet` names
+                              , isMonomorphicRetainedWitness owner]
+              witnesses = [(term, nameSrcSpan term)
+                          | (term, family) <- needed, not (family `elemNameSet` known)
+                          , term `elemNameSet` witness_owners]
+          cases <- if null witnesses then pure [] else do
+            -- See Note [Scheduling a retained witness projection].
+            checkLocalOpenDeferrals witnesses
+            failIfErrsM
+            (cores, _) <- localOpenDefinitions witnesses (tcg_ev_binds early_env `unionBags` evs) (tcg_binds early_env)
+            let wanted_names = mkNameSet (map fst witnesses)
+                selected (owner, _) = idName owner `elemNameSet` wanted_names
+            sourceRetainedWitnessTables (filterNameEnv selected cores)
+          let tables = structural ++ cases
+              found = mkNameSet (map (tyConName . snd) tables)
           for_ needed $ \(term, family) ->
             unless (family `elemNameSet` found) $
               setSrcSpan (nameSrcSpan term) (addErr (TcRnNoSourceTable term))
@@ -2416,6 +2443,22 @@ tcTopSrcTables group = do
             setGblEnv tables_env $ do
               (rest_envs, _, _) <- tcTopSrcDeclGroupWithMethods False (Just deriving_info) rest
               pure rest_envs
+
+{- Note [Scheduling a retained witness projection]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A dependent result signature can name a local ordinary witness
+projection. The renamer's existing source-table dependency selects
+the typed worker before the consumer signature, even in reversed
+source order. Read its identity from the checked bindings. The
+early group's value Ids may not be in the global type environment.
+
+After solving the early group, obtain the demanded Core definitions
+through the local observer. This checks for pending typed splices
+before zonking. Use the same direct witness check as the final
+interface writer. Install the resulting table through the normal
+dependency and RULE checks. The renamer still owns group and cycle
+eligibility.
+-}
 
 {- Note [Deriving for early source tables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2589,7 +2632,7 @@ tcLocalOpenGroup demands group@HsGroup
         let checked_demands = reverse ready
         definitions <- localOpenDefinitions checked_demands
                          (tcg_ev_binds early_env `unionBags` evs) (tcg_binds early_env)
-        addTopEvBinds evs $ withLocalCharacterTables checked_demands definitions $
+        addTopEvBinds evs $ withLocalCaseTables checked_demands definitions $
           tcTopSrcDeclsThen (map fst (reverse blocked)) rest $ \rest_envs ->
             case methods of
               Nothing -> finish rest_envs

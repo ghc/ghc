@@ -1,5 +1,5 @@
 -- | Closed type families for checked functions that match one constructor.
-module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableTyCons, sourceCaseTables, sourceCharacterTables, finalCoreMappers, verifyFinalCoreMapper, failedFinalListTables, finalCoreSourceFamilies, isFinalCoreIdentity, indexedProjectionSource, isFinalCoreReverseWrapper, sourcePairBuilderField, lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
+module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableTyCons, sourceCaseTables, sourceCharacterTables, sourceRetainedWitnessTables, isMonomorphicRetainedWitness, finalCoreMappers, verifyFinalCoreMapper, failedFinalListTables, finalCoreSourceFamilies, isFinalCoreIdentity, indexedProjectionSource, isFinalCoreReverseWrapper, sourcePairBuilderField, lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
                               sourceTableCallees, sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
                               sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, monomorphicEnumCaseArity, groundFirstHead,
                               isFinalStructuralSource, isStructuralSourceTable, isNominalStructuralSource,
@@ -89,7 +89,7 @@ import GHC.Types.InlinePragma (ActivationX(ActiveAfter, ActiveBefore), PhaseNum,
 import GHC.Types.Name (Name, OccName, isExternalName, mkSourceTableOcc, mkSourceFstOcc, mkSourceSndOcc, mkInstTyCoOcc, mkTcOcc,
                        isVarOcc, mkTyVarOcc, mkVarOcc, nameModule_maybe, nameOccName, nameSrcSpan, occNameString, setOccNameSpace, sourceTableTermOcc, stableNameCmp, nameStableString, tvName, SourceProofRule, SourceProofArgs, SourceProofArg(..))
 import GHC.Core.Opt.Pipeline (pairObservationOcc, pairObservationType, scalarRecipeTableOcc)
-import GHC.Types.Name.Reader (gre_imp, is_decl, is_isboot, lookupGRE_Name)
+import GHC.Types.Name.Reader (GlobalRdrEnv, gre_imp, is_decl, is_isboot, lookupGRE_Name)
 import GHC.Types.Name.Env (NameEnv, delFromNameEnv, elemNameEnv, extendNameEnv, extendNameEnv_C, isEmptyNameEnv,
                            lookupNameEnv, mkNameEnv, nonDetNameEnvElts, plusNameEnv_C)
 import GHC.Types.Name.Set (NameSet, emptyNameSet, elemNameSet, extendNameSet, extendNameSetList, filterNameSet,
@@ -2231,18 +2231,6 @@ sourceCaseTables binds = do
       where
         enumVisible = maybe False (publicCaseType env exported imported . fst) . caseDatatype
 
-    publicCaseType env exported imported tc =
-      all available (tyConName tc : map dataConName (tyConDataCons tc))
-      where
-        available name
-          | nameModule_maybe name == Just (tcg_semantic_mod env)
-          = name `elemNameSet` exported
-          | otherwise = imported name
-
-    ordinaryImport rdr_env name = case lookupGRE_Name rdr_env name of
-      Just gre -> any ((== NotBoot) . is_isboot . is_decl) (gre_imp gre)
-      Nothing -> False
-
     bindingCore bind owner = do
       (messages, bindings) <- initDsTc (dsTopLHsBinds [bind])
       pure $ case bindings of
@@ -2306,6 +2294,41 @@ sourceCharacterTables definitions = do
         | otherwise -> publishCertifiedCharacter owner rhs
       Nothing -> pure Nothing
   publishCharacterAliases env candidates direct
+
+-- | Certify only the demanded direct witnesses from already solved bindings.
+sourceRetainedWitnessTables :: NameEnv (Id, Core.CoreExpr) -> TcM [(Id, TyCon)]
+sourceRetainedWitnessTables definitions = do
+  env <- getGblEnv
+  rdr_env <- getGlobalRdrEnv
+  let exported = availsToNameSet (tcg_exports env)
+      public = publicCaseType env exported (ordinaryImport rdr_env)
+      candidates = sortBy (\(left, _) (right, _) -> stableNameCmp (idName left) (idName right))
+                   (nonDetNameEnvElts definitions)
+  fmap catMaybes $ forM candidates $ \(owner, rhs) ->
+    if isMonomorphicRetainedWitness owner
+      then case checkedConstructorCase public (const Nothing) owner rhs of
+        Just (signature, rows) -> Just . (owner,) <$> publishConstructorCase owner signature rows
+        Nothing -> pure Nothing
+      else pure Nothing
+
+-- | The early witness path only considers signatures accepted by this rule.
+isMonomorphicRetainedWitness :: Id -> Bool
+isMonomorphicRetainedWitness = isJust . monomorphicRetainedWitnessType . varType
+
+-- | Require the case datatype and all of its constructors to be visible.
+publicCaseType :: TcGblEnv -> NameSet -> (Name -> Bool) -> TyCon -> Bool
+publicCaseType env exported imported tc =
+  all available (tyConName tc : map dataConName (tyConDataCons tc))
+  where
+    available name
+      | nameModule_maybe name == Just (tcg_semantic_mod env) = name `elemNameSet` exported
+      | otherwise = imported name
+
+-- | A constructor-case certificate cannot depend on a boot-only import.
+ordinaryImport :: GlobalRdrEnv -> Name -> Bool
+ordinaryImport rdr_env name = case lookupGRE_Name rdr_env name of
+  Just gre -> any ((== NotBoot) . is_isboot . is_decl) (gre_imp gre)
+  Nothing -> False
 
 -- | Order exact aliases of checked character workers by source identity.
 publishCharacterAliases :: TcGblEnv -> [(Id, Core.CoreExpr)] -> [(Id, TyCon)]
