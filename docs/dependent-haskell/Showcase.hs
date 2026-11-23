@@ -2496,7 +2496,10 @@ listBoundaries = do
     observe "read a supplied field when its sibling is omitted"
         (toList (Named.namedFlags flagsOnly))
     let updated = named
-            { Named.namedFlags = replicateNative (Named.storedLength named) False }
+            { Named.namedFlags = case Named.namedFlags named of
+                VNil -> VNil
+                VCons _ rest -> VCons False rest
+            }
     observe "replace a named field at the original stored length"
         (natToInt (Named.storedLength updated), NamedSiblingColumnsClient.readPairs updated)
     let unpack :: forall len. TypeLambda.Fields '[Vec Char len, Vec Bool len] -> (String, [Bool])

@@ -413,11 +413,11 @@ names the required field.
 [Field omission and witness inference](../REFERENCES.md#omitted-fields-in-a-dependent-record).
 
 An ordinary caller can replace one payload at the original witness.
-For example, `p { namedFlags = replicateNative (storedLength p) False }`
-uses `storedLength p` for the replacement type and keeps the other
-fields. Job 1968 passed the source-hidden test at `-O0` and `-O2`.
-It checked the unchanged length, lazy demand for the other fields,
-and the GHC-83865 error for a vector at a separate record's witness.
+The Showcase sets the first flag to `False` and keeps the rest of the
+vector. The update checks the replacement at `storedLength p` for
+receiver `p`. Job 1968 passed the source-hidden test at `-O0` and `-O2`.
+It checked the unchanged length, the laziness of the fields, and the
+GHC-83865 error for a vector at a separate record's witness.
 The receiver must be a supported retained operand, such as a local
 variable. To change the witness or replace several fields, construct
 a new record.
