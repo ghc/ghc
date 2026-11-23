@@ -44,6 +44,16 @@ lambda because it is unmatchable. Both checks pass in the isolated
 compiler. [Map source](../examples/open-evaluation/TypeLambda.hs) and
 [proposal decisions](../REFERENCES.md#matchability-and-multiplicity-on-arrows).
 
+## Standalone opt-in
+
+Enable `UnsaturatedTypeFamilies` to pass a partial family or synonym
+without enabling retained quantifiers, retained sums, or term promotion.
+The flag implies `TypeFamilies` and explicit matchability printing, as
+specified by [proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#proposed-change-specification).
+Use `Modifiers` separately for the current `%M` and `%U` arrow syntax.
+The umbrella keeps its existing admission without implying `TypeFamilies`
+or its local-generalisation restriction. [Source-hidden regression](../../../testsuite/tests/dependent/should_run/NativeStandaloneUnsaturation.sh).
+
 ## Compatibility with existing Haskell
 
 An ordinary module with `LiberalTypeSynonyms` can pass a partially applied

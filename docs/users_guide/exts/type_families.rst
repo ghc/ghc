@@ -8,7 +8,8 @@ Type families
 
     :implies: :extension:`MonoLocalBinds`, :extension:`KindSignatures`,
               :extension:`ExplicitNamespaces`
-    :implied by: :extension:`TypeFamilyDependencies`
+    :implied by: :extension:`TypeFamilyDependencies`,
+                 :extension:`UnsaturatedTypeFamilies`
     :since: 6.8.1
 
     Allow use and definition of indexed type and data families.
@@ -70,6 +71,45 @@ families <https://www.haskell.org/haskellwiki/GHC/Indexed_types>`__.
     Proceedings of “ICFP 2008: The 13th ACM SIGPLAN International Conference
     on Functional Programming”, ACM Press, pages 51-62, 2008.
 
+
+Unsaturated type families and synonyms
+-------------------------------------
+
+.. extension:: UnsaturatedTypeFamilies
+    :shortdesc: Allow partial applications of type families and type synonyms.
+    :implies: :extension:`TypeFamilies`
+    :since: 10.1
+
+    Permit a type argument to be a partial application of a type family or
+    type synonym at an unmatchable arrow kind.
+
+For example, the same unsigned synonym can apply a type family and a data
+type constructor::
+
+    {-# LANGUAGE UnsaturatedTypeFamilies #-}
+    module Callbacks where
+
+    type family Identity a where
+        Identity a = a
+
+    type Apply f a = f a
+
+    familyResult :: Apply Identity Bool
+    familyResult = True
+
+    constructorResult :: Apply Maybe Bool
+    constructorResult = Just True
+
+GHC infers the matchability of an unsigned higher-order synonym parameter.
+A written kind still fixes the matchability. To write an explicit
+matchability on an arrow, enable :extension:`Modifiers` and annotate the
+arrow with ``%M`` or ``%U`` from ``GHC.Matchability``. The extension turns
+on :ghc-flag:`-fprint-explicit-matchabilities`.
+
+:extension:`ExperimentalDependentTypes` also permits partial applications
+through its existing checks. It has independent implications. In
+particular, ``NoUnsaturatedTypeFamilies`` disables the standalone flag
+while the umbrella continues to permit these applications.
 
 .. _data-families:
 
@@ -278,12 +318,11 @@ defaults to ``Type`` if omitted. An example is ::
 
 Parameters can also be given explicit kind signatures if needed. We call
 the number of parameters in a type family declaration, the family's
-arity, and all applications of a type family must be fully saturated
-with respect to that arity. This requirement is unlike ordinary type synonyms
-and it implies that the kind of a type family is not sufficient to
-determine a family's arity, and hence in general, also insufficient to
-determine whether a type family application is well formed. As an
-example, consider the following declaration: ::
+arity. By default, a type family application must supply all arguments up
+to that arity. :extension:`UnsaturatedTypeFamilies` can permit a partial
+application at an unmatchable kind. The declaration determines the
+family's arity. The kind alone is insufficient to decide if an application
+is saturated. For example::
 
     type family F a b :: Type -> Type
       -- F's arity is 2,
@@ -339,8 +378,8 @@ higher-rank scenario: ::
       --     In the type ‘HRK F1’
       --     In the type declaration for ‘H2’
 
-This is a consequence of the requirement that all applications of a type family
-must be fully saturated with respect to their arity.
+With the default saturation rule, these checks instantiate invisible
+parameters up to the family's arity.
 
 .. _type-instance-declarations:
 
