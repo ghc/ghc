@@ -141,6 +141,18 @@ that changes the returned length also prevents its use.
   mismatched index and the two independent field-demand examples.
 - [x] Use the ordinary imported first projection in the result signature.
 
+The same projection works for a package with no type parameters.
+The ordinary length worker exports an equation for the direct first
+field. An interface-only module can use that equation to check the
+vector's result type. The qualified reader accepts the valid signature
+and rejects a result at the successor index. Reading the stored length
+leaves the payload unevaluated. Demanding the vector can encounter an
+exception in that field while the witness remains unevaluated.
+[Package](../examples/packed-vector/RetainedCharVector.hs).
+[Length worker](../examples/packed-vector/RetainedCharLength.hs).
+[Dependent projection](../examples/packed-vector/RetainedCharProjection.hs).
+[Ordinary client](../examples/packed-vector/RetainedCharClient.hs).
+
 ## Abstract over the payload family
 
 The family parameter `p` may itself be a variable. The promoted kind

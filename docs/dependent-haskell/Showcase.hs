@@ -222,6 +222,7 @@ import RetainedNat (Retained(..), constantPackage, withRetained)
 import qualified DependentPair as Pair
 import qualified DependentProjection as Pair
 import qualified RetainedProjection
+import qualified RetainedCharClient
 import qualified QualifiedPiLibrary as Qualified
 import qualified QuantifiedGadtIndex as QuantifiedIndex
 import qualified ReadNatural
@@ -2450,6 +2451,7 @@ listBoundaries = do
     let p = packList xs
     observe "project the vector at the length stored in its own package"
         (toList (PackedProjection.payload p))
+    RetainedCharClient.observeProjection >>= observe "project each field of a monomorphic retained vector"
     observe "project the length of a known dependent package in a type"
         (Refl :: PackedProjection.Length PackedProjection.One :~: 'S 'Z)
     let vector = Retain n (replicateNative n 'x') :: Retained (Vec Char)
