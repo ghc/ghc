@@ -47,24 +47,37 @@ the new kind.
 
 [Proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#proposed-change-specification),
 [arrow syntax decision](../REFERENCES.md#matchability-and-multiplicity-on-arrows),
-[built-in arithmetic](../REFERENCES.md#built-in-arithmetic-as-a-higher-order-argument)
+[built-in arithmetic example](#passing-built-in-arithmetic-to-map)
 and [the stock transformer case](#a-transformer-kind-synonym).
 
-### Built-in arithmetic callbacks
+## Passing built-in arithmetic to Map
 
-On the standalone flag compiler `4215377781`, job 1595 checked
-`Map ((+) 1) '[2, 3, 4]`, `Map (CmpNat 3) '[2, 3, 4]` and a
-list mapped with `AppendSymbol "ghc-"`. All three direct uses
-reported GHC-27346. Passing a user-defined closed family that
-saturates the operation proved all three results with `Refl`.
+On public 561 a user-defined closed family can pass built-in arithmetic
+to a higher-order type function. `Map` here takes an unmatchable
+type function and applies it to each element of a type-level list.
+This example uses `UndecidableInstances` for the wrapper equation.
 
-Job 1601 checked those wrappers on public 561 at `-O0` and `-O2`
-with Core and STG Lint. The family wrappers passed. With type synonyms in their place, Core
-Lint found
-`AppendSymbol "ghc-"` unsaturated in the type of the symbol-list proof.
-The fix must cover partial functions reconstructed from type synonyms
-as well as direct source applications.
-[Built-in arithmetic references](../REFERENCES.md#built-in-arithmetic-as-a-higher-order-argument).
+```haskell
+type family AddOne (n :: Nat) :: Nat where
+  AddOne n = 1 + n
+
+addProof :: Map AddOne '[2, 3, 4] :~: '[3, 4, 5]
+addProof = Refl
+```
+
+The same test covers comparison with `CmpNat 3 n` and string prefixes
+with `AppendSymbol "ghc-" s`. Job 1601 compiled all three proofs at
+`-O0` and `-O2` with Core and STG Lint. Replacing the closed families
+with ordinary type synonyms exposed a compiler defect at both levels.
+Core Lint reported an unsaturated `AppendSymbol "ghc-"` in the type
+of the string-list proof.
+
+Job 1595 also checked direct `Map ((+) 1)`, `Map (CmpNat 3)` and
+`Map (AppendSymbol "ghc-")` on the private standalone-flag compiler
+at `4215377781`. All three produced GHC-27346. The current arity
+check excludes built-in families from partial application. This
+limitation applies even when the built-in has an unmatchable arrow.
+[Arithmetic and arity references](../REFERENCES.md#built-in-arithmetic-as-a-higher-order-argument).
 
 ## Matchability on a source arrow
 
