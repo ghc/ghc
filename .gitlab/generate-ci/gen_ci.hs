@@ -1255,6 +1255,10 @@ onlyRule t = modifyValidateJobs (onlyValidateJobRule t)
 disableValidate :: JobGroup Job -> JobGroup Job
 disableValidate = modifyValidateJobs (removeValidateJobRule FastCI . removeValidateJobRule FullCI)
 
+-- | Drop the nightly job from a 'JobGroup'.
+disableNightly :: JobGroup a -> JobGroup a
+disableNightly jg = jg { n = Nothing }
+
 ---------------------------------------------------------------------
 -- NamedJob
 ---------------------------------------------------------------------
@@ -1349,7 +1353,8 @@ debian_x86 =
   , onlyRule LLVMBackend (validateBuilds Amd64 (Linux validate_debian) llvm)
   , addValidateRule TestPrimops (standardBuilds Amd64 (Linux validate_debian))
 
-  , onlyRule NonmovingGc (validateBuilds Amd64 (Linux validate_debian) vanilla {validateNonmovingGc = True})
+  , -- No nightly while the test job times out: #27284
+    disableNightly (onlyRule NonmovingGc (validateBuilds Amd64 (Linux validate_debian) vanilla {validateNonmovingGc = True}))
   , onlyRule IpeData (validateBuilds Amd64 (Linux validate_debian) zstdIpe)
   ]
   where
