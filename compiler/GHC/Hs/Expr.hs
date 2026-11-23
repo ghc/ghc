@@ -865,7 +865,8 @@ pprApp app
     ppr_type_arg ext arg
       | GhcRn <- ghcPass @p
       , Just (HsAppTypeSource written) <- ext
-      = ifPprDebug (ppr arg) (ppr written)
+      = ifPprDebug (ppr arg) $
+          updSDocContext (\ctx -> ctx { sdocSuppressUniques = True }) (ppr written)
       | otherwise = ppr arg
 
     ppr_app fun args
