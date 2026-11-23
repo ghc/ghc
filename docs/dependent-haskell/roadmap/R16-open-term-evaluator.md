@@ -2714,8 +2714,9 @@ The client tests both a singleton right list and an empty right list.
 | --- | --- | --- | --- |
 | Published 577, `-O0` | `Zero / Zero` | `Zero / Zero` | `Refl` |
 | Published 577, `-O2 -fno-enable-rewrite-rules` | `Zero / Zero` | `Zero / Zero` | `Refl` |
-| 577 and 578, default `-O2` | `Zero / bottom` | `Zero / Zero` | Core Lint fails after Specialise |
+| 577 and 578 with the original package, default `-O2` | `Zero / bottom` | `Zero / Zero` | Core Lint fails after Specialise |
 | 577 with the private Specialise change, default `-O2` | `Zero / bottom` | `Zero / Zero` | `Refl` |
+| 578 with the current HaskLib proof kept out of line, default `-O2` | `Zero / bottom` | `Zero / Zero` | `Refl` |
 
 Both right lists produced the same observations. The executable forced each
 count only to its outer constructor. Here `bottom` records a caught
@@ -2734,7 +2735,12 @@ Job 1952 compiled the linked source files against both installed packages.
 At `-O0` and at `-O2 -fno-enable-rewrite-rules` the program printed
 `Zero / Zero` for both controls and returned `Refl` for both right lists.
 At default `-O2` each compiler reported the unsupported `build` argument
-in `MapZipFusionWitness.hs`. To run the example with HaskLib installed:
+in `MapZipFusionWitness.hs`. Job 1969 used the same compiler with the
+rewritten proof in a fresh HaskLib installation. The proof matched
+`lengthMap` and returned `lengthZip` in that branch. Its `NOINLINE`
+pragma kept the two proof steps inside the module that disables list rules.
+The optimized program returned `Refl` and still observed the independent
+demand difference. To run the example with HaskLib installed:
 
 ```sh
 src=docs/dependent-haskell/examples/open-evaluation

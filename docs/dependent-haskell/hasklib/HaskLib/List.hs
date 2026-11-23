@@ -60,11 +60,22 @@ lengthTakeSize (Succ _) [] = Refl
 lengthTakeSize (Succ n) (_ : xs) = congSucc (lengthTakeSize n xs)
 
 -- | Mapping the pairs preserves the length of the shorter list.
+-- See Note [Inlining the composed zip proof].
+{-# NOINLINE lengthMapZip #-}
 lengthMapZip :: forall a b c. foreach (f :: (a, b) -> c)
              -> foreach (xs :: [a]) -> foreach (ys :: [b])
              -> size (map f (zip xs ys)) :~: minSize (size xs) (size ys)
 lengthMapZip f xs ys = case lengthMap f (zip xs ys) of
     Refl -> lengthZip xs ys
+
+{- Note [Inlining the composed zip proof]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This module checks the two proof steps with list rewrite rules disabled.
+Inlining the proof in an optimized caller can expose the indexed argument
+of lengthMap to the zip rule. Specialise can then replace that argument
+with build. Core Lint rejects the changed index. Keep the proof call intact.
+See Note [Map fusion and length witnesses] for the separate demand issue.
+-}
 
 -- | Count the result of the reverse worker with any accumulator.
 lengthReverseOnto :: forall a. foreach (xs :: [a]) -> foreach (acc :: [a])
