@@ -41,6 +41,12 @@ in kinds. The R24 card links the review questions to the interface test.
 [Disallow constraints in kinds](https://ghc-proposals.readthedocs.io/en/latest/proposals/0547-no-kind-equalities.html)
 and [R24 source syntax](roadmap/R24-constrained-type-families.md#source-syntax-and-separate-compilation).
 
+R04 uses an ordered telescope for a record with several indexed fields.
+One stored length can occur in the types of two later vectors. Instantiate
+both field types with that same binder when opening the package.
+[Agda telescopes](https://agda.readthedocs.io/en/v2.8.0/language/telescopes.html)
+and [two vector fields at one length](roadmap/R04-dependent-sums.md#two-vector-fields-at-one-length).
+
 R04 also needs projections of an abstract package. Haskell permits
 exporting a datatype without its constructor. Agda allows an abstract
 definition to reduce inside an abstract implementation while checking
@@ -60,6 +66,14 @@ named and inline case stuck when it has no nominal equality.
 [Agda function equality](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#lambda-expressions),
 [#242 review](https://github.com/ghc-proposals/ghc-proposals/pull/242#issuecomment-503360362)
 and [the two callback spellings](roadmap/R17-type-level-lambdas.md#forwarding-the-same-callback).
+
+For expression type signatures, R17 follows GHC's lexical scope rule.
+With `ScopedTypeVariables`, an explicit `forall` in an annotation
+binds its variables over the annotated expression. A nested type lambda
+must capture the variable at that binding site, including its kind.
+Agda's ordinary lambda supplies the comparison for abstraction.
+[GHC expression type signatures](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/scoped_type_variables.html#expression-type-signatures)
+and [Agda lambda expressions](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#lambda-expressions).
 
 Agda lets a field's type use earlier field values in the same record.
 GHC record dot uses `HasField` with a result determined by the label

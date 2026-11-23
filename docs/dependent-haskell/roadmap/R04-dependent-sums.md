@@ -289,6 +289,35 @@ distinguishes the places where an abstract function may reduce.
 [Haskell 2010 exports](https://www.haskell.org/onlinereport/haskell2010/haskellch5.html)
 and [Agda abstract definitions](https://agda.readthedocs.io/en/v2.8.0/language/abstract-definitions.html).
 
+### Two vector fields at one length
+
+A next positional case has two vector fields with a common index.
+
+```haskell
+data Columns where
+    Columns :: foreach (n :: Nat) -> Vec Char n -> Vec Bool n -> Columns
+
+size :: Columns -> Nat
+size (Columns n _ _) = n
+
+letters :: foreach (p :: Columns) -> Vec Char (size p)
+letters (Columns _ xs _) = xs
+
+flags :: foreach (p :: Columns) -> Vec Bool (size p)
+flags (Columns _ _ bs) = bs
+```
+
+Each projection should preserve the index of its own input. Reading either vector should leave the other
+unevaluated. A separate client claiming `Vec Bool (S (size p))` should
+fail at the returned field. Check both projections through an interface
+and ensure an older reader reports an unsupported interface before it
+uses evidence that needs the extended constructor kind.
+
+In Agda, the types of later bindings in a telescope may refer to an
+earlier binding. This permits both fields to use the same length.
+[Agda telescopes](https://agda.readthedocs.io/en/v2.8.0/language/telescopes.html)
+and [Serokell dependent sums](https://ghc.serokell.io/dh#dependent-sums).
+
 ### What record dot would need
 
 With the standard GHC interpretation, `packet.cells` uses `getField`.

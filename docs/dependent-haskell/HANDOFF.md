@@ -34,12 +34,25 @@ list that job as running. Check the slice's `cgroup.events` before
 diagnosing a stalled build. The ordinary replacement check records
 its job in `r04-projection-replacement-572-20261123/normal.pueue.id`.
 
-The next R17 candidate checks an unapplied lambda under its enclosing
-signature's type variables. The combined 573 runner in
-`r17-r04-combined-normal-573-20261123` also checks projections with
-opaque payload types. It requires the published 572 revision and the
-572 qualification results. The checked candidate for a package and its
-projections in one source group is a separate R04/R21 experiment.
+Job 1818 checks an incremental upgrade from 571. It keeps the old
+ordinary length worker's source, object and interface in place, then
+adds the dependent consumer and invokes `--make`. Read the outcome
+under `r04-warm-projection-572-20261123/component`. The older-reader
+check in job 1752 started with a newly compiled provider.
+
+After 572, check jobs 1793, 1799 and 1801 before scheduling another
+full build. They cover an installed abstract vector package, inline type
+lambdas in expression annotations, and an ordinary vector replacement
+using projections defined beside the datatype.
+The current private source and test revisions have local recovery refs
+under `refs/archive/dependent-haskell/2026-11-23/`.
+
+The staged 573 compiler checks lambda formation under the enclosing
+signature's type variables, passive-field visibility and diagnostics
+for non-injective source functions. Its runner needs the published 572
+revision and receipts. The integration plan for a single later build is
+`_build/on-demand/r04-r21-r17-integration-after-573-20261123/QUALIFICATION.md`.
+Run the compatibility suites and the new cases on the combined compiler.
 
 The preceding R04 compiler is `aba28b367f`. A dependent pair can select
 its payload type with an associated family. Reading the tag leaves
