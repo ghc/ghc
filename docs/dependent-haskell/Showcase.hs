@@ -38,6 +38,7 @@ import qualified CallbackRulesClient
 import qualified CharacterDecision
 import qualified RetryCharacters
 import qualified CharacterExport
+import qualified CharacterCase
 import qualified ClosedLengthProducer as Length
 import qualified ClosedTableLibrary as Table
 import qualified CompareAt
@@ -1283,6 +1284,7 @@ main = do
     observe "ordinary identity applied to a type variable" (openIdentity @Int)
     observe "uppercase character and digit proof from Data.Char" checkedCharacters
     observe "certified Unicode title, upper, and lower case" certifiedCaseMappings
+    observe "certified character predicate" certifiedCharacterPredicate
     observe "match the Int# field in a closed type family" machineIntProof
     observe "match zero and the target maximum in a Word# family" PrimitiveWordFieldsClient.wordFieldResults
     observe "Prelude.const selects the first type variable" (openLeft 'x' (undefined :: Bool))
@@ -2084,6 +2086,15 @@ certifiedCaseMappings =
                 , charVal (Proxy @(Data.Char.toUpper '\x1c6'))
                 , charVal (Proxy @(UnicodeExport.Lower '\x1c4'))
                 ]
+
+-- | Check the specialized predicate equations and show the runtime results.
+certifiedCharacterPredicate :: [Bool]
+certifiedCharacterPredicate =
+    case ( Refl :: CharacterExport.Flag 'x' :~: 'True
+         , Refl :: CharacterExport.Flag 'é' :~: 'True
+         , Refl :: CharacterExport.Flag '!' :~: 'False
+         ) of
+        (Refl, Refl, Refl) -> map CharacterCase.flag ['x', 'é', '!']
 
 -- | Read the outcome from the decision constructor.
 characterDecisionValue :: CharacterDecision.Decision predicate result -> Bool
