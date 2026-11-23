@@ -2499,3 +2499,46 @@ recursive proof use under `congSucc`. It could not identify the seed
 at that use. The result was the same at `-O0` and `-O2`. A client of
 a separately compiled re-export still lacks the argument mapping.
 The guard continues to reject that call at default `-O2`.
+
+The successor at `5f39176d4e` checks the actual arguments of direct
+recursive calls. In `lengthAppend xs ys`, the recursive call passes
+the original `ys` binder in the second position. Job 1370 recovered
+that position for all three uses at both optimization levels. Job 1375
+kept the result unknown when a call replaced the seed with `[]`, used
+different seeds on different paths, or called a mutually recursive
+proof. A source-hidden client still needs the mapping from the
+provider and a separate check of the active rewrite rules.
+[Fixed parameters in recursive calls](../REFERENCES.md#append-fusion-with-a-strict-producer).
+
+The private compiler at `492fe1285a` records the checked position on
+the exported proof. A client with only interfaces recovered position 2
+for `lengthAppend`. A wrapper that swapped the inputs reported position
+1. With an older provider that lacked the position, the client kept
+the seed unknown. Changing only the recorded position from 2 to 1
+invalidated a previously compiled client. Jobs 1387 and 1393 checked
+the interface and recompilation behavior. A caller with a custom append
+rule still gets GHC-83605 at the proof use.
+
+A defined singleton is sufficient to expose a cons cell to a list
+producer. An outer fold can supply a stricter seed. Job 1395 used
+the following definitions with both `[True]` and `True : []`.
+
+```haskell
+data Result = Hit
+
+sensitive :: (Bool -> b -> b) -> b -> b
+sensitive cons seed = seed `seq` cons False seed
+
+step False _    = Hit
+step True  next = next
+
+outer = foldr step (error "fold seed") (build sensitive ++ [True])
+```
+
+With the producer compiled separately and marked `NOINLINE`, `outer`
+returned `Hit` at `-O0` and at `-O2 -fno-enable-rewrite-rules`.
+Default `-O2` raised the fold seed exception. The recursive HaskLib
+`size` returned two successors in all three modes, even with a bottom
+element in the singleton. A check that admits this particular use of
+`size` must account for the consuming function as well as the right
+list.

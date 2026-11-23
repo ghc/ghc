@@ -59,12 +59,45 @@ specialized :: Title 'x' :~: Data.Char.toTitle 'x'
 specialized = Refl
 ```
 
-This also affects the example above. A client cannot give
+On that compiler a client cannot give
 `spaceDecision 'x'` the result type `Decision Char.isSpace (Char.isSpace 'x')`.
 A closed family with an `'X'` branch and a catch-all stays stuck on
 `Title 'x'`. Neither branch equality was accepted. Job 1360 checks all
 three cases. Keep this candidate private until substituting a literal
 agrees with writing the literal at the original call.
+
+The successor at `9202568aae` drops the rule that selected opaque
+application solely because an operand was open. Its provider exports
+the following synonym alongside `spaceDecision`.
+
+```haskell
+type Space (c :: Char) = (Char.isSpace :: Char %U -> Bool) c
+
+atX :: Decision Char.isSpace (Space 'x')
+atX = spaceDecision 'x'
+```
+
+Here the kind ascription selects `Char.isSpace` as a function value.
+The compiler knows its identity but has no checked equations for it.
+The application stays opaque when the caller substitutes `'x'`. A
+direct, executable `Char.isSpace 'x'` still computes `'False`.
+For a function with checked source equations, the function-value form
+can reduce too. Jobs 1365 and 1372 checked both cases with only the
+provider interfaces on the client's import path. Reducing an ordinary
+executable call after substitution remains open.
+[Prior art for specialization](../REFERENCES.md#imported-functions-in-retained-indices).
+
+For `Data.Char.toTitle`, the original spelling can already work when
+the provider publishes its checked equations. Job 1382 compiled the
+unmodified title-case and lower-case workers with source-table
+publication enabled. The workers use the same literal-case form as the
+installed upper-case worker. With only interfaces, the client checked
+`Title 'x' :~: Data.Char.toTitle 'x'` and `Title 'x' :~: 'X'`.
+It also distinguished the title case of U+01C6 (U+01C5) from its
+upper case (U+01C4). An unknown input still blocked the catch-all.
+This was a package experiment. The normal build currently publishes
+only the upper-case table of these three.
+[Installed upper-case example](R16-open-term-evaluator.md#the-installed-unicode-function).
 
 ## Supported subset and evidence
 

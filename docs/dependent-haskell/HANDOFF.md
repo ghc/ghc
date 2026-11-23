@@ -141,12 +141,38 @@ The candidate accepted the open call in `NativeClosedCharRigid`. Job
 writing the literal directly. Keep the candidate private. See the
 [source and interface examples](roadmap/R03-dependent-products.md#specializing-an-imported-call).
 
+Its successor is `9202568aae` in
+`r03-explicit-function-normal-554-20261123/source`. Its exported
+`Space c` synonym lets a client specialize the decision at a literal.
+Jobs 1365 and 1372 checked opaque and source-backed functions with
+the compiler component. Job 1371 built both normal stages. Job 1377
+checks the Showcase, 95 focused registrations, the 234-case cohort,
+specialization and package identity. Job 1381 runs the maintained
+regressions at `10f627f3a7` and checks the interpreter-off selection.
+
+The next source pin is `1659c10b23` in
+`r03-r15-unicode-normal-555-20261123/source`. Job 1382 checked the
+generated title-case and lower-case equations through package interfaces.
+Job 1384 changed one title-case equation. GHC rechecked the unchanged
+client and rejected its previous proof. Job 1390 separately checked that
+an executable call still tracks its object file. Job 1391 passed all 555
+Showcase outputs at `-O0` with the experimental package interfaces.
+Job 1397 rebuilds Hadrian and the normal installation. Job 1398 checks
+109 focused registrations, the 234-case comparison and all three Showcase
+modes.
+
 Job 1335 used installed HaskLib on `4d10fdc35f` to check the
 [append counterexample](roadmap/R16-open-term-evaluator.md#append-fusion-and-an-undefined-right-list).
 The private guard rejected the proof at default `-O2`. The public R41
 compiler still accepts it. Job 1338 separately verified that GHCi
 shows constructor argument order from the published R41 interfaces.
 This supersedes stashed job 1273.
+
+On the private R16 compiler, job 1375 verified that the recursive
+`lengthAppend` proof passes the same right operand at each use.
+Jobs 1392 and 1393 checked that a source-hidden client can recover
+that position at `492fe1285a`. The optimized caller still needs the
+rewrite-rule check.
 
 The local archive refs `r19-r41-normal-552`, `r16-hasklib-tree-553`
 and `r27-legacy-transition-normal` are under

@@ -7434,6 +7434,14 @@ proof check for append. An ordinary optimized computation can still use
 [GHC list fusion rules](../../libraries/ghc-internal/src/GHC/Internal/Base.hs)
 and [measured append observations](roadmap/R16-open-term-evaluator.md#append-fusion-and-an-undefined-right-list).
 
+Lean tracks which caller parameter supplies each callee parameter in
+recursive definitions. A parameter can vary if some call supplies a
+different argument. The R16 prototype checks one special case in solved
+Core. Every relevant recursive call must pass the same binder in the
+same position. In `lengthAppend`, that position holds the right list.
+This argument check gives no evidence about which compiler rules can fire.
+[Lean's fixed-parameter analysis](https://leanprover-community.github.io/mathlib4_docs/Lean/Elab/PreDefinition/FixedParams.html#Lean.Elab.FixedParams.Info).
+
 ## Right fold after map
 
 The Agda standard library proves `foldr-map` by induction on the input
@@ -8161,6 +8169,17 @@ as the head of an application. The encoding is specific to this fork.
 [#242 on matchability](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchability),
 [Agda 2.8.0 opaque definitions](https://agda.readthedocs.io/en/v2.8.0/language/opaque-definitions.html)
 and [R03 source example](roadmap/R03-dependent-products.md#private-check-for-an-imported-function-in-an-index).
+
+Agda 2.8 implements `primIsSpace` with `Data.Char.isSpace`. Its unary
+primitive reducer first tries to read the argument as a character. A
+variable can block reduction. Once a character literal is available,
+the same reducer computes the Boolean result. This is the intended
+specialization behavior for computable Haskell indices. Agda controls
+opacity at a definition and its unfolding scope. Selecting a function
+value with a kind ascription is a convention of this fork.
+[Agda character primitives](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#characters),
+[Agda primitive reducer](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Primitive.hs)
+and [Agda opacity](https://agda.readthedocs.io/en/v2.8.0/language/opaque-definitions.html).
 
 ### Nested constructors with a runtime result index
 
