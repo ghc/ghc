@@ -174,6 +174,7 @@ HS
         cat >DirectIndexCoverage.hs <<'HS'
 {-# LANGUAGE DataKinds, EmptyCase, GADTs, NoExperimentalDependentTypes #-}
 module DirectIndexCoverage where
+import GHC.Sigma (Sigma(Pair))
 import NativeGadtRetainedSumProvider
 
 knownZero :: DirectVec a 'Z -> Bool
@@ -235,23 +236,38 @@ knownNestedBool (Blocked _ _ _ (VCons True _) _) = True
 knownNestedInaccessible :: Blocked a ('Block 'Z mark depth) -> Bool
 knownNestedInaccessible (Blocked _ _ _ (VCons _ _) _) = False
 knownNestedInaccessible (Blocked _ _ _ _ _) = True
+
+missingNamed :: Phantom -> Bool
+missingNamed (Pair Z _) = False
+
+missingApplied :: Packed Bool -> Bool
+missingApplied (Pair Z _) = False
+
+missingOrdinary :: OrdinaryOptional Bool -> Bool
+missingOrdinary (Just _) = False
 HS
         "${ghc[@]}" "${flags[@]}" -ferror-spans -Wincomplete-patterns -Woverlapping-patterns \
             -c DirectIndexCoverage.hs >coverage.log 2>&1
-        grep -Fq 'DirectIndexCoverage.hs:12:1-34: warning: [GHC-62161]' coverage.log &&
+        grep -Fq 'DirectIndexCoverage.hs:13:1-34: warning: [GHC-62161]' coverage.log &&
             grep -Fq 'not matched: DirectVec (S _) _' coverage.log &&
-            grep -Fq 'DirectIndexCoverage.hs:15:1-44: warning: [GHC-94210]' coverage.log &&
-            grep -Fq 'DirectIndexCoverage.hs:32:1-37: warning: [GHC-94210]' coverage.log &&
-            grep -Fq 'DirectIndexCoverage.hs:41:1-39: warning: [GHC-62161]' coverage.log &&
+            grep -Fq 'DirectIndexCoverage.hs:16:1-44: warning: [GHC-94210]' coverage.log &&
+            grep -Fq 'DirectIndexCoverage.hs:33:1-37: warning: [GHC-94210]' coverage.log &&
+            grep -Fq 'DirectIndexCoverage.hs:42:1-39: warning: [GHC-62161]' coverage.log &&
             grep -Fq 'not matched: SuccVec (S _) _' coverage.log &&
-            grep -Fq 'DirectIndexCoverage.hs:47:1-31: warning: [GHC-62161]' coverage.log &&
+            grep -Fq 'DirectIndexCoverage.hs:48:1-31: warning: [GHC-62161]' coverage.log &&
             grep -Fq 'not matched: Tile (S _) _ _' coverage.log &&
-            grep -Fq 'DirectIndexCoverage.hs:56:1-47: warning: [GHC-62161]' coverage.log &&
+            grep -Fq 'DirectIndexCoverage.hs:57:1-47: warning: [GHC-62161]' coverage.log &&
             grep -Fq 'Blocked _ _ _ VNil _' coverage.log &&
-            grep -Fq 'DirectIndexCoverage.hs:59:1-55: warning: [GHC-62161]' coverage.log &&
+            grep -Fq 'DirectIndexCoverage.hs:60:1-55: warning: [GHC-62161]' coverage.log &&
             grep -Fq 'Blocked _ _ _ (VCons False _) _' coverage.log &&
-            grep -Fq 'DirectIndexCoverage.hs:62:1-61: warning: [GHC-94210]' coverage.log &&
-            test "$(grep -c 'warning:' coverage.log)" -eq 8 || { cat coverage.log >&2; exit 1; }
+            grep -Fq 'DirectIndexCoverage.hs:63:1-61: warning: [GHC-94210]' coverage.log &&
+            grep -F -A3 'DirectIndexCoverage.hs:67:1-31: warning: [GHC-62161]' coverage.log |
+                grep -Fq 'Patterns of type ‘Phantom’ not matched: Pair (S _) _' &&
+            grep -F -A3 'DirectIndexCoverage.hs:70:1-33: warning: [GHC-62161]' coverage.log |
+                grep -Fq 'Patterns of type ‘Packed Bool’ not matched: Pair (S _) _' &&
+            grep -F -A3 'DirectIndexCoverage.hs:73:1-32: warning: [GHC-62161]' coverage.log |
+                grep -Fq 'Patterns of type ‘Maybe Bool’ not matched: Nothing' &&
+            test "$(grep -c 'warning:' coverage.log)" -eq 11 || { cat coverage.log >&2; exit 1; }
     fi
 
     cat >BadScope.hs <<'HS'

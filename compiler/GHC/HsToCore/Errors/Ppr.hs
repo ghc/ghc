@@ -74,13 +74,14 @@ instance Diagnostic DsMessage where
                $$ bullet <+> text "Redundant clauses might be reported as inaccessible"
                $$ bullet <+> text "Patterns reported as unmatched might actually be matched")
            ]
-    DsNonExhaustivePatterns kind _flag maxPatterns vars nablas
+    DsNonExhaustivePatterns kind _flag maxPatterns args nablas
       -> mkSimpleDecorated $
            pprContext False kind (text "are non-exhaustive") $ \_ ->
-             case vars of -- See #11245
+             case args of -- See #11245
                   [] -> text "Guards do not cover entire pattern space"
-                  _  -> let us = map (\nabla -> pprUncovered nabla vars) nablas
-                            pp_tys = pprQuotedList $ map idType vars
+                  _  -> let vars = map fst args
+                            us = map (\nabla -> pprUncovered nabla vars) nablas
+                            pp_tys = pprQuotedList $ map snd args
                         in  hang
                               (text "Patterns of type" <+> pp_tys <+> text "not matched:")
                               4

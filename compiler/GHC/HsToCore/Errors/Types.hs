@@ -98,7 +98,7 @@ data DsMessage
   | DsNonExhaustivePatterns !HsMatchContextRn
                             !ExhaustivityCheckType
                             !MaxUncoveredPatterns
-                            [Id]
+                            [(Id, Type)] -- Match variables and their display types
                             [Nabla]
 
   | DsTopLevelBindsNotAllowed !BindsType !(HsBindLR GhcTc GhcTc)

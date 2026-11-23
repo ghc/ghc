@@ -49,6 +49,9 @@ import GHC.HsToCore.Pmc.Solver
 import GHC.HsToCore.Types
 import GHC.Types.Basic (Origin(..))
 import GHC.Core
+import GHC.Core.TyCon (closedFamilyScope_maybe, isTypeSynonymTyCon, tyConArity)
+import GHC.Core.TyCo.Compare (eqType)
+import GHC.Core.Type (Type, splitTyConApp_maybe, splitTyConAppNoView_maybe)
 import GHC.Driver.DynFlags
 import GHC.Hs
 import GHC.Types.Id
@@ -115,7 +118,7 @@ pmcPatBind ctxt@(DsMatchContext match_ctxt loc) var p
       tracePm "pmcPatBind }: " $
         vcat [ text "cr_uncov:" <+> ppr (cr_uncov result)
              , text "ldi:" <+> ppr ldi ]
-      formatReportWarnings ReportPatBind ctxt [var] result
+      formatReportWarnings ReportPatBind ctxt [(var, idType var)] result
       return ldi
   where
     -- See Note [pmcPatBind doesn't warn on pattern guards]
@@ -170,11 +173,12 @@ pmcGRHSs hs_ctxt guards@(GRHSs _ grhss _) =
 pmcMatches
   :: Origin
   -> DsMatchContext                  -- ^ Match context, for warnings messages
+  -> [Type]                          -- ^ The checked match-group argument types
   -> [Id]                            -- ^ Match variables, i.e. x and y above
   -> [LMatch GhcTc (LHsExpr GhcTc)]  -- ^ List of matches
   -> DsM [(LdiNablas, NonEmpty LdiNablas)] -- ^ One covered 'Nablas' per Match and
                                      --   GRHS, for long distance info.
-pmcMatches origin ctxt vars matches = {-# SCC "pmcMatches" #-}
+pmcMatches origin ctxt arg_tys vars matches = {-# SCC "pmcMatches" #-}
   whenDoingPmc (initNablasMatches NoPmc matches) $ \ !missing -> do
   -- We have to force @missing@ before printing out the trace message,
   -- otherwise we get interleaved output from the solver. This function
@@ -190,7 +194,7 @@ pmcMatches origin ctxt vars matches = {-# SCC "pmcMatches" #-}
         empty_case <- dontDoPmc $ desugarEmptyCase var
         result <- unCA (checkEmptyCase empty_case) missing
         tracePm "}: " (ppr (cr_uncov result))
-        formatReportWarnings ReportEmptyCase ctxt vars result
+        formatReportWarnings ReportEmptyCase ctxt display_vars result
         return []
       Just matches -> do
         matches <- {-# SCC "desugarMatches" #-}
@@ -200,8 +204,41 @@ pmcMatches origin ctxt vars matches = {-# SCC "pmcMatches" #-}
                    unCA (checkMatchGroup matches) missing
         tracePm "}: " (ppr (cr_uncov result))
         ({-# SCC "formatReportWarnings" #-}
-          formatReportWarnings ReportMatchGroup ctxt vars result)
+          formatReportWarnings ReportMatchGroup ctxt display_vars result)
         return (NE.toList (ldiMatchGroup (cr_ret result)))
+  where
+    display_vars = zipWithEqual (\ty var -> (var, matchDisplayType ty var)) arg_tys vars
+
+{- Note [Aliases of retained sums in coverage warnings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained constructor pattern exposes its checked fields and constructor
+type. The match variable selected from that pattern can therefore have
+Sigma A p as its type. For a source sum p is a generated private family.
+The match group can still have the writer's type synonym. If the two
+types agree, display that synonym instead of the generated family. Obtain
+the synonym from the same argument position. Do not infer a synonym from
+the payload family, which can have several aliases.
+
+Use the original match variables to check inhabitation and print the
+missing patterns. The display type changes only the warning heading.
+For ordinary synonyms and associated-family contexts keep the existing
+spelling used by the match variable.
+-}
+
+-- | Choose the type to print with this match variable in a warning.
+matchDisplayType :: Type -> Id -> Type
+matchDisplayType expected var
+  | Just (synonym, _) <- splitTyConAppNoView_maybe expected
+  , isTypeSynonymTyCon synonym
+  , Just (_, [_, payload]) <- splitTyConApp_maybe actual
+  , Just (family, args) <- splitTyConApp_maybe payload
+  , Just (_, True) <- closedFamilyScope_maybe family
+  , length args + 1 == tyConArity family
+  , expected `eqType` actual
+  = expected
+  | otherwise = actual
+  where
+    actual = idType var
 
 initNablasMatches :: LdiNablas -> [LMatch GhcTc b] -> [(LdiNablas, NonEmpty LdiNablas)]
 initNablasMatches ldi_nablas ms
@@ -576,16 +613,18 @@ collectInMode ReportEmptyCase  = cirbsEmptyCase
 
 -- | Given a 'FormatReportWarningsMode', this function will emit warnings
 -- for a 'CheckResult'.
-formatReportWarnings :: FormatReportWarningsMode ann -> DsMatchContext -> [Id] -> CheckResult ann -> DsM ()
-formatReportWarnings report_mode ctx vars cr@CheckResult { cr_ret = ann } = do
+formatReportWarnings :: FormatReportWarningsMode ann -> DsMatchContext -> [(Id, Type)]
+                     -> CheckResult ann -> DsM ()
+formatReportWarnings report_mode ctx args cr@CheckResult { cr_ret = ann } = do
   cov_info <- collectInMode report_mode ann
   dflags <- getDynFlags
-  reportWarnings dflags report_mode ctx vars cr{cr_ret=cov_info}
+  reportWarnings dflags report_mode ctx args cr{cr_ret=cov_info}
 
 -- | Issue all the warnings
 -- (redundancy, inaccessibility, exhaustiveness, redundant bangs).
-reportWarnings :: DynFlags -> FormatReportWarningsMode ann -> DsMatchContext -> [Id] -> CheckResult CIRB -> DsM ()
-reportWarnings dflags report_mode (DsMatchContext kind loc) vars
+reportWarnings :: DynFlags -> FormatReportWarningsMode ann -> DsMatchContext -> [(Id, Type)]
+               -> CheckResult CIRB -> DsM ()
+reportWarnings dflags report_mode (DsMatchContext kind loc) args
   CheckResult { cr_ret    = CIRB { cirb_inacc = inaccessible_rhss
                                  , cirb_red   = redundant_rhss
                                  , cirb_bangs = redundant_bangs }
@@ -611,8 +650,9 @@ reportWarnings dflags report_mode (DsMatchContext kind loc) vars
         maybePutSrcSpanDs l (diagnosticDs (DsInaccessibleRhs kind q))
 
       when exists_u $
-        maybePutSrcSpanDs loc (diagnosticDs (DsNonExhaustivePatterns kind check_type maxPatterns vars unc_examples))
+        maybePutSrcSpanDs loc (diagnosticDs (DsNonExhaustivePatterns kind check_type maxPatterns args unc_examples))
   where
+    vars = map fst args
     flag_i = overlapping dflags kind
     flag_u = exhaustive dflags kind
     flag_b = redundantBang dflags

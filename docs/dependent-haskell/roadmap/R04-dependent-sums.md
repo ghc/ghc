@@ -290,6 +290,15 @@ GHC warns about a missing successor clause. An explicit successor clause
 at the known zero index has an inaccessible right-hand side. Its pattern
 can still force the stored witness.
 
+An ordinary client that omits the successor case of `Packed Bool` gets
+GHC-62161 at the incomplete equation. The warning names `Packed Bool`
+and shows the missing pattern `Pair (S _) _`. Desugaring takes the displayed
+alias from the checked argument type. Coverage checking still uses the
+lowered type. The source-hidden test also checks the unparameterized
+alias `Phantom` and an ordinary alias that still displays as `Maybe Bool`.
+[Source-hidden check](../../../testsuite/tests/dependent/should_run/NativeGadtRetainedSum.sh)
+and [desugaring](../../../compiler/GHC/HsToCore/Match.hs).
+
 An ordinary client can use `BangPatterns` to evaluate the stored length
 before it uses the payload. The test calls its version of `SomeVec`
 `DirectVec`. The payload still has the public index `n`.

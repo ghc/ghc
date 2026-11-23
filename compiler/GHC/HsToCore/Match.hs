@@ -859,7 +859,7 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches
 
             -- See Note [Long-distance information] in GHC.HsToCore.Pmc
             then addCoreScrutTmCs (concat scrs) new_vars $
-                 pmcMatches origin (DsMatchContext ctxt locn) new_vars matches
+                 pmcMatches origin (DsMatchContext ctxt locn) (map scaledThing arg_tys) new_vars matches
 
             -- When we're not doing PM checks on the match group,
             -- we still need to propagate long-distance information.

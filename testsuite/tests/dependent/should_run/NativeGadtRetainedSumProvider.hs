@@ -171,6 +171,9 @@ type Phantom = some (n :: Nat) | Vec Bool Z
 phantom :: Phantom
 phantom = Pair (S Z) VNil
 
+-- | Give an ordinary type synonym to the coverage client.
+type OrdinaryOptional a = Maybe a
+
 -- | Compare values whose vector indices must agree.
 sameLength :: forall n. foreach (xs :: Vec Bool n) -> foreach (ys :: Vec Bool n) -> Bool
 sameLength _ _ = True
