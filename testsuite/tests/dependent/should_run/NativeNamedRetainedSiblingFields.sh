@@ -257,7 +257,8 @@ wrong =
 HS
     reject 'GHC-83605' MissingChangedPayload.hs
     grep -Fq 'MissingChangedPayload.hs:9:12:' rejected.log
-    grep -Eq 'Updating witness field .*storedLength.*of constructor .*NamedColumns' rejected.log
+    grep -A1 -E 'Updating witness field .*storedLength.*of constructor' rejected.log |
+        grep -Fq 'NamedColumns'
     grep -Eq 'requires replacement for field .*namedLetters' rejected.log
 
     cat > WrongNewPayload.hs <<'HS'
