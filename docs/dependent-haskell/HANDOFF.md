@@ -8,6 +8,49 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
+Compiler `893d2ebc06` and Showcase `09b855305e` passed the 577-observation
+checkpoint. A heterogeneous row now takes its two vector lengths from
+one retained record. HaskLib also exports `lengthMapZip`; its proof uses
+`trans`, `lengthMap` and `lengthZip`.
+
+Job 1881 built the bootstrap and self-hosted compilers and passed all
+ten selected registrations. Both warm upgrade tests, both package tests
+and all 234 compatibility cases passed. The focused suite passed 137
+of 138. The remaining failure is the existing `MTrans` diagnostic in
+`deriving-via-compile`. Job 1893 ran all 577 observations at native
+`-O0`, default `-O2` and in GHCi after the local row signature gained
+an explicit `forall len`. The installed list-law client ran at both
+optimization levels with rewrite rules disabled.
+[Code and qualification](CHECKPOINTS.md#two-vector-fields-at-one-stored-length).
+
+For a restart, verify `published-qualification.tsv` in
+`_build/on-demand/r04-r16-r17-normal-after-574-20261123` with
+`python3 accept-publication.py` from that directory. Job 1881's original
+exit code is 1. Its three Showcase runs found the scoping error. The
+receipt includes the corrected Showcase and the original test suites.
+
+## Next compiler work
+
+| Jobs | Result and next action |
+| --- | --- |
+| 1863, 1880 | The warm native and typecheck-only upgrades recovered the sibling equation. An ordinary client consumed an unknown record at both optimization levels through a typed row eliminator. |
+| 1875, 1876 | The 574 compiler accepts `zip @a @b xs ys` in the composed length proof. The exported law passed after a fresh HaskLib installation with rewrite rules disabled. |
+| 1883, 1888, 1889, 1891, 1894 | The R16 component infers both element types from the lists. The implicit, partially explicit and fully explicit spellings agreed on demand at both optimization levels. Prefix, grouped and infix applications passed. The actual HaskLib package now builds with the implicit form. Vector append worked at its declared index at `-O0`. Its optimized provider's rewrite rule blocked both explicit and inferred proofs. Job 1894 passed the corrected vector test. |
+| 1871, 1884, 1890 | The matching compiler and external interpreter check the quoted row. All five checks in 1890 passed. A wildcard in a type case works directly and in a type quote. In a quoted type synonym it fails with GHC-65507, with or without a lambda. The baseline still rejects an enclosing variable captured by a spliced local signature. The combined candidate must accept that program. Job 1897 checks a separate fix for case-pattern wildcards in declaration quotes. |
+| 1882, 1885, 1892, 1895 | Source renaming resolved a length field used by later fields. Both native and typecheck-only builds then stalled checking the named record. A positional record and an ordinary record with selectors disabled compiled. Job 1895 deferred payload validation and compiled the provider. Its ordinary zip consumer still fails. Job 1898 compares handwritten and generated selectors from the same interface. |
+| 1866 | The private R23 change passed the original transformer test and 32 reification cases. An old installed provider still needs rebuilding. |
+
+The combined candidate for quoted row schemas and implicit proof
+composition is `c71890c7f1` in
+`r04-r17-combined-quoted-columns-20261123/source`. Merge the 577
+publication and run the candidate with its matching interpreter.
+The generated compiler trees for 564, 566, 567, 568 and 569 were retired.
+The commits, recipes and test results remain. The two retention manifests
+are `retirement-normal-564-566-20261123/retired.tsv` and
+`retirement-normal-567-569-20261123/retired.tsv`.
+
+## Previous checkpoints
+
 Updated 23 November 2026. The development branch is
 `dependent-haskell`. Use the fork command below to find its latest commit.
 
@@ -28,27 +71,10 @@ inferred capture kind in a type lambda. A reader built from 572
 consumed the resulting row from a stripped interface at both
 optimization levels.
 
-The private sibling candidate adds a second vector at the same stored
-length. Job 1855 passed the historical-reader and warm upgrade checks
-on the component compiler. Its ordinary source-hidden caller zipped
-the two vectors and rejected a field from another package. Its
-consolidated source is `95066da452`. Job 1863 checks a mixed module
-that already carries the preceding recompilation marker.
-
-R17 job 1859 built the quoted-lambda compiler and its libraries. The
-first quote failed because `GHC.KnownKeys` did not export `lamT`. Job
-1871 checks the export correction and its scope controls. Job 1865
-ran a heterogeneous row with two fields at one retained length. A
-named index alias worked. Capturing the record directly in the inline
-lambda failed with GHC-27185. Job 1869 checks the proposed repair. R23 job 1866
-tests the reification of legacy transformer kind synonyms on a private
-prototype. R04 job 1868 tests generated named selectors. Read each
-job's receipt before using its candidate. The two GHC slots share a
-16-core, 64,000,000,000-byte slice and yield to the benchmark queues.
-After the sibling upgrade passed, retiring its superseded build tree
-released 3,911,356,416 bytes. The template sources and recipes remain.
-The [queue recovery procedure](CHECKPOINTS.md#restore-the-shared-wsl-build-queue)
-restores those limits after a distribution restart.
+The two GHC build slots share a 16-core, 64,000,000,000-byte slice and
+yield to the benchmark queues. Use the
+[queue recovery procedure](CHECKPOINTS.md#restore-the-shared-wsl-build-queue)
+after a distribution restart.
 
 Job 1756 qualified the private 572 compiler. Job 1818 found its stale
 length interface before publication. Jobs 1843 and 1848 verified the
