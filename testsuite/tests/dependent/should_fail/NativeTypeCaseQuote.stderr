@@ -1,9 +1,0 @@
-NativeTypeCaseQuote.hs:5:9: error: [GHC-97233]
-    • A type case needs a supported position in a top-level type synonym, a top-level value signature, or a constructor field.
-    • In the Template Haskell quotation:
-        [t| case 'True of
-              True -> Int
-              False -> Bool |]
-  |
-5 | q = [t| case 'True of { True -> Int; False -> Bool } |]
-  |         ^^^^

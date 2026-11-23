@@ -97,6 +97,8 @@ test('T25834', normal, compile, [''])
 test('GADTSingletons', normal, compile, [''])
 test('NativeNestedSumCapture', normal, compile, [''])
 test('NativeDependentResultBinders', normal, compile, [''])
+test('NativeTypeCaseQuote', [req_th, only_ways(['normal'])],
+     compile, [config.ghc_th_way_flags])
 
 test('NativeSourceCallIface',
      extra_files(['../../../../docs/dependent-haskell/examples/qualified-pi/ClosedTableLibrary.hs',
