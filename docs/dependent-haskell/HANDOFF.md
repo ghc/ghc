@@ -40,13 +40,30 @@ records that failure on both 577 and 578.
 
 ## Next compiler work
 
+The combined candidate is `0d7904b831` at
+`refs/spikes/r04-r05-r17-combined-584`. Its Showcase has 584 expected
+observations. Job 1976 builds and tests this revision in
+`_build/on-demand/r04-r05-r17-combined-584-20261123`. Check
+`run-all.exit` and the individual gates before publishing it.
+Job 1972 built both stages of the earlier 581 candidate. Sixteen of 17
+registrations passed. The capture test expected the wrong error code.
+GHC reported GHC-25897 at `Captured.hs:14:17` for the rigid type variable.
+Job 1982 replays the corrected test with the same compiler and libraries.
+
 | Area | Verified result and next step |
 | --- | --- |
 | R04, R17 and R19 | The 581 source `156cd84633` combines named dependent record fields, wildcard patterns in quoted type cases and inline lambdas in visible type arguments. Job 1937 stopped on the Haddock conversion of H98 constructors. Commit `573a021142` corrected the optional renamed field. Job 1959 stopped before qualification to replace the proof and upgrade-test sources. Job 1972 resumes the warm tree at `3744f3820d` with the independent qualification programs in `r04-r19-following-quoted-578-20261123`. Check `qualification/gates.tsv`, `cohorts/gates.tsv` and `run-all.exit`. |
 | R04 omitted record fields | Job 1946 qualified `f2ab5c36a1` at both optimization levels. A supplied witness permits an omitted lazy sibling. Omitting the witness reports GHC-83605 at the constructor and names the required field. An omitted ordinary strict field still reports GHC-95909. Job 1954 exercised the exact additional Showcase row from `322b680d53` with the component compiler. The combined source still needs its normal build. |
+| R04 record update | The component at `435ef74242` accepts a change to one payload at the stored length. An ordinary caller can leave its sibling untouched. Job 1971 checked this case. The 584 candidate includes it. Job 1978 tests a separate change that also replaces the length witness. |
+| R17 visible type arguments | The component at `09dc3ac32d` accepts a quoted two-argument type lambda in a visible type argument. Jobs 1962 and 1967 checked the splice and its diagnostics. The 584 candidate includes this change. Job 1980 tests a separate rule for a lambda that forwards its argument to a named family. |
 | R05 Specialise | On both 577 and 578, default `-O2` replaced an indexed `zip` operand with `build`. Job 1948 preserved the checked operand, passed Core and STG Lint, and returned `Refl`. Job 1956 reproduced the repair with only `base`, a retained `Proxy` result and a vacuous binder. See `r05-specialise-retained-zip-20261123`. |
 | R16 proof validity | Independent count expressions can produce `Zero` and bottom under stock fusion. Both shared counts produced `Zero`. The private Specialise repair leaves that distinction observable. In job 1957, rebuilding HaskLib with private `4c4cc16244` recorded the `map` dependency on the composed proof. The optimized client then reported GHC-83605 at the call to `lengthMapZip`. The same diagnostic occurred with a producer that simply constructs one cell. The old installed interface still reached Core Lint. The consumer-side policy remains open. |
 | R23 matchability | The private prototype `99bfde4ec4` passed the original transformer test and 32 Template Haskell reification cases. An old installed provider still needs rebuilding. The published compiler retains the existing matchability policy. |
+
+For R16, job 1981 compares the published HaskLib interface with a fresh
+interface for the same package source. Both clients use the private
+compiler at `8bed8f549b`. The inputs and results belong to
+`r16-proof-provenance-current-hasklib-20261123`.
 
 The GHC queue has two slots. Other benchmark jobs take priority and freeze
 the GHC slice. Jobs 1947 and 1949 were exploratory allocation measurements.
