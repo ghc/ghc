@@ -470,6 +470,7 @@ capture a type before and after a local let: Refl
 give every field in a row the same error type: (Right 'x',Right True)
 map row cells with a lambda in a local signature: (Right 'x',Right True)
 tag a row cell with a local type lambda that infers the capture kind: True
+splice a column schema and attach a caller-supplied label: (Right 42,Left "missing flag",("column",True))
 forward a row with the same callback across modules: Right 'x'
 use column schemas defined in separate modules: (Just 42,Left "missing")
 map a type lambda with a constructor case: Refl
