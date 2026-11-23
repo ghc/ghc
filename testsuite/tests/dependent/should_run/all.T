@@ -50,6 +50,10 @@ test('NativeOpenCharFamily',
      [only_ways(['normal']),
       extra_files([open_eval_dir + f for f in ['CharacterCase.hs', 'CharacterExport.hs']])],
      run_command, ['bash NativeOpenCharFamily.sh "{compiler}" "{libdir}"'])
+test('NativeOpenCharPredicate',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files([open_eval_dir + f for f in ['CharacterCase.hs', 'CharacterExport.hs']])],
+     run_command, ['bash NativeOpenCharPredicate.sh "{compiler}" "{libdir}"'])
 test('NativeOpenInstalledUpper',
      [only_ways(['normal']), extra_files([open_eval_dir + 'UnicodeExport.hs',
                                         'NativeOpenInstalledInterfaces.sh'])],

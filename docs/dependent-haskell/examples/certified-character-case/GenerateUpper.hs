@@ -1,5 +1,6 @@
 module Main (main) where
 
+import Control.Monad (forM, unless)
 import GHC (
     CoreModule (..),
     compileToCoreModule,
@@ -10,9 +11,11 @@ import GHC (
     runGhc,
     setSessionDynFlags,
  )
+import GHC.Builtin.WiredIn.Types (charTyCon)
 import GHC.Core (bindersOfBinds, flattenBinds)
-import GHC.Core.CharCase (certOwner, certRows, certify)
+import GHC.Core.CharCase (certOwner, certResultTyCon, certRows, certify)
 import GHC.Core.Lint (lintExpr)
+import GHC.Core.Type (isCharLitTy)
 import GHC.Driver.Config.Core.Lint (initLintConfig)
 import GHC.Driver.DynFlags (verbosity)
 import GHC.Types.Id (idName)
@@ -49,9 +52,16 @@ generate libdir source worker destination = do
         Nothing -> pure ()
         Just problems -> die (showSDocUnsafe (ppr problems))
     certificate <- either (die . show) pure (certify owner rhs)
-    if certOwner certificate == idName owner
-        then writeFile destination (renderUpper (certRows certificate))
-        else die "certificate belongs to a different producer"
+    unless (certOwner certificate == idName owner) $
+        die "certificate belongs to a different producer"
+    -- The character certificate requires an identity default.
+    unless (certResultTyCon certificate == charTyCon) $
+        die "expected a character mapping certificate"
+    rows <- forM (certRows certificate) $ \(input, result) ->
+        case isCharLitTy result of
+            Just output -> pure (input, output)
+            Nothing -> die "expected a character literal in the certificate"
+    writeFile destination (renderUpper rows)
 
 {- | Render only an already certified decision. Put the default after literals
 so the closed family's ordinary apartness check can keep it stuck on a skolem.

@@ -29,6 +29,12 @@ for invalid in recursive partial wrongDefault; do
         { cat reject.log >&2; exit 1; }
     test ! -e InvalidFamily.hs
 done
+if ./generate-upper "$libdir" Rejected.hs predicate InvalidFamily.hs >reject.log 2>&1; then
+    printf 'rendered a Boolean predicate as a character mapping\n' >&2
+    exit 1
+fi
+grep -Fxq 'expected a character mapping certificate' reject.log
+test ! -e InvalidFamily.hs
 cp "$src/P3.hs" exported/
 cp "$src"/{Client,GroundProof,Wrong,RigidDefault}.hs client/
 (cd producer && "${ghc[@]}" -fomit-interface-pragmas -c Upper.hs)

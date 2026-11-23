@@ -17,10 +17,11 @@ import GHC.Prelude
 import GHC.Builtin.KnownOccs (eqClassOpOcc, minusClassOpOcc)
 import GHC.Core.Class (Class, classAllSelIds, classMethods, className, classTyCon, classTyVars)
 import GHC.Builtin.Modules (gHC_CLASSES, gHC_INTERNAL_BASE, gHC_INTERNAL_NUM_INTEGER, gHC_TYPES, mkGhcInternalModule)
-import GHC.Builtin.WiredIn.Types (nilDataCon, consDataCon, boolTy, falseDataCon, trueDataCon, charTy, charTyCon, typeSymbolKind, stringTy, integerTy, integerTyConName, listTyCon, mkListTy, mkTupleTy, promotedTupleDataCon, tupleDataCon, tupleTyCon, unmatchableDataConTy)
+import GHC.Builtin.WiredIn.Types (nilDataCon, consDataCon, boolTy, falseDataCon, trueDataCon, charTy, typeSymbolKind, stringTy, integerTy, integerTyConName, listTyCon, mkListTy, mkTupleTy, promotedTupleDataCon, tupleDataCon, tupleTyCon, unmatchableDataConTy)
 import GHC.Core (CoreRule(..), isAutoRule, ruleActivation)
 import qualified GHC.Core as Core
-import GHC.Core.CharCase (certOwner, certRows, certify)
+import GHC.Core.CharCase
+    ( certDefault, certOwner, certResultTyCon, certRows, certify, charCaseResultTyCon )
 import GHC.Core.OpenWhnf (openDataConFieldTypes)
 import GHC.Core.Predicate (classMethodInstTy, getClassPredTys_maybe, isPredTy, mkClassPred)
 import GHC.Core.Rules (RuleEnv(..), emptyRuleBase, emptyRuleEnv, extendRuleBaseList, getRules)
@@ -2055,7 +2056,7 @@ sourceCaseTables binds = do
       eligible owner =
         is_exported owner &&
         (final_candidate owner || not (idName owner `elemNameSet` ruled)) &&
-        ((char_tables && varType owner `eqType` charArrow) ||
+        ((char_tables && isJust (charCaseResultTyCon (varType owner))) ||
          not (isNothing (pairCaseType (varType owner))) ||
          not (isNothing (pairBuilderType (varType owner))) ||
          eligible_case owner)
@@ -2170,7 +2171,6 @@ sourceCaseTables binds = do
       pure (catMaybes final_tables ++ reverse_wrappers ++ identities ++ roots ++ used_helpers,
             concat guard_tables ++ concat fields)
   where
-    charArrow = mkVisFunTyManyU charTy charTy
     finalOwner owner table = setIdDetails owner
       (SourceTableId (idName owner) table FinalCoreSourceTable)
 
@@ -2252,7 +2252,8 @@ sourceCaseTables binds = do
       | Just build <- checkedPairBuilder owner rhs = build
       | otherwise = (, []) <$>
           case rhs of
-            Core.Var target | varType owner `eqType` charArrow -> forwarding env owner target
+            Core.Var target | Just result <- charCaseResultTyCon (varType owner) ->
+              forwarding env result owner target
             _ | Just projection <- checkedPairCase owner rhs ->
                   Just . (owner,) <$> publishPairCase owner projection
               | let imported = ordinaryImport rdr_env
@@ -2270,7 +2271,7 @@ sourceCaseTables binds = do
                   pure (Just (certified, table))
               | Right certificate <- certify owner rhs
               , certOwner certificate == idName owner ->
-                  publish owner (certRows certificate) id
+                  publish owner (certResultTyCon certificate) (certRows certificate) (certDefault certificate)
               | otherwise -> pure Nothing
 
     -- A binary enumeration certificate inspects the first argument.
@@ -2288,18 +2289,18 @@ sourceCaseTables binds = do
       | imported (idName actual) = sourceTableId_maybe actual
       | otherwise = Nothing
 
-    forwarding env owner target
+    forwarding env result owner target
       | Just target_mod <- nameModule_maybe (idName target)
       , target_mod /= tcg_semantic_mod env
       , not (isHoleModule target_mod)
       , (installed, Nothing) <- getModuleInstantiation target_mod
       , Just IsBoot /= (gwib_isBoot <$> lookupInstalledModuleEnv
                                       (imp_boot_mods (tcg_imports env)) installed)
-      , varType target `eqType` charArrow
+      , varType target `eqType` varType owner
       , Just table <- sourceTableId_maybe target
       , [arg] <- tyConTyVars table
       , tyVarKind arg `eqType` charTy
-      , tyConResKind table `eqType` charTy
+      , tyConResKind table `eqType` mkTyConTy result
       = do
         dependencies <- sourceTableDependencies table
         case dependencies of
@@ -2308,21 +2309,21 @@ sourceCaseTables binds = do
             changed <- changedSourceUse uses
             case changed of
               Nothing -> do
-                result <- publish owner [] (\arg_ty -> mkTyConApp table [arg_ty])
+                forwarded <- publish owner result [] (\arg_ty -> mkTyConApp table [arg_ty])
                 publishSourceUses uses
-                pure result
+                pure forwarded
               Just _ -> pure Nothing
           Nothing -> pure Nothing
       | otherwise = pure Nothing
 
-    publish owner rows fallback = do
+    publish owner result rows fallback = do
       let loc = nameSrcSpan (idName owner)
-          literal (input, result) _ =
-            mkCoAxBranch [] [] [] [mkCharLitTy input] (mkCharLitTy result) [] loc
+          literal (input, value) _ =
+            mkCoAxBranch [] [] [] [mkCharLitTy input] value [] loc
       var <- flip mkTyVar charTy <$> newSysName (mkTyVarOcc "c")
       let ty = mkTyVarTy var
           default_branch _ = mkCoAxBranch [var] [] [] [ty] (fallback ty) [Nominal] loc
-      table <- makeFamily (idName owner) (ClosedInput charTy []) [] charTyCon
+      table <- makeFamily (idName owner) (ClosedInput charTy []) [] result
                           (map literal rows ++ [default_branch])
       pure (Just (owner, table))
 
@@ -2340,8 +2341,7 @@ for the owner before constructing the family. The usual SourceTableId
 publication and solver dependency checks apply to the resulting table.
 
 An exact imported variable can forward to an existing checked table.
-Require the target's own SourceTableId and the same Char domain and
-codomain. Check the target and all its checked callees for visible rules
+Require the target's own SourceTableId and the same checked arrow type. Check the target and all its checked callees for visible rules
 before publishing. The default equation references the target family, so
 the usual dependency walk checks the same chain where the solver uses it.
 The new table belongs to the alias. Re-exporting the target keeps its

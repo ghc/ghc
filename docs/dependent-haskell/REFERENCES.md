@@ -6387,12 +6387,13 @@ and [GHC's source type checker](../../compiler/GHC/Tc/Gen/HsType.hs).
 ### Publishing the character worker's equality
 
 Agda compiles ordered clauses to a case tree. A rigid scrutinee can
-prevent the tree from selecting a branch. For a finite strict character
-case with an identity default, a GHC closed family can express the same
-condition through its apartness check. The generated equations must use
-the worker's checked binding and preserve its literal alternatives. The
-declaration's identity matters when a client reads the equation through
-a second module's signature.
+prevent the tree from selecting a branch. A GHC closed family can express
+the same condition through its apartness check. The checker accepts
+a strict character case with character literals and an identity default,
+or a strict predicate whose branches and default return Boolean constants.
+It derives equations from the worker's checked binding and preserves
+the literal alternatives before the default. The defining name identifies
+the equations when a client reads them through an exported signature.
 [Agda 2.8.0 case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees),
 [GHC's closed-family axioms](../../compiler/GHC/Core/FamInstEnv.hs)
 and [the exported equality in proposal #509](https://github.com/ghc-proposals/ghc-proposals/pull/509).
