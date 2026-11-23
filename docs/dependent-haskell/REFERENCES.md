@@ -8365,6 +8365,14 @@ at the same source revision.
 [Agda 2.8.0 rewriting](https://agda.readthedocs.io/en/v2.8.0/language/rewriting.html),
 and [R16 mapping proof](roadmap/R16-open-term-evaluator.md#a-rule-in-the-module-importing-a-mapping-proof).
 
+GHC matches a rule against a Core application. At a checked value
+position, `Nothing` and `Just x` have distinct constructor Names.
+The field of `Just` plays no part in this comparison. Agda uses the
+same constructor distinction when unification encounters `zero` and
+`suc n` in an indexed pattern.
+[GHC rule matching](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rewrite_rules.html#semantics)
+and [Agda absurd patterns](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#absurd-patterns).
+
 Agda checks the recorded hashes of imports before reusing a checked
 module. GHC records fingerprints for modules and individual declarations.
 The R16 upgrade uses GHC's declaration fingerprints to recheck a client

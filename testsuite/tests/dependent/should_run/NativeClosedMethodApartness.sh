@@ -54,6 +54,8 @@ image = Refl
 
 #ifdef DEAD
 {-# RULES "r16/constructor" [~1] forall f. fmap f (Just False) = Nothing #-}
+#elif defined(EMPTY_RULE)
+{-# RULES "r16/constructor" [~1] forall f. fmap f Nothing = Just (f True) #-}
 #elif defined(INACTIVE)
 {-# RULES "r16/constructor" [~] forall f. fmap f (Just True) = Nothing #-}
 #else
@@ -68,7 +70,7 @@ main = do
 #ifdef PROOF
   print image
 #endif
-  print (fmap not (Just True) :: Maybe Bool, fmap not (Just False) :: Maybe Bool)
+  print (fmap not (Just True), fmap not (Just False), fmap not Nothing :: Maybe Bool)
 HS
 for form in ALIAS FAMILY; do
     (cd provider && "${ghc[@]}" -O2 -fno-enable-rewrite-rules -D"$form" \
@@ -79,15 +81,16 @@ for form in ALIAS FAMILY; do
      cp ../Client.hs Main.hs
      proof_line=$(awk '/^image = Refl$/ { print NR }' Main.hs)
      for opt in -O0 -O2; do
-         for variant in MATCH DEAD INACTIVE; do
+         for variant in MATCH DEAD EMPTY_RULE INACTIVE; do
              label="$form.${opt#-}.$variant"
              "${ghc[@]}" "$opt" -fenable-rewrite-rules -D"$variant" -ddump-rule-firings \
                  Main.hs -o runtime > "$label.firings.log" 2>&1
              ./runtime > "$label.runtime.out"
              case $variant in
-                MATCH)  expected='(Nothing,Just True)' ;;
-                DEAD)   expected='(Just False,Nothing)' ;;
-                INACTIVE) expected='(Just False,Just True)' ;;
+                MATCH)      expected='(Nothing,Just True,Nothing)' ;;
+                DEAD)       expected='(Just False,Nothing,Nothing)' ;;
+                EMPTY_RULE) expected='(Just False,Just True,Just False)' ;;
+                INACTIVE)   expected='(Just False,Just True,Nothing)' ;;
              esac
              [[ $(cat "$label.runtime.out") == "$expected" ]]
              fired=no

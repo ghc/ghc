@@ -2089,6 +2089,27 @@ types of imported definitions during reduction. Agda can also check
 confluence. [GHC rule phases and semantics](../../users_guide/exts/rewrite_rules.rst),
 [GHC rule matching](../../../compiler/GHC/Core/Rules.hs#L739-L806)
 and [Agda 2.8.0 rewriting](https://agda.readthedocs.io/en/v2.8.0/language/rewriting.html#importing-rewrite-rules).
+#### Constructor clashes with different field counts
+
+A rule on `fmap f Nothing` cannot rewrite `fmap not (Just True)`.
+The rule checker used to require both constructors to have the same
+number of fields before comparing their names. Job 1996 compared the
+published compiler with `7f56212d49`. The ordinary client received only
+the type synonym's interface. Its optimizer fired the rule at the
+matching runtime call in every case.
+
+| Operand recorded in the proof | Rule on `Nothing` | Rule on `Just True` |
+| --- | --- | --- |
+| `Nothing` | GHC-83605 at `Refl` | Accepted and returned `Refl` |
+| `Just True` | Accepted and returned `Refl` | GHC-83605 at `Refl` |
+
+The table held for a rule in the client and for an imported orphan rule.
+The published compiler rejected all eight proofs. Job 1999 passed the
+expanded regression, including the existing conservative checks for
+computed inputs, opaque aliases and a callback with its own rule.
+[Source regression](../../../testsuite/tests/dependent/should_run/NativeClosedMethodApartness.sh)
+and [constructor and optimizer rule semantics](../REFERENCES.md#rewrite-rules-and-imported-method-proofs).
+
 #### A proof whose method is reduced in a type synonym
 
 The private importer prototype records the checked method, dictionary
