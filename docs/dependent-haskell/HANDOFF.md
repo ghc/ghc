@@ -35,6 +35,16 @@ source at `refs/spikes/r04-r16-r17-normal-588`. Check `build.exit`,
 `qualification/gates.tsv`, `cohorts/gates.tsv` and `run-all.exit`
 before publishing. PLFH can keep using the qualified 585 compiler.
 
+The next R17 candidate is `1a02a866e7` at
+`refs/spikes/r17-schema-transformer-590`. Job 2055 checked equality of
+two schema transformers before the caller supplied any rows. Job 2074
+checked the closed cell schema with `NoUndecidableInstances`. Its
+ordinary interface-only client printed `((),Right 42)` at `-O0` and
+`-O2`. Job 2080 waits for job 2027 before building both stages and
+running all 590 Showcase observations, the fusion checks and the
+compatibility suite. Its source is in
+`_build/on-demand/r17-schema-transformer-post-588-20261124/source`.
+
 | Area | Verified result and next step |
 | --- | --- |
 | R04 | Job 2025 compiled an ordinary client against interfaces alone. It copied flags when two stored lengths compared equal and returned `Nothing` for different lengths at `-O0` and `-O2`. Jobs 2002, 2015 and 2021 cover the record update, equality and selector operations used by this example. |
@@ -64,6 +74,10 @@ component now require rebuilding for a binary replay. Their Git sources,
 logs and results remain available. The exact three generated trees are in
 `retirement-four-finished-warm-trees-20261123/sizes.tsv`.
 The 585 qualification reuses the previous 584 build tree.
+On 24 November, retirement of the completed R16 operand-inference and
+R17 diagnostic build trees recovered 7.83 GB. The directory list and
+source revisions are in
+`_build/on-demand/retirement-r16-r17-post-585-20261124`.
 
 ## Previous checkpoints
 
