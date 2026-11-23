@@ -401,6 +401,14 @@ signature. It captures the enclosing function's label type by its
 exact name.
 [Source and executable example](../examples/open-evaluation/TypeLambdaQuote.hs).
 
+Job 1902 compared the published 577 reader and the quoted-lambda
+reader in separate executables. The shared examples had identical
+bytes. Both readers decoded each other's examples. Only the newer
+reader decoded the additional `LamT` example. The old reader returned
+`Unknown encoding for constructor`. The ordinary quote checks use the
+external interpreter that matches the compiler.
+[Binary samples](../../../testsuite/tests/dependent/should_run/NativeTypeCaseRetainedThWire.hs).
+
 This follows the Template Haskell translation of a quoted binder
 into a fresh name in the quotation monad. The callback's kind stays
 subject to the ordinary checks at the splice site.

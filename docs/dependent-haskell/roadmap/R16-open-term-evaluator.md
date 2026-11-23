@@ -130,7 +130,8 @@ still needs a representation and evidence before it could enter Core.
 lengthAfterZip :: forall a b c. foreach (f :: (a, b) -> c)
                -> foreach (xs :: [a]) -> foreach (ys :: [b])
                -> size (map f (zip xs ys)) :~: minSize (size xs) (size ys)
-lengthAfterZip f xs ys = trans (lengthMap f (zip xs ys)) (lengthZip xs ys)
+lengthAfterZip f xs ys = case lengthMap f (zip xs ys) of
+    Refl -> lengthZip xs ys
 ```
 
 The retained operand `zip xs ys` gets its erased arguments from the
@@ -2666,11 +2667,12 @@ when the right list was empty. The proof did not force the callback.
 
 HaskLib now proves the same law from two existing equalities.
 `lengthMap` removes the map from the length expression. Its result
-is the left side of `lengthZip`, so `trans` can join the two proofs.
+is the left side of `lengthZip`, so matching `Refl` lets the branch
+return the existing zip proof.
 
 ```haskell
-lengthMapZip f xs ys =
-    trans (lengthMap f (zip xs ys)) (lengthZip xs ys)
+lengthMapZip f xs ys = case lengthMap f (zip xs ys) of
+    Refl -> lengthZip xs ys
 ```
 
 Job 1876 checked the explicitly instantiated proof from a fresh package installation
@@ -2685,7 +2687,6 @@ The declaration of the second list supplies `b`. Giving the
 intermediate list a local name also failed with GHC-83865 in job 1870.
 [Implicit arguments and visible type applications](../REFERENCES.md#inferring-the-element-types-of-zip).
 
-
 Job 1883 checked the implicit form, an explicit first argument, and
 both explicit arguments. All three preserved the list and callback
 demand at `-O0` and `-O2` with rewrite rules disabled. Job 1888
@@ -2699,3 +2700,48 @@ The independent vector append test passed at its declared length at
 even with all type arguments supplied. Replacing the declared addition
 by its normalized result also fails with explicit type arguments.
 Jobs 1891 and 1894 distinguish these cases from argument inference.
+
+### The optimized client of the composed proof
+
+The client's producer inspects the result of one application of its
+constructor. The mapper closes over the source list. The left count
+evaluates `size (map f (zip xs ys))`. The right count evaluates
+`minSize (size xs) (size ys)`. One control gives both counts the
+same filtered list. The other constructs that list at separate call sites.
+The client tests both a singleton right list and an empty right list.
+
+| Compiler and flags | Independent counts | Shared counts | Installed proof |
+| --- | --- | --- | --- |
+| Published 577, `-O0` | `Zero / Zero` | `Zero / Zero` | `Refl` |
+| Published 577, `-O2 -fno-enable-rewrite-rules` | `Zero / Zero` | `Zero / Zero` | `Refl` |
+| 577 and 578, default `-O2` | `Zero / bottom` | `Zero / Zero` | Core Lint fails after Specialise |
+| 577 with the private Specialise change, default `-O2` | `Zero / bottom` | `Zero / Zero` | `Refl` |
+
+Both right lists produced the same observations. The executable forced each
+count only to its outer constructor. Here `bottom` records a caught
+`ErrorCall`. The producer's strictness distinguishes the two independent
+evaluations. The witness itself receives one shared input. Returning
+`Refl` does not establish that the separately optimized counts have the
+same demand. [Count expressions](../examples/open-evaluation/MapZipFusionCounts.hs)
+and [proof client](../examples/open-evaluation/MapZipFusionWitness.hs).
+
+Job 1945 compared the two compiler checkpoints on the same client built
+against their installed libraries. Each failed with or without an explicit
+`-dcore-lint`. Job 1948 restored the typed Core operand and ran both
+controls. [Source and rules references](../REFERENCES.md#specialisation-of-an-indexed-zip-operand).
+
+Job 1952 compiled the linked source files against both installed packages.
+At `-O0` and at `-O2 -fno-enable-rewrite-rules` the program printed
+`Zero / Zero` for both controls and returned `Refl` for both right lists.
+At default `-O2` each compiler reported the unsupported `build` argument
+in `MapZipFusionWitness.hs`. To run the example with HaskLib installed:
+
+```sh
+src=docs/dependent-haskell/examples/open-evaluation
+out=$(mktemp -d)
+ghc -O2 -package hasklib -i -i"$src" -outputdir "$out" \
+    -main-is MapZipFusionWitness "$src/MapZipFusionWitness.hs" -o "$out/observe"
+```
+
+To run the unfused control, add `-fno-enable-rewrite-rules` after `-O2`,
+then run `"$out/observe"`.

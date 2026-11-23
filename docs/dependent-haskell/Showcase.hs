@@ -2051,10 +2051,10 @@ main = do
         , HaskLib.lengthZipWith zipCallback zipLeft zipRight
         , HaskLib.lengthZipWith unusedCallback zipLeft zipRight
         )
-    let unusedPairMap :: (Bool, Bool) -> Char
-        unusedPairMap = error "lengthMapZip forced its callback"
+    let mapPair :: (Bool, Bool) -> Bool
+        mapPair = Prelude.uncurry unusedCallback
     observe "prove the length after mapping over zipped pairs"
-        (HaskLib.lengthMapZip unusedPairMap zipLeft zipRight)
+        (HaskLib.lengthMapZip mapPair zipLeft zipRight)
     beforeZip <- newIORef not >>= readIORef
     observe "prove map and zipWith length directly and with trans and congFirst"
         ( zipWith zipCallback (map beforeZip zipLeft) zipRight

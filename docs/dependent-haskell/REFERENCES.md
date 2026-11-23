@@ -8587,6 +8587,38 @@ proof, the declarations of `xs` and `ys` supply those types when
 [GHC visible type application](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_applications.html)
 and [R16 list proof](roadmap/R16-open-term-evaluator.md#map-over-the-result-of-zip).
 
+### Recompilation after adding a quotation helper
+
+GHC resolves compiler-known library entities through `GHC.Essentials`.
+Eligible modules record an implicit dependency on its exports. The R17
+quotation needs `lamT` in those exports. When the library changes, an
+unchanged ordinary module can therefore recompile once. This dependency
+also applies to modules that contain no quotes. The warm-upgrade checks
+compare an installed library change with a compiler change that uses the
+same library before and after.
+[GHC's account of the implicit dependency](../../compiler/GHC/Builtin.hs)
+and [the helper exported by base](../../libraries/base/src/GHC/Essentials.hs).
+
+### Specialisation of an indexed zip operand
+
+In `lengthMap f (zip xs ys)` the source call `zip xs ys` determines a
+result index. Replacing it with a fused `build` expression requires an
+index that Core can typecheck. A GHC optimizer rule carries no proof of
+nominal equality for that substitution. Agda's `REWRITE` registers
+an equality for conversion. Its optional confluence check examines
+overlapping reductions. The private GHC change applies the current
+substitution to the checked operand and leaves fusion available in ordinary
+calls. [GHC rule semantics](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rewrite_rules.html#semantics)
+and [Agda rewriting](https://agda.readthedocs.io/en/latest/language/rewriting.html#confluence-checking).
+
+Johann and Voigtländer's Theorem 8.2 gives sufficient conditions for
+`foldr/build` equality in the presence of `seq`. A polymorphic producer
+can inspect its supplied step. The optimized zip client exercises this
+case. Preserving the source call inside the proof fixes the ill-typed Core
+and leaves the independent count observations accessible to the caller.
+[Theorem 8.2](https://janis-voigtlaender.eu/papers/TheImpactOfSeqOnFreeTheoremsBasedProgramTransformations.pdf#page=29)
+and [compiled observations](roadmap/R16-open-term-evaluator.md#the-optimized-client-of-the-composed-proof).
+
 ### Omitted fields in a dependent record
 
 Haskell 2010 assigns an omitted lazy field a bottom value. It requires
