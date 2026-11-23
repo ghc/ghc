@@ -1965,13 +1965,13 @@ coAxNthLHS ax ind =
 isUnsaturatedUserFamily :: TyCon -> [Type] -> Bool
 isUnsaturatedUserFamily tc args
   | TypeSynonymFlavour <- tyConFlavour tc = False
+  | Just _ <- builtInClosedTyFamTyCon_maybe tc = False
   | otherwise = isPartialTypeFunction tc args
 
 -- | A family or type synonym before all of its unmatchable arguments are supplied.
 isPartialTypeFunction :: TyCon -> [Type] -> Bool
 isPartialTypeFunction tc args
   | type_function (tyConFlavour tc)
-  , Nothing <- builtInClosedTyFamTyCon_maybe tc
   , let missing = tyConArity tc - length args
   , missing > 0 =
       unmatchable missing (piResultTys (tyConKind tc) args)
@@ -2000,6 +2000,8 @@ Each Flip xs can pass Flip as a function. The family axiom for Flip
 expects an argument. Until the application reaches its arity, rewrite
 its arguments by congruence and leave its head intact. Only a saturated
 application can be a TyFamLHS or enter the family reduction cache.
+This includes built-in families. Their axioms and solver improvement
+rules receive only saturated applications.
 Data family representation axioms have their own eta-reduced arity.
 
 Check each missing binder in the instantiated kind, including its
