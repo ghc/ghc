@@ -455,6 +455,7 @@ interpret two applications of the optional type constructor: Just (Just True)
 choose an interpreted arrow from its expected kind: (Just 3,Right 3)
 use a nested arrow for Either and a short-circuiting callback: (Right 7,False)
 apply a type lambda to Maybe, Either String and IO: Refl
+store a checked value or an error in each record cell: (Right True,Left "missing count")
 map a partially applied column type synonym: Refl
 compare two column readers before choosing the cell type: Refl
 partially apply a two-argument type lambda: Refl

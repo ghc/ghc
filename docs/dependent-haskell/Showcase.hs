@@ -1686,6 +1686,12 @@ main = do
     observe "use a nested arrow for Either and a short-circuiting callback"
         (NestedFunctionClient.binaryChoice, NestedFunctionClient.conjunction False (error "unused operand"))
     observe "apply a type lambda to Maybe, Either String and IO" TypeLambda.roadmap
+    let checkedRow :: TypeLambda.CheckedRow String '[Bool, Int]
+        checkedRow = TypeLambda.CheckedRow
+            (TypeLambda.Field (Right True) (TypeLambda.Field (Left "missing count") TypeLambda.End))
+    case TypeLambda.checkedCells checkedRow of
+        TypeLambda.Field flag (TypeLambda.Field count TypeLambda.End) ->
+            observe "store a checked value or an error in each record cell" (flag, count)
     observe "map a partially applied column type synonym" TypeLambda.optionalColumns
     observe "compare two column readers before choosing the cell type" TypeLambda.sameColumnReader
     observe "partially apply a two-argument type lambda" TypeLambda.partial

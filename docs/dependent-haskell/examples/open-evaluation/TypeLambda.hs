@@ -3,7 +3,7 @@
 -- | Apply a type lambda to a list of type constructors.
 module TypeLambda
   ( L, Captured, Shadowed, WithError, Prefixes, ScopedRow, Mixed, Held, CaseShadow, Rebuild
-  , Fields(..), Map, Columns, Optional, withErrors, IndexedTag(..), IndexedCase, IndexedCaseInferred
+  , Fields(..), CheckedRow(..), Map, Columns, Optional, withErrors, IndexedTag(..), IndexedCase, IndexedCaseInferred
   , roadmap, partial, optionalColumns, sameColumnReader, prefixes, mixed, indexedFields
   ) where
 
@@ -30,6 +30,10 @@ type instance Columns Optional fields = Map (\a -> Maybe a) fields
 data Fields (xs :: [Type]) where
   End :: Fields '[]
   Field :: a -> Fields xs -> Fields (a ': xs)
+
+-- | Store either an error or a value of the declared type in each cell.
+data CheckedRow e (xs :: [Type]) = CheckedRow
+  { checkedCells :: Fields (Map (\a -> Either e a) xs) }
 
 -- | Give each field the same error type.
 withErrors :: Proxy e -> Fields xs -> Fields (Map (\a -> Either e a) xs)
