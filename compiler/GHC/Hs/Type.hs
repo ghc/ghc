@@ -552,6 +552,9 @@ data HsTypeGhcRnExt
   | HsTypeCaseRn (LHsType GhcRn) [([Name], LHsType GhcRn, LHsType GhcRn)]
     -- Quoted case. Each row carries its pattern binders, pattern and result.
   | HsTypeLetProductCheckRn (LocatedN Name) !Int (LHsType GhcRn)
+  | HsTypeLambdaCheckRn [LocatedN Name] (LHsType GhcRn) (LHsType GhcRn)
+    -- Original body and lowered application. See Note [Checking local lambda captures]
+    -- in GHC.Tc.Gen.HsType.
 
 -- Extension of HsType during parsing.
 -- see Note [Trees That Grow] in Language.Haskell.Syntax.Extension
@@ -571,6 +574,8 @@ data HsTypeGhcPsExt
 
   | HsTypeLambda (EpToken "\\", EpUniToken "->" "→")
                  [LocatedN RdrName] (LHsType GhcPs)
+
+  | HsTypeLambdaCheck [LocatedN RdrName] (LHsType GhcPs) (LHsType GhcPs)
 
   | HsTypeExists (EpToken "exists", Either (EpToken "|") (EpToken "."))
       (LHsTyVarBndr Specificity GhcPs) (LHsType GhcPs)
@@ -1930,6 +1935,7 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
       text "some" <+> parens (ppr binder <+> dcolon <+> ppr_mono_lty domain)
         <+> char '|' <+> ppr_mono_lty body
     HsTypeCaseAlias _ _ body -> ppr_mono_lty body
+    HsTypeLambdaCheck vars body _ -> char '\\' <> hsep (map ppr vars) <+> arrow <+> ppr_mono_lty body
     HsTypeLetProductCheck _ _ body -> ppr_mono_lty body
     HsTypeExists (_, sep_tok) b body -> pprExistsTy (hsExistsTyFlag sep_tok) (ppr b) (ppr_mono_lty body)
     HsTypeLet _ brackets _ binds body ->
@@ -1953,6 +1959,7 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
     HsCoreTyRn ty -> ppr ty
     HsGadtFieldRn field -> pprHsConDeclFieldNoMult field
     HsTypeCaseAliasRn _ body -> ppr_mono_lty body
+    HsTypeLambdaCheckRn vars body _ -> char '\\' <> hsep (map ppr vars) <+> arrow <+> ppr_mono_lty body
     HsTypeLetProductCheckRn _ _ body -> ppr_mono_lty body
     HsTypeCaseRn scrutinee rows ->
       text "case" <+> ppr_mono_lty scrutinee <+> text "of"
@@ -2040,6 +2047,7 @@ hsTypeNeedsParens p = go_hs_ty
         HsBangTy{}  -> p > topPrec
         HsRecTy{}   -> False
         HsTypeLambda{} -> p >= topPrec
+        HsTypeLambdaCheck{} -> p >= topPrec
         HsTypeCaseHead{} -> False
         HsTypeSome{} -> p >= topPrec
         HsTypeCaseAlias{} -> p >= topPrec
@@ -2051,6 +2059,7 @@ hsTypeNeedsParens p = go_hs_ty
         HsCoreTyRn ty -> go_core_ty ty
         HsGadtFieldRn{} -> False
         HsTypeCaseAliasRn{} -> p >= topPrec
+        HsTypeLambdaCheckRn{} -> p >= topPrec
         HsTypeLetProductCheckRn _ _ body -> hsTypeNeedsParens p (unLoc body)
         HsTypeCaseRn{} -> p >= topPrec
         HsTypeExistsRn{} -> p >= funPrec

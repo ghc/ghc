@@ -4601,8 +4601,7 @@ data TcRnMessage where
   TcRnTypeLetDisabled :: TcRnMessage
 
   -- | A type lambda appears outside the supported declaration context.
-  -- The names identify local captures whose enclosing signatures omit kinds.
-  TcRnTypeLambdaContext :: Maybe (NonEmpty Name) -> TcRnMessage
+  TcRnTypeLambdaContext :: TcRnMessage
 
   -- | A type-level case needs ExperimentalDependentTypes.
   TcRnTypeCaseDisabled :: TcRnMessage

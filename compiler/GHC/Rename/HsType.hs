@@ -1092,7 +1092,21 @@ rnHsTyKi env ty@(XHsType (HsBangTy _ bang (L _ inner))) = do
 
 rnHsTyKi _ (XHsType HsTypeLambda{}) = do
   enabled <- xoptM LangExt.ExperimentalDependentTypes
-  failWithTc (if enabled then TcRnTypeLambdaContext Nothing else TcRnTypeLambdaDisabled)
+  failWithTc (if enabled then TcRnTypeLambdaContext else TcRnTypeLambdaDisabled)
+
+-- See Note [Checking local lambda captures] in GHC.Tc.Gen.HsType.
+rnHsTyKi env (XHsType (HsTypeLambdaCheck binders body helper)) = do
+  checkDupRdrNames binders
+  binders' <- traverse (\bndr -> L (getLoc bndr) <$> newLocalBndrRn bndr) binders
+  (body', body_fvs) <- bindLocalNamesFV (map unLoc binders') (rnLHsTyKi env body)
+  -- An ordinary type can resolve to a source term in this extension.
+  -- A generated source family can still select executable code.
+  let source_name name = isVarName name || isJust (sourceTableTermOcc (nameOccName name))
+  when (nameSetAny source_name body_fvs) $
+    failWithTc TcRnTypeLambdaContext
+  (helper', helper_fvs) <- rnLHsTyKi env helper
+  pure (XHsType (HsTypeLambdaCheckRn binders' body' helper'),
+        body_fvs `plusFN` helper_fvs)
 
 rnHsTyKi _ (XHsType HsTypeSome{}) =
   failWithTc (mkTcRnUnknownMessage (mkPlainError []
@@ -2866,6 +2880,8 @@ extract_lty (L _ ty) acc
       XHsType (HsTypeLet _ _ _ binds result) ->
         let (binder, rhs, body) = splitHsTypeLet binds result
         in extract_lty rhs (extract_body [unLoc binder] body acc)
+      XHsType (HsTypeLambdaCheck binders body helper)
+                                  -> extract_body (map unLoc binders) body (extract_lty helper acc)
       XHsType (HsTypeLetProductCheck _ _ rhs) -> extract_lty rhs acc
       XHsType (HsTypeSome _ binder domain body)
                                   -> extract_lty domain (extract_body [unLoc binder] body acc)

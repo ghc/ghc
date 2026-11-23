@@ -49,7 +49,7 @@ import GHC.Data.FastString
 import qualified GHC.Data.Strict as Strict
 import GHC.Hs.Decls.Overlap (OverlapMode(..))
 import GHC.Hs.Type
-  ( HsTypeGhcPsExt(HsTypeLambda, HsTypeLet, HsTypeCase, HsTypeCaseAlias, HsTypeCaseHead, HsTypeExists, HsTypeSome, HsTypeLetProductCheck)
+  ( HsTypeGhcPsExt(HsTypeLambda, HsTypeLet, HsTypeCase, HsTypeCaseAlias, HsTypeCaseHead, HsTypeExists, HsTypeSome, HsTypeLetProductCheck, HsTypeLambdaCheck)
   , HsTypeCaseAlt(..), HsTypeLetBind(..), HsTypeLetPair(..), HsTypeLetPat(..)
   )
 import GHC.TypeLits
@@ -4155,6 +4155,8 @@ instance ExactPrint (HsType GhcPs) where
     return (XHsType (HsTypeSome (some', open', signature', close', bar') binder' domain' body'))
   exact (XHsType (HsTypeCaseAlias generated alias body)) =
     XHsType . HsTypeCaseAlias generated alias <$> markAnnotated body
+  exact (XHsType HsTypeLambdaCheck{}) =
+    error "exact: compiler-generated local lambda check"
   exact (XHsType (HsTypeLetProductCheck con arity body)) =
     XHsType <$> (HsTypeLetProductCheck <$> markAnnotated con <*> pure arity <*> markAnnotated body)
   exact (XHsType (HsTypeExists (exists, sep_tok) binder body)) = do

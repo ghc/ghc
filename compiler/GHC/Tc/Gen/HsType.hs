@@ -2249,6 +2249,27 @@ tcHsType mode (XHsType (HsGadtFieldRn field)) exp_kind =
 tcHsType _ (XHsType HsTypeCaseAliasRn{}) _ = failWithTc TcRnTypeCaseContext
 tcHsType _ (XHsType HsTypeCaseRn{}) _ = failWithTc TcRnTypeCaseContext
 
+tcHsType mode src@(XHsType (HsTypeLambdaCheckRn binders body helper)) exp_kind = do
+  (ty, kind) <- tc_infer_lhs_type mode helper
+  checked_kind <- liftZonkM (zonkTcType kind)
+  (telescope, result_kind) <- splitLambdaKind binders checked_kind
+  skol <- mkSkolemInfo (ForAllSkol (HsTyVarBndrsRn (map unLoc telescope)))
+  _ <- tcExplicitTKBndrs skol telescope $
+    tcLHsType mode body (Check result_kind)
+  checkExpKind mode src ty kind exp_kind
+  where
+    -- See Note [Checking local lambda captures].
+    splitLambdaKind :: [LocatedN Name] -> TcKind -> TcM ([LHsTyVarBndr () GhcRn], TcKind)
+    splitLambdaKind [] result = pure ([], result)
+    splitLambdaKind (name : rest) k
+      | Just (_, arg, result) <- tcSplitFunTy_maybe k = do
+          (binders, result_kind) <- splitLambdaKind rest result
+          let loc = getLoc name
+              kind_ty = L (l2l loc) (XHsType (HsCoreTyRn (scaledThing arg)))
+              binder = HsTvb noAnn () (HsBndrVar noExtField name) (HsBndrKind noExtField kind_ty)
+          pure (L (l2l loc) binder : binders, result_kind)
+      | otherwise = failWithTc TcRnTypeLambdaContext
+
 tcHsType mode src@(XHsType (HsTypeLetProductCheckRn (L loc name) arity rhs)) exp_kind = do
   parent <- setSrcSpanA loc $ do
     thing <- tcLookup name
@@ -2771,6 +2792,27 @@ tcCheckMatchabilityArrow ma hs_ty kind
   = setSrcSpanA l $
       tc_fun_type_x (tcCheckMatchabilitySynRhs ma) (pure ma) typeLevelMode arr a b (Check kind)
   | otherwise = tcCheckLHsType hs_ty kind
+
+{- Note [Checking local lambda captures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A local type lambda is lowered to an application of a private synonym
+and closed family. If an enclosing variable has no written kind, the
+helper can infer a more general capture telescope than the original
+body permits. A family equation can restrict that telescope only once
+the family is applied. Checking `Proxy (\x -> ...)` must also check
+the body even though it does not apply the family.
+
+Keep the original body with its lexical Names until we check the local
+signature. Use the helper's argument kinds for fresh rigid parameters
+in a nested implication. Check the original body with the ordinary
+signature skolems still in scope. The helper still supplies the
+resulting type and its existing equality rules.
+
+Restrict the recheck to ordinary types. A type case can require
+branch-local equalities. Splices, source terms, and generated source
+families can run compile-time code. The renamer refuses these bodies
+when formation would require this extra check.
+-}
 
 -- | Check a required forall with the supplied checker for its body.
 -- See Note [Body kind of a HsForAllTy] and Note [Higher-order retained signatures].
