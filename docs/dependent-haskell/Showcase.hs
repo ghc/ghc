@@ -1713,6 +1713,8 @@ main = do
     observe "map a callback that captures a closed family pattern" TypeLambda.prefixes
     observe "forward a list of column groups to the named error schema"
         (TypeLambdaSchema.forwardRowSchema (Proxy @String) (Proxy @'[ '[Int], '[Bool, Char]]))
+    observe "compare schema transformers before choosing any column groups"
+        (TypeLambdaSchema.forwardSchemaTransformer (Proxy @String))
     observe "capture a type before and after a local let"
         (Refl :: TypeLambda.ScopedRow Char '[Bool] :~: '[(Maybe Char, Either Char Bool)])
     let fields = TypeLambda.Field 'x' (TypeLambda.Field True TypeLambda.End)
