@@ -2216,6 +2216,8 @@ sourceCaseTables binds = do
     eligibleCase env exported enum_enabled imported owner
       | Just kinds <- monomorphicEnumCaseKinds (varType owner)
       = enum_enabled && all enumVisible kinds
+      | Just (con, _) <- monomorphicRetainedWitnessType (varType owner)
+      = publicCaseType env exported imported (dataConTyCon con)
       | Just signature@(ConstructorCaseType _ tc _ domains position _) <- constructorCaseType (varType owner)
       , not (isBinaryListCase signature)
       , not (isTwoStructuralCase signature || isSizeListCase signature)
@@ -2586,13 +2588,19 @@ sourceCaseVisibleArity table
           case traverse (caseBranchConstructor telescope) branches of
             Just [con] | con == tupleDataCon Boxed 2 -> Just 1
             _ -> Nothing
-        Nothing -> case constructorCaseType kind <|> monomorphicGuardedListCaseType kind of
-          Just (ConstructorCaseType telescope tc _ domains position _)
-            | isNothing (monomorphicEnumCaseArity kind)
-            , let visible = length domains
-            , Just roots <- traverse (projectionBranch telescope tc visible position) branches
-            , mkUniqSet roots == mkUniqSet (tyConDataCons tc) -> Just visible
-          _ -> Nothing
+        Nothing
+          | Just (expected, _) <- monomorphicRetainedWitnessType kind -> do
+              [branch] <- pure branches
+              (con, [witness, _]) <- caseBranch [] branch
+              guard (con == expected && coAxBranchRHS branch `eqType` witness)
+              pure 1
+          | otherwise -> case constructorCaseType kind <|> monomorphicGuardedListCaseType kind of
+              Just (ConstructorCaseType telescope tc _ domains position _)
+                | isNothing (monomorphicEnumCaseArity kind)
+                , let visible = length domains
+                , Just roots <- traverse (projectionBranch telescope tc visible position) branches
+                , mkUniqSet roots == mkUniqSet (tyConDataCons tc) -> Just visible
+              _ -> Nothing
   | otherwise = Nothing
   where
     projectionBranch telescope tc visible root branch = do
@@ -2811,6 +2819,18 @@ constructorCaseType tau = do
       | ty `eqType` liftedTypeKind || any (eqType ty) fixed = Just Nothing
       | otherwise = Just <$> getTyVar_maybe ty
 
+-- | Check the signature of a direct witness projection from a nullary package.
+-- See Note [Retained field kinds in source equations].
+monomorphicRetainedWitnessType :: Type -> Maybe (DataCon, ConstructorCaseType)
+monomorphicRetainedWitnessType ty = do
+    (domain, result) <- caseArrow ty
+    (tc, []) <- caseDatatype domain
+    [con] <- pure (tyConDataCons tc)
+    guard (isRetainedCaseRoot domain tc)
+    [witness, _] <- pure (dataConOrigArgTys con)
+    guard (result `eqType` scaledThing witness)
+    pure (con, ConstructorCaseType [] tc [] [domain] 0 result)
+
 -- | A type variable quantified by an ordinary inferred or specified forall.
 ordinaryCaseBinder :: (Type, ForAllTyBinder) -> Maybe ForAllTyBinder
 ordinaryCaseBinder (ma, binder@(Bndr v (Invisible _)))
@@ -2861,6 +2881,13 @@ does not introduce a free runtime Id or a new axiom about evaluation.
 The ordinary visibility, constructor coverage, and RULE checks still
 apply. Interface recognition checks the instantiated promoted argument
 kinds again before classifying the table as a constructor case.
+
+A nullary package can supply an exact projection of its witness. Keep
+this rule separate from ordinary constructor cases with no domain type
+parameters. Check that the Core case returns its first field directly.
+The second field remains a variable in the checked alternative, even
+when its type depends on the witness. Check that the sole imported
+equation also returns the first variable of this same constructor.
 -}
 
 -- | Check the retained constructor and its actual structural root domain.
@@ -4459,13 +4486,18 @@ checkedConstructorCaseWith specialized visible helper owner rhs = do
                                      patterns aliases expr)
     rows <- checkedConstructorRows (multipleCaseOperands signature) public helper recursive
                                   kinds result (map CaseField terms) scrutinee body
+    forM_ (monomorphicRetainedWitnessType rhs_type) $ \(con, _) -> do
+      [ConstructorCaseRow [CaseConstructor actual [] [CaseField witness, CaseField _]]
+                          (CaseField value)] <- pure rows
+      guard (actual == con && value == witness)
     -- The patterns use types from the Core binders. Use the same telescope
     -- for substitution. Keep the owner's declared visibility in the interface.
-    ConstructorCaseType declared _ _ _ _ _ <- constructorCaseType (varType owner)
+    ConstructorCaseType declared _ _ _ _ _ <- signature_type (varType owner)
     let binders = zipWith (\(Bndr v _) (Bndr _ vis) -> Bndr v vis) telescope declared
     pure (ConstructorCaseType binders tc args domains position result, rows)
   where
-    checked_signature = constructorCaseType (exprType rhs)
+    signature_type ty = constructorCaseType ty <|> (snd <$> monomorphicRetainedWitnessType ty)
+    checked_signature = signature_type (exprType rhs)
 
     public tc = visible tc || case checked_signature of
       Just signature@(ConstructorCaseType _ root _ _ _ _) ->
