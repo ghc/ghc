@@ -267,6 +267,18 @@ can write `type a ~> b = TyFun a b %M -> Type` once.
 [#242 on synonym right-hand sides](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#rhs-of-type-synonyms)
 and [normative inference rules](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#inference).
 
+Proposal #242 specifies `UnsaturatedTypeFamilies` as the standalone
+opt-in and makes it imply `TypeFamilies` and explicit matchability
+printing. The fork also permits partial applications through
+`ExperimentalDependentTypes`. That umbrella keeps its existing
+implications, so it does not gain `TypeFamilies` or the accompanying
+`MonoLocalBinds` behavior. `LiberalTypeSynonyms` remains independent.
+An ordinary client can use the inferred callback kind with `Maybe`
+and a saturated alias from the standalone provider.
+[Proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#proposed-change-specification) ·
+[Standalone provider](examples/open-evaluation/StandaloneCallback.hs) ·
+[Ordinary client](examples/open-evaluation/StandaloneCallbackClient.hs).
+
 Proposal #242 also specifies `-fprint-explicit-matchabilities`.
 The flag shows fixed matchabilities in GHCi. GHCi shows a variable modifier
 such as `%m` even without the flag. Enable `Modifiers` to write this arrow

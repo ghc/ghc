@@ -61,6 +61,7 @@ import qualified ForgetWitness
 import qualified ImplicitVector
 import qualified PartitionChoices
 import qualified PrimitiveWordFieldsClient
+import qualified StandaloneCallbackClient
 import qualified ErasedStream
 import qualified StreamFold
 import qualified StreamPreview
@@ -1660,6 +1661,8 @@ main = do
     observe "infer the arrows in a promoted Endo callback" inferredEndo
     observe "infer the arrows of a bare promoted Endo passed to Pure1" barePromotedEndo
     observe "apply one inferred synonym to a constructor and a family" appliedSynonym
+    observe "use a standalone family callback in an ordinary module"
+        (StandaloneCallbackClient.callbackResults (Just 'q') [False, True])
     observe "forward an inferred partial-family callback and an ordinary constructor" forwardedMap
     observe "infer both bare kind arrows in a list family proof" annotatedMap
     observe "infer the inner arrow of a higher-order family callback" nestedCallback
