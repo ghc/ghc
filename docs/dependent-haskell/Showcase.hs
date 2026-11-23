@@ -131,7 +131,7 @@ import OpenArrowKindClient (openKindRows)
 import StoredReflectionClient (readStoredReflection)
 import IndexedMapClient (mappedCells)
 import qualified MatchableView as View
-import LaterMatchabilityClient (annotatedMap, appliedCallback, boxedCallbacks, computedDictionary, flippedCallbacks, forwardedMap,
+import LaterMatchabilityClient (annotatedMap, appliedCallback, barePromotedEndo, boxedCallbacks, computedDictionary, flippedCallbacks, forwardedMap,
                                 inferredEndo, laterMatchability, nestedCallback, rankedMap)
 import qualified SchemaColumns
 import qualified TypeLambda
@@ -1658,6 +1658,7 @@ main = do
     observe "map cells with a class method over a family prefix and Maybe" mappedCells
     observe "infer the matchability of a family prefix from a later argument" laterMatchability
     observe "infer the arrows in a promoted Endo callback" inferredEndo
+    observe "infer the arrows of a bare promoted Endo passed to Pure1" barePromotedEndo
     observe "forward an inferred partial-family callback and an ordinary constructor" forwardedMap
     observe "infer both bare kind arrows in a list family proof" annotatedMap
     observe "infer the inner arrow of a higher-order family callback" nestedCallback

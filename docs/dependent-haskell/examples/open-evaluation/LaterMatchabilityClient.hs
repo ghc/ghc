@@ -3,14 +3,14 @@
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes, TypeFamilies #-}
 module LaterMatchabilityClient
   ( laterMatchability, forwardedMap, annotatedMap, nestedCallback, appliedCallback
-  , boxedCallbacks, rankedMap, flippedCallbacks, computedDictionary, inferredEndo
+  , boxedCallbacks, rankedMap, flippedCallbacks, computedDictionary, inferredEndo, barePromotedEndo
   ) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy(Proxy))
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Matchability (U)
-import PromotedEndo (Endo(Endo), Eval, Exp, UnEndo)
+import PromotedEndo (Endo(Endo), Eval, Exp, Pure1, UnEndo)
 import LaterMatchability (AtBool, CallbackResult(CallbackResult), ForwardMap,
                            computedTag, FamilyBox(FamilyBox), FlippedMatch, FlippedUnmatch, ForwardBox, KnownListCallback, ListBox,
                            ListCallback, ListRecipe, MatchResult, Recipe(Recipe), UnmatchResult)
@@ -78,3 +78,7 @@ inferredEndo = (callable, Refl)
   where
     callable = case (Endo (\_ _ -> undefined) :: Endo Bool) of
       Endo f -> f `seq` True
+
+-- | Pass the promoted constructor itself to a higher-order function.
+barePromotedEndo :: Eval (UnEndo (Eval (Pure1 'Endo Echo)) 'True) :~: 'True
+barePromotedEndo = Refl

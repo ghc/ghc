@@ -31,30 +31,23 @@ cat >Main.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 module Main where
 
-import LaterMatchabilityClient (flippedCallbacks, inferredEndo, rankedMap)
+import LaterMatchabilityClient (barePromotedEndo, flippedCallbacks, inferredEndo, rankedMap)
 
 main :: IO ()
-main = print (rankedMap, flippedCallbacks, inferredEndo)
+main = print (rankedMap, flippedCallbacks, inferredEndo, barePromotedEndo)
 HS
 "${ghc[@]}" -c Main.hs
 "${ghc[@]}" Main.o LaterMatchabilityClient.o ../provider/{AnchorReceiver,LaterMatchability,PromotedEndo}.o -o ranked-map
-test "$(./ranked-map)" = '((Just True,[False]),(Just False,[True]),(True,Refl))'
+test "$(./ranked-map)" = '((Just True,[False]),(Just False,[True]),(True,Refl),Refl)'
 
 cat >BareEndo.hs <<'HS'
 {-# LANGUAGE CPP, DataKinds, GADTs, Modifiers, NoExperimentalDependentTypes,
-             PolyKinds, StandaloneKindSignatures, TypeApplications, TypeFamilies, TypeOperators #-}
+             PolyKinds, StandaloneKindSignatures, TypeApplications #-}
 module BareEndo where
 
 import Data.Kind (Type)
-import Data.Type.Equality ((:~:)(Refl))
 import GHC.Matchability (M, U)
-import PromotedEndo (Endo(Endo), Eval, Exp, UnEndo)
-
-data Pure1 :: (a -> b) -> a -> Exp b
-type instance Eval (Pure1 f x) = f x
-
-data Echo :: Bool -> Exp Bool
-type instance Eval (Echo x) = x
+import PromotedEndo (Endo(Endo), Pure1)
 
 type Unanchored = Pure1 'Endo
 
@@ -67,14 +60,12 @@ type Wrong = Holder ('Endo @U)
 type Wrong = Holder ('Endo @M @U)
 #else
 type Partial = Holder ('Endo @M)
-
-folded :: Eval (UnEndo (Eval (Pure1 'Endo Echo)) 'True) :~: 'True
-folded = Refl
 #endif
 HS
 "${ghc[@]}" -c BareEndo.hs
 "${ghc[@]}" -fprint-explicit-kinds -dppr-cols=500 --show-iface BareEndo.hi >bare-endo.iface
-grep -Eq 'type Unanchored .* = Pure1 .*Endo @.*Unmatchable @.*Unmatchable @' bare-endo.iface
+grep -Eq 'type Unanchored .* = PromotedEndo\.Pure1 .*Endo @.*Unmatchable @.*Unmatchable @' bare-endo.iface ||
+    { cat bare-endo.iface >&2; exit 1; }
 for which in WRONG_FIRST WRONG_SECOND; do
     if "${ghc[@]}" -fforce-recomp -D"$which" -c BareEndo.hs >bare-endo.log 2>&1 ||
        ! grep -Fq '[GHC-83865]' bare-endo.log ||

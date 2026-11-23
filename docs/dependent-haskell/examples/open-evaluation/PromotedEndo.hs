@@ -1,7 +1,7 @@
-{-# LANGUAGE DataKinds, KindSignatures, Modifiers, PolyKinds,
+{-# LANGUAGE DataKinds, GADTs, KindSignatures, Modifiers, PolyKinds,
              StandaloneKindSignatures, TypeAbstractions, TypeApplications,
              TypeFamilies #-}
-module PromotedEndo (Endo(Endo), Eval, Exp, UnEndo) where
+module PromotedEndo (Endo(Endo), Eval, Exp, Pure1, UnEndo) where
 
 import Data.Kind (Type)
 import GHC.Matchability (M, Matchability)
@@ -10,6 +10,10 @@ import GHC.Matchability (M, Matchability)
 type Exp a = a %M -> Type
 -- | Evaluate a first-class expression.
 type family Eval (e :: Exp a) :: a
+
+-- | Lift a matchable function into a first-class expression.
+data Pure1 :: (a -> b) -> a -> Exp b
+type instance Eval (Pure1 f x) = f x
 
 -- | A callback whose two arrows can have different matchabilities.
 type Endo :: forall (m :: Matchability) (n :: Matchability). Type -> Type
