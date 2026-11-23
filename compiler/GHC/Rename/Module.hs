@@ -190,6 +190,13 @@ the domain before the result so their lambda helpers have distinct
 names. Keep the arrow and its modifiers at the written occurrence.
 This step lifts lambdas. The existing sum positions stay the same.
 
+An ordinary erased forall adds explicitly kinded variables to the
+lambda's scope. Check the copied kinds in telescope order. The original
+forall remains at its source site. The new path requires distinct
+telescope names and splice-free syntax. The lambda binder can shadow a
+kind name because the existing lambda pass separates its equation
+patterns from the captured kinds.
+
 A type let binds a name only in its body. Lift callbacks in the RHS
 with the outer captures. A callback in the body can capture the checked
 let result as another argument. Give this argument a fresh family
@@ -309,6 +316,14 @@ liftTypeLambdas sigma group = do
       let (domain', domain_families, next) = liftRhs False scoped owner captures domain salt
           (result', result_families, end) = liftRhs False scoped owner captures result next
       in (L loc (HsFunTy ann arrow domain' result'), domain_families ++ result_families, end)
+    liftRhs _ scoped owner captures
+      (L loc quantified@HsForAllTy{hst_tele = tele, hst_body = body}) salt
+      | ordinaryErasedForall tele
+      , Just locals <- forallCaptures tele
+      , Just scope <- extendLambdaForallScope captures locals
+      , spliceFree body
+      = let (body', families, next) = liftRhs False scoped owner scope body salt
+        in (L loc quantified{hst_body = body'}, families, next)
     liftRhs _ scoped owner captures (L loc (XHsType let_ty@(HsTypeLet ann _ _ binds result_ty))) salt =
       let (binder, rhs, body) = splitHsTypeLet binds result_ty
           (rhs', rhs_families, next) = liftRhs False scoped owner captures rhs salt
@@ -545,6 +560,58 @@ liftedTypeVarBinder v =
   L (l2l (getLoc v)) (HsTvb noAnn (HsBndrRequired noExtField)
     (HsBndrVar noExtField v) (HsBndrNoKind noExtField))
 
+-- | The parameter copied into a generated declaration and its lexical name.
+type LiftedTypeCapture = (LHsTyVarBndr (HsBndrVis GhcPs) GhcPs, LocatedN RdrName)
+
+explicitCaptures :: [LHsTyVarBndr flag GhcPs] -> [LiftedTypeCapture]
+explicitCaptures binders =
+  [(fmap (updateHsTyVarBndrFlag (const (HsBndrRequired noExtField))) b, v)
+  | b <- binders, Just v <- [hsLTyVarLocName b]]
+
+ordinaryErasedForall :: HsForAllTelescope GhcPs -> Bool
+ordinaryErasedForall HsForAllInvis{hsf_matchability = Nothing} = True
+ordinaryErasedForall _ = False
+
+forallCaptures :: HsForAllTelescope GhcPs -> Maybe [LiftedTypeCapture]
+forallCaptures HsForAllInvis{hsf_invis_bndrs = binders} = writtenCaptures binders
+forallCaptures HsForAllVis{hsf_vis_bndrs = binders} = writtenCaptures binders
+
+writtenCaptures :: [LHsTyVarBndr flag GhcPs] -> Maybe [LiftedTypeCapture]
+writtenCaptures binders
+  | all hasWrittenKind binders = Just (explicitCaptures binders)
+  | otherwise = Nothing
+
+hasWrittenKind :: LHsTyVarBndr flag GhcPs -> Bool
+hasWrittenKind (L _ (HsTvb _ _ HsBndrVar{} (HsBndrKind _ kind))) = copyable kind
+hasWrittenKind _ = False
+
+-- | Check that a copied binding cannot acquire a different kind variable.
+extendLambdaForallScope :: [LiftedTypeCapture] -> [LiftedTypeCapture]
+                        -> Maybe [LiftedTypeCapture]
+extendLambdaForallScope captures locals
+  | all originalName captures
+  , Just _ <- foldM extend (map (unLoc . snd) captures) locals
+  = Just (captures ++ locals)
+  | otherwise = Nothing
+  where
+    originalName (binder, name) =
+      copyable binder && (unLoc <$> hsLTyVarLocName binder) == Just (unLoc name)
+    extend names (L _ HsTvb{tvb_kind = HsBndrKind _ kind}, name) =
+      extendForallNames names (unLoc name) (map unLoc (extractHsTyRdrTyVars kind))
+    extend _ _ = Nothing
+
+extendForallNames :: [RdrName] -> RdrName -> [RdrName] -> Maybe [RdrName]
+extendForallNames names name mentions
+  | name `notElem` names, all (`elem` names) mentions = Just (name : names)
+  | otherwise = Nothing
+
+-- | Check that a type can be copied into a lifted declaration.
+copyable :: Data a => a -> Bool
+copyable node = case cast node :: Maybe (LHsType GhcPs) of
+  Just (L _ HsSpliceTy{}) -> False
+  Just (L _ HsWildCardTy{}) -> False
+  _ -> and (gmapQ copyable node)
+
 -- | Rename occurrences whose binding sites the caller has identified.
 renameCaptures :: Data a => [(RdrName, RdrName)] -> a -> a
 renameCaptures [] node = node
@@ -618,7 +685,8 @@ source so the normal context check rejects it.
 Give a lambda in a top-level value signature or ordinary constructor
 field its own private synonym. Its parameters are the free variables
 of the lambda and the variables in their kinds. Keep the application
-of the synonym at the written occurrence. The existing lambda pass
+of the synonym at the written occurrence. In a signature, an ordinary
+erased forall can also provide captures. The existing lambda pass
 then lifts the synonym body. See Note [Lifting type lambdas].
 
 A foreach telescope starts a new table too. Lift a case on an
@@ -694,7 +762,7 @@ data LiftedTypeSite
   = FieldTypeSite
   | RetainedFieldTypeSite [RdrName]
   | SignatureTypeSite
-  | ForallTypeSite
+  | ForallTypeSite Bool  -- The scope permits lifting a type lambda.
   | RetainedTypeSite [RdrName]
   deriving Eq
 
@@ -919,18 +987,12 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
 
     namedWildcard = (named_wildcards &&) . startsWithUnderscore . rdrNameOcc
 
-    explicitCaptures :: [LHsTyVarBndr flag GhcPs]
-                     -> [(LHsTyVarBndr (HsBndrVis GhcPs) GhcPs, LocatedN RdrName)]
-    explicitCaptures binders =
-      [(fmap (updateHsTyVarBndrFlag (const (HsBndrRequired noExtField))) b, v)
-      | b <- binders, Just v <- [hsLTyVarLocName b]]
-
     liftFieldAt site owner scope ty salt =
       let (ty', sums, (next, _)) = liftBody site owner scope ty (salt, [])
       in (ty', sums, next)
 
-    liftedAnchor SignatureTypeSite _ ty@(L _ (XHsType HsTypeLambda{}))
-      | lift_cases, copyable ty = Just ("$signature-lambda:", Nothing)
+    liftedAnchor site _ ty@(L _ (XHsType HsTypeLambda{}))
+      | lift_cases, signatureLambdaSite site, copyable ty = Just ("$signature-lambda:", Nothing)
     liftedAnchor FieldTypeSite _ ty@(L _ (XHsType HsTypeLambda{}))
       | lift_cases, copyable ty = Just ("$field-lambda:", Nothing)
     liftedAnchor SignatureTypeSite _ ty@(L _ (XHsType HsTypeLet{}))
@@ -962,6 +1024,14 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
     fieldSite FieldTypeSite = True
     fieldSite RetainedFieldTypeSite{} = True
     fieldSite _ = False
+
+    signatureSite SignatureTypeSite = True
+    signatureSite ForallTypeSite{} = True
+    signatureSite _ = False
+
+    signatureLambdaSite SignatureTypeSite = True
+    signatureLambdaSite (ForallTypeSite allowed) = allowed
+    signatureLambdaSite _ = False
 
     caseScrutinee (RetainedFieldTypeSite names) scope scrutinee
       | L _ (HsTyVar _ _ name) <- ignoreParens scrutinee
@@ -1004,32 +1074,22 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
         copyableAlt (L _ (HsTypeCaseAlt pat _ rhs)) =
           isJust (classifyTypeCasePattern pat) && copyable rhs
 
-    forallCaptures HsForAllInvis{hsf_invis_bndrs = binders} = writtenCaptures binders
-    forallCaptures HsForAllVis{hsf_vis_bndrs = binders} = writtenCaptures binders
-
-    writtenCaptures :: [LHsTyVarBndr flag GhcPs]
-                    -> Maybe [(LHsTyVarBndr (HsBndrVis GhcPs) GhcPs, LocatedN RdrName)]
-    writtenCaptures binders
-      | all hasWrittenKind binders = Just (explicitCaptures binders)
-      | otherwise = Nothing
-
-    hasWrittenKind (L _ (HsTvb _ _ HsBndrVar{} (HsBndrKind _ kind))) = copyable kind
-    hasWrittenKind _ = False
-
-    innerScope site HsForAllTy{hst_tele = tele, hst_body = body}
-      | site == SignatureTypeSite || site == ForallTypeSite
+    innerScope site scope HsForAllTy{hst_tele = tele, hst_body = body}
+      | signatureSite site
       , Just locals <- forallCaptures tele
-      = Just (ForallTypeSite, locals, body)
+      = let lift_lambda = signatureLambdaSite site && ordinaryErasedForall tele
+                          && isJust (extendLambdaForallScope scope locals) && spliceFree body
+        in Just (ForallTypeSite lift_lambda, locals, body)
       | site == FieldTypeSite
-      , HsForAllInvis{hsf_matchability = Nothing} <- tele
+      , ordinaryErasedForall tele
       , Just locals <- forallCaptures tele
       = Just (FieldTypeSite, locals, body)
-    innerScope site HsForEachTy{hst_bndrs = binders, hst_body = body}
+    innerScope site _ HsForEachTy{hst_bndrs = binders, hst_body = body}
       | not (fieldSite site)
       , Just locals <- writtenCaptures binders
       , not (null locals)
       = Just (RetainedTypeSite (map (unLoc . snd) locals ++ retainedNames site), locals, body)
-    innerScope _ _ = Nothing
+    innerScope _ _ _ = Nothing
 
     liftBody site owner scope whole@(L loc _) (salt, seen)
       | Just (prefix, key) <- liftedAnchor site scope whole
@@ -1062,7 +1122,7 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
                   pure (share_key, renameCaptures copied captures, call_uses)
             in (applyAnchor loc occ used, [((alias, (occ, Nothing)), shared, unbound)], (salt + 1, seen'))
     liftBody site owner scope (L loc quantified) (salt, seen)
-      | Just (inner, locals, body) <- innerScope site quantified
+      | Just (inner, locals, body) <- innerScope site scope quantified
       , let names = map (unLoc . snd) locals
       , null (findDupsEq (==) names)
       , let (hidden, outer) = partition ((`elem` names) . unLoc . snd) scope
@@ -1113,12 +1173,6 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
           | null exact_retained = []
           | Just rdr <- cast node = [rdr | rdr `elem` exact_retained]
           | otherwise = concat (gmapQ exactUses node)
-
-    copyable :: Data a => a -> Bool
-    copyable node = case cast node :: Maybe (LHsType GhcPs) of
-      Just (L _ HsSpliceTy{}) -> False
-      Just (L _ HsWildCardTy{}) -> False
-      _ -> and (gmapQ copyable node)
 
     copyableCapture site (L _ ty) (binder, name) =
       copyable binder && case ty of
@@ -1657,12 +1711,9 @@ liftTypeCases group =
     captureKindNames (L _ HsTvb{tvb_kind = HsBndrKind _ kind}, _, _) = lexicalNames kind
     captureKindNames _ = Just []
 
-    extendForall names binder@(_, name, _)
-      | unLoc name `notElem` names
-      , Just mentions <- captureKindNames binder
-      , all (`elem` names) mentions
-      = Just (unLoc name : names)
-    extendForall _ _ = Nothing
+    extendForall names binder@(_, name, _) = do
+      mentions <- captureKindNames binder
+      extendForallNames names (unLoc name) mentions
 
     typeName n = L (l2l (getLoc n)) (HsTyVar noAnn NotPromoted n)
 

@@ -1,14 +1,15 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, Modifiers, PolyKinds, StandaloneKindSignatures,
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, Modifiers, PolyKinds, RankNTypes, StandaloneKindSignatures,
              TypeApplications, TypeFamilies, TypeOperators, UndecidableInstances #-}
 -- | Apply a type lambda to a list of type constructors.
 module TypeLambda
   ( L, Captured, Shadowed, WithError, Prefixes, ScopedRow, Mixed, Held, CaseShadow, Rebuild
   , Fields(..), CheckedRow(..), Map, Columns, Optional, withErrors, IndexedTag(..), IndexedCase, IndexedCaseInferred
+  , RankedReader, rankedReader, rankedReaderAt
   , roadmap, partial, optionalColumns, sameColumnReader, prefixes, mixed, indexedFields
   ) where
 
 import Data.Kind (Type)
-import Data.Proxy (Proxy)
+import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Matchability (U)
 
@@ -39,6 +40,21 @@ data CheckedRow e (xs :: [Type]) = CheckedRow
 withErrors :: Proxy e -> Fields xs -> Fields (Map (\a -> Either e a) xs)
 withErrors _ End = End
 withErrors p (Field x xs) = Field (Right x) (withErrors p xs)
+
+-- | Give a cell the table and column indices.
+type RankedReader (k :: Type) (table :: k) =
+  forall (column :: k). Proxy column ->
+    Fields (Map (\k -> (Proxy table, Proxy column, k)) '[Char])
+
+-- | Read a cell from a fixed table.
+rankedReader :: RankedReader Bool 'True
+rankedReader _ = Field (Proxy, Proxy, 'r') End
+
+-- | Choose the table before supplying the column.
+rankedReaderAt :: forall (k :: Type) (table :: k). Proxy table ->
+  (forall (column :: k). Proxy column ->
+    Fields (Map (\cell -> (Proxy table, Proxy column, cell)) '[Char]))
+rankedReaderAt _ _ = Field (Proxy, Proxy, 's') End
 
 -- | A column read can fail or return a missing cell.
 type Column err a = Either err (Maybe a)

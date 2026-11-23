@@ -82,13 +82,13 @@ if "${g[@]}" -c ChangedLambda.hs >changed.log 2>&1 ||
 fi
 
 cat >Ordinary.hs <<'HS'
-{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeApplications, TypeOperators #-}
+{-# LANGUAGE DataKinds, KindSignatures, NoExperimentalDependentTypes, RankNTypes, TypeApplications, TypeOperators #-}
 module Ordinary where
 import Data.Kind (Type)
 import Data.Type.Equality ((:~:)(Refl))
 import NativeTypeLambdaScope
 import TypeLambda (Fields(..), L, Captured, Shadowed, WithError, Prefixes, ScopedRow, Mixed, Held, CaseShadow, Rebuild,
-                   IndexedTag(..), IndexedCase, IndexedCaseInferred)
+                   IndexedTag(..), IndexedCase, IndexedCaseInferred, rankedReader, rankedReaderAt)
 import Data.Proxy (Proxy(..))
 result :: L :~: '[Maybe Int, Either String Int, IO Int]
 result = Refl
@@ -149,6 +149,10 @@ checkedField :: CheckedField String '[Bool]
 checkedField = CheckedField { checkedFields = Field (Right True) End }
 indexedField :: IndexedField Bool 'True
 indexedField = IndexedField (Field (Right Proxy) End)
+rankedSynonym :: forall (column :: Bool). Proxy column -> Fields '[ (Proxy 'True, Proxy column, Char) ]
+rankedSynonym = rankedReader
+rankedSignature :: forall (column :: Bool). Proxy column -> Fields '[ (Proxy 'True, Proxy column, Char) ]
+rankedSignature = rankedReaderAt (Proxy :: Proxy 'True)
 ordinaryLambda :: a -> b -> a
 ordinaryLambda x = (\_ -> x)
 HS
@@ -158,7 +162,7 @@ cat >RowsMain.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, TypeOperators #-}
 module Main where
 import Data.Type.Equality ((:~:)(Refl))
-import Ordinary (capturedRow, independentRow, scopedRow)
+import Ordinary (capturedRow, independentRow, rankedSignature, rankedSynonym, scopedRow)
 import Data.Proxy (Proxy(..))
 import TypeLambda (Columns, Fields(..), Optional, Prefixes, ScopedRow)
 import SchemaColumns (Callable, Checked)
@@ -195,14 +199,30 @@ main = case (capturedRow, independentRow, withError, withoutError) of
     case callable of
       Field wrap End -> case wrap (Field True End) of
         Field x End -> print x
+    case (rankedSynonym (Proxy :: Proxy 'False), rankedSignature (Proxy :: Proxy 'True)) of
+      (Field (_, _, x) End, Field (_, _, y) End) -> print (x, y)
 HS
 "${g[@]}" -c RowsMain.hs
 "${g[@]}" RowsMain.o Ordinary.o TypeLambdaClient.o ../provider/TypeLambda.o \
     ../provider/SchemaColumns.o ../provider/NativeTypeLambdaScope.o -o rows
 printf '%s\n' "(Left GT,Right True,Just 'a',Just True)" "(Just 'x',Right True)" "Right 'x'" \
-    '(Just 42,Left "missing")' "Right True" >rows.expected
+    '(Just 42,Left "missing")' "Right True" "('r','s')" >rows.expected
 ./rows >rows.actual
 cmp rows.expected rows.actual
+
+cat >WrongRankedCapture.hs <<'HS'
+{-# LANGUAGE DataKinds, KindSignatures, NoExperimentalDependentTypes, RankNTypes #-}
+module WrongRankedCapture where
+import Data.Proxy (Proxy)
+import TypeLambda (Fields, rankedReader)
+wrong :: forall (column :: Bool). Proxy column -> Fields '[ (Proxy 'True, Proxy 'False, Char) ]
+wrong = rankedReader
+HS
+if "${g[@]}" -c WrongRankedCapture.hs >wrong-ranked.log 2>&1 ||
+   ! grep -Fq 'WrongRankedCapture.hs:6:9: error: [GHC-25897]' wrong-ranked.log; then
+    cat wrong-ranked.log >&2
+    exit 1
+fi
 
 cat >Conflict.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes, TypeFamilies, UndecidableInstances #-}

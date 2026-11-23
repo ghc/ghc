@@ -135,6 +135,24 @@ a bound variable.
 [equality evidence](../../../compiler/GHC/Builtin/CoercionRules.hs) and
 [Agda function equality](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html).
 
+## Rows under an erased forall
+
+```haskell
+type RankedReader (k :: Type) (table :: k) =
+  forall (column :: k). Proxy column ->
+    Fields (Map (\k -> (Proxy table, Proxy column, k)) '[Char])
+```
+
+The result carries the outer table index, the quantified column
+index, and the cell. Both indices keep the enclosing kind. The
+lambda's own `k` names the cell type. A nested erased forall in a
+top-level signature can use the same form. The new path checks
+explicitly kinded, splice-free binders in telescope order and
+requires distinct telescope names. Retained and splice-dependent
+binders keep their existing scope checks.
+[Row example](../examples/open-evaluation/TypeLambda.hs) and
+[ordinary client](../../../testsuite/tests/dependent/should_run/NativeTypeLambda.sh).
+
 ## Capturing a closed family pattern
 
 ```haskell
@@ -182,6 +200,16 @@ GHC still rejects an overlapping instance with a different result.
 [Schema library](../examples/open-evaluation/TypeLambda.hs),
 [instance module](../examples/open-evaluation/SchemaColumns.hs) and
 [GHC open type families](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#open-type-synonym-families).
+
+## Earlier interface reader
+
+Normal 566 reads stripped interfaces for the new ordinary fields and
+instances. Its ordinary clients can construct the fields and call the
+row readers. With `UnsaturatedTypeFamilies`, Template Haskell on 566
+can reify and splice the open and associated instance RHSs. It can
+reify the new field selector. Splicing that selector's reified type
+reports GHC-55017 for its private field alias on 566. The current
+converter accepts the same splice.
 
 ## Matching a lambda argument
 
