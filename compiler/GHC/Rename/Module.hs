@@ -67,6 +67,7 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.DynFlags
 import GHC.Driver.Env ( HscEnv(..), hsc_home_unit)
 
+import GHC.Utils.Encoding ( zEncodeString )
 import GHC.Utils.Misc   ( lengthExceeds )
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
@@ -2224,6 +2225,13 @@ rnLocalSignatureLambdas sigma named_wildcards fix_env generated local_lambdas ki
   = do
       local <- getLocalRdrEnv
       ordinal <- readTcRef local_lambdas
+      level <- getThLevel
+      let site = "local-" ++ show ordinal
+      site_suffix <- case level of
+        Brack _ RnPendingTyped ->
+          zEncodeString . occNameString <$>
+            chooseUniqueOccTc (mkInstTyTcOcc ("$typed-quote-" ++ site))
+        _ -> pure site
       let formals = case outer of
               HsOuterImplicit{} -> []
               HsOuterExplicit{hso_bndrs = binders} -> mapMaybe hsLTyVarName binders
@@ -2242,7 +2250,7 @@ rnLocalSignatureLambdas sigma named_wildcards fix_env generated local_lambdas ki
           scope = LocalLambdaScope actuals unavailable
           signature = noLocA (TypeSig noAnn [] names ty)
           input = emptyRdrGroup{hs_valds = ValBinds noExtField [VbSig signature]}
-          suffix salt = "local-" ++ show ordinal ++ "-" ++ show salt
+          suffix salt = site_suffix ++ "-" ++ show salt
           (updated, anchors, aliases, _, _, _) =
             liftDeclarationTypes [] [] suffix True named_wildcards (Just (scope, map fst ambient)) input
       case (anchors, hs_valds updated) of
@@ -2250,15 +2258,24 @@ rnLocalSignatureLambdas sigma named_wildcards fix_env generated local_lambdas ki
           (late, lambdas, scopes) <- liftTypeLambdas True sigma emptyRdrGroup{hs_tyclds = anchors}
           let hidden = aliases ++ [(fam, Just owner) | (fam, owner) <- lambdas]
               declarations = hs_tyclds late
-          (envs, _) <- getLocalNonValBinders fix_env emptyRdrGroup{hs_tyclds = declarations}
-          renamed <- restoreEnvs envs $ setLocalRdrEnv emptyLocalRdrEnv $
+          -- See Note [Lifting type lambdas in typed quotations].
+          (envs, names) <- setThLevel Comp $
+            getLocalNonValBinders fix_env emptyRdrGroup{hs_tyclds = declarations}
+          let at_source :: RnM a -> RnM a
+              at_source action = restoreEnvs envs $ setThLevel level $
+                updLclCtxt (atHelperStage level names) action
+          renamed <- at_source $ setLocalRdrEnv emptyLocalRdrEnv $
             rnTyClDecls hidden scopes declarations
           updTcRef generated (renamed :)
           updTcRef local_lambdas (+ 1)
-          Just <$> restoreEnvs envs (rnHsSigWcType doc result)
+          Just <$> at_source (rnHsSigWcType doc result)
         _ -> pure Nothing
   | otherwise = pure Nothing
   where
+    atHelperStage level names ctxt =
+      ctxt{tcl_th_bndrs = extendNameEnvList (tcl_th_bndrs ctxt)
+        [(name, (TopLevel, thLevelIndex level)) | name <- nonDetEltsUniqSet names]}
+
     occurrences = extractHsTyRdrTyVars body
     no_named_hole = not named_wildcards ||
       all (not . startsWithUnderscore . rdrNameOcc . unLoc) occurrences
@@ -2267,6 +2284,26 @@ rnLocalSignatureLambdas sigma named_wildcards fix_env generated local_lambdas ki
     hasLambda node
       | Just (L _ (XHsType HsTypeLambda{})) <- cast node :: Maybe (LHsType GhcPs) = True
       | otherwise = or (gmapQ hasLambda node)
+
+{- Note [Lifting type lambdas in typed quotations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The producer checks the body of a typed quote. The typed splice runs in the
+zonker, after the consumer has checked its declaration group. It cannot add
+a lambda's helper declarations to that group. Lift the lambda in the producer
+and quote the resulting helper application. The helper is a private global
+type synonym, so a splice in another module can resolve its original Name
+from the producer's interface. Reserve its suffix in the module-wide
+occurrence supply. The ordinary local counter restarts at each declaration
+group, so it cannot distinguish helpers referenced by different quotes on
+the two sides of a declaration splice. Encode the suffix so a colon in
+it does not change the owner found by pprLiftedTypeLambdaSite.
+
+Allocate the helper's name at Comp so it is external. Rename its copied
+source at the quote's level, where the usual checks on levelled names
+apply. The helper itself is available at that level. A typed quote
+evaluated by an untyped splice during renaming cannot use this path.
+Its declaration group has yet to be typechecked.
+-}
 
 -- | Bind the visible captures in their original dependency order and name form.
 localSignatureCaptures :: (Name -> RdrName) -> LocalRdrEnv -> [RdrName] -> LocalSignatureKinds

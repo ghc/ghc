@@ -1536,6 +1536,9 @@ repLTyAt tyki (L _ (XHsType (HsTypeLambdaQuoteRn binders body))) =
     MkC names <- repList nameTyConOcc (lookupOcc . unLoc) binders
     MkC body' <- repLTyAt tyki body
     rep2 lamTName [names, body']
+-- The typed quote has already checked the capture kinds against the body.
+-- See Note [Lifting type lambdas in typed quotations] in GHC.Rename.Module.
+repLTyAt tyki (L _ (XHsType (HsTypeLambdaCheckRn _ _ helper))) = repLTyAt tyki helper
 repLTyAt tyki ty = repTy tyki (unLoc ty)
 
 {- Note [Quoting type lambdas]
