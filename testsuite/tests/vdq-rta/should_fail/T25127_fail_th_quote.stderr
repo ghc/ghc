@@ -4,4 +4,4 @@ T25127_fail_th_quote.hs:9:2: error: [GHC-51580]
     • In the definition of data constructor ‘VP’
       In the data type declaration for ‘VisProxy’
     Suggested fix:
-      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension (implied by ‘ExperimentalDependentTypes’)

@@ -7,4 +7,4 @@ T15859.hs:9:19: error: [GHC-51580]
       In an equation for ‘a’:
           a = (undefined :: forall k -> k -> Type) @Int
     Suggested fix:
-      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension (implied by ‘ExperimentalDependentTypes’)
