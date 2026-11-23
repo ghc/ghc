@@ -12,6 +12,44 @@ mkdir eta-results
 cd eta-results
 result=$PWD/results.tsv
 
+if [[ "$mode" == candidate ]]; then
+    mkdir termination
+    (
+        cd termination
+        cat >ForwardTermination.hs <<'HS'
+{-# LANGUAGE CPP, ExperimentalDependentTypes, Modifiers, NoUndecidableInstances #-}
+{-# LANGUAGE StandaloneKindSignatures, TypeFamilies #-}
+module ForwardTermination where
+
+import Data.Kind (Type)
+import GHC.Matchability (U)
+
+#ifdef CALLABLE
+type Apply :: (Type %U -> Type) %U -> Type %U -> Type
+type family Apply f cell where
+  Apply f cell = f cell
+type Applied f = \cell -> Apply f cell
+#else
+type Stamped tag = \cell -> Stamp tag cell
+type family Stamp tag cell where
+#ifdef CAPTURED
+  Stamp tag cell = Stamped tag cell
+#else
+  Stamp tag cell = Either tag cell
+#endif
+#endif
+HS
+        "${run[@]}" -c ForwardTermination.hs
+        for reject in CALLABLE CAPTURED; do
+            if "${run[@]}" -fforce-recomp "-D$reject" -c ForwardTermination.hs >"$reject.log" 2>&1 ||
+               ! grep -Fq 'error: [GHC-22979]' "$reject.log"; then
+                cat "$reject.log" >&2
+                exit 1
+            fi
+        done
+    )
+fi
+
 for opt in O0 O2; do
     mkdir "$opt"
     (
