@@ -475,6 +475,13 @@ test('NativeMonomorphicRetainedProjection',
                              'RetainedCharLocal.hs', 'RetainedCharClient.hs']])],
      run_command, ['bash NativeMonomorphicRetainedProjection.sh "{compiler}" "{libdir}"'])
 
+test('NativeRetainedVectorFacade',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/' + f
+                   for f in ['PackedVecLibrary.hs', 'RetainedCharVector.hs',
+                             'RetainedCharLength.hs', 'RetainedCharProjection.hs']])],
+     run_command, ['bash NativeRetainedVectorFacade.sh "{compiler}" "{libdir}" "{ghc_pkg}"'])
+
 test('NativeAlternatingBinders',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeAlternatingBindersProvider.hs', 'NativeAlternatingBindersClient.hs'])],
