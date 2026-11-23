@@ -40,8 +40,8 @@ synonym bodies and family equation right-hand sides. It descends into
 applications, parentheses, kind ascriptions, list and tuple elements,
 and both operands of an arrow. Constructor fields and top-level value
 signatures can also contain a lambda. The [ranked row example](#rows-under-an-erased-forall)
-shows which quantified binders it can capture. A local value signature
-still reports GHC-27185 at the backslash.
+shows which quantified binders it can capture. A [local value signature](#a-lambda-in-a-local-value-signature)
+can capture types from the enclosing signature.
 With the extension disabled, the diagnostic is GHC-27184 at the lambda.
 
 Adjacent lambdas share one family telescope. A lambda nested in an
@@ -138,31 +138,60 @@ a bound variable.
 [equality evidence](../../../compiler/GHC/Builtin/CoercionRules.hs) and
 [Agda function equality](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html).
 
-A local value signature exposes a remaining placement restriction.
-For example, a row mapper can take its error type `e` from the
-enclosing signature and recurse on the row inside a `where` clause.
+## A lambda in a local value signature
+
+A `where` signature can use the same error type as the enclosing
+function. Here `e` is in scope at the local signature through
+`ScopedTypeVariables`. Each recursive call checks a shorter row.
 
 ```haskell
-    go :: forall (ys :: [Type]). Fields ys -> Fields (Map (WithError e) ys)
+checkRow :: forall (e :: Type) xs.
+            Proxy e -> Fields xs -> Fields (Map (\a -> Either e a) xs)
+checkRow _ = go
+  where
+    go :: forall (ys :: [Type]). Fields ys -> Fields (Map (\cell -> Either e cell) ys)
     go End = End
     go (Field x rest) = Field (Right x) (go rest)
 ```
 
-With the top-level synonym `type WithError e a = Either e a`, this
-definition compiles. Replacing only `WithError e` with
-`(\x -> Either e x)` reports GHC-27185 at the backslash. Job 1679
-checked both spellings on normal 567 and the erased-forall component.
+The renamer captures `e` by its lexical name. Its written kind comes
+from the enclosing signature. A row index that appears only outside the
+lambda needs no written kind. In the current compiler, omitting the kind
+of `e` reports GHC-27185 at the backslash and names `e`. A shadowed kind
+that a capture needs can also prevent lifting. Quoted local signatures
+still reject the lambda.
+[Maintained row mapper](../examples/open-evaluation/TypeLambda.hs)
+and [scope checks](../../../testsuite/tests/dependent/should_run/NativeTypeLambda.sh).
 
-Moving the inner callback to a top-level synonym isolates a second
-issue. With `type Inline e = \x -> Either e x`, the inner helper can
-return `Fields (Map (Inline e) xs)`. At `go row`, GHC-83865 reports
-that this result does not match `Fields (Map (WithError e) xs)` for
-unknown `xs`. Job 1683 checked that using `Inline e` in both signatures
-works, as does a separately written alpha-renamed lambda in the outer
-signature. Agda has definitional function eta. GHC's existing rule
-for shortening a partial synonym checks that the remaining arrow has
-the same kind and matchability.
-[Agda function equality](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#lambda-expressions)
+An inferred kind must preserve dependencies at the point where the
+lambda is written. For example, an outer `tag :: k` keeps its original
+kind when a local signature binds another `k`. The type
+`Proxy (\cell -> (Proxy (tag :: k), cell))` then refers to two different
+kinds. An early prototype accepted this type and failed only if a client
+tried to reduce the function. Job 1743 found the same failure with an
+ascription, a dependent constructor and a dependent family. Checking
+the callback only on application missed all three formation errors.
+The published compiler retains the written-kind restriction for captures.
+
+### Forwarding the same callback
+
+The outer and inner lambda may use different parameter names. An
+ordinary client can also share the callback through
+`type WithError e = \cell -> Either e cell`. If the outer signature
+instead uses `type WithError e a = Either e a` and the inner uses a
+lambda, GHC-83865 points to `go row` for unknown `xs`. Both callbacks
+have an unmatchable arrow. Shortening the named synonym to `Either e`
+would change its arrow to matchable.
+
+Job 1725 tested the two callbacks as arguments to a closed family with a
+repeated variable. The mixed comparison stays stuck. A differently named
+parameter in an otherwise identical generated lambda selects the equal
+branch. Agda uses definitional function eta. The #242 review retains
+fixed family arities and leaves distinct partial family applications
+potentially equal. Its rule does not identify those applications by
+comparing their results on a fresh argument.
+[Agda function equality](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#lambda-expressions),
+[#242 review of arity and apartness](https://github.com/ghc-proposals/ghc-proposals/pull/242#issuecomment-503360362)
 and [GHC's partial synonym rule](../../../compiler/GHC/Core/Type.hs).
 
 ## Rows under an erased forall

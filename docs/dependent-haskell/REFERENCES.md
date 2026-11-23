@@ -41,6 +41,17 @@ in kinds. The R24 card links the review questions to the interface test.
 [Disallow constraints in kinds](https://ghc-proposals.readthedocs.io/en/latest/proposals/0547-no-kind-equalities.html)
 and [R24 source syntax](roadmap/R24-constrained-type-families.md#source-syntax-and-separate-compilation).
 
+For R17, a local type lambda uses the enclosing signature's scoped type
+variables. Two checked lambda bodies can agree after a binder renaming.
+Agda also identifies a function with its eta expansion. In the #242
+review, Kiss explains how fixed arity restricts the corresponding
+equality for partial Haskell type families. The fork keeps the mixed
+named and inline case stuck when it has no nominal equality.
+[Scoped type variables](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/scoped_type_variables.html),
+[Agda function equality](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#lambda-expressions),
+[#242 review](https://github.com/ghc-proposals/ghc-proposals/pull/242#issuecomment-503360362)
+and [the two callback spellings](roadmap/R17-type-level-lambdas.md#forwarding-the-same-callback).
+
 R04 uses Serokell's dependent sum syntax. In
 `some (tag :: Bool) | Body a tag`, an associated family selects the payload type. Agda's built-in sum gives
 the second field a type indexed by the first field. The additional

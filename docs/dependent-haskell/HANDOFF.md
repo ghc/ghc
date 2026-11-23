@@ -11,7 +11,26 @@ and its [expected output](Showcase.stdout) are the executable examples.
 Updated 23 November 2026. The development branch is
 `dependent-haskell`. Use the fork command below to find its latest commit.
 
-The current compiler is `aba28b367f`. A dependent pair can select
+The current compiler is `203245e124`. A local type lambda can capture
+the error type from an enclosing signature. A dependent pair can store
+a `Maybe` or tuple whose fields use associated families. Job 1748
+verified the combination through a source-hidden ordinary client at
+`-O0` and `-O2`. Reading the tag left an undefined payload unevaluated.
+Job 1739 qualified both stages, all 571 Showcase observations in
+three modes, 22 selected registrations, and 234 compatibility cases.
+The focused suite passed 137 of 138 with the existing `MTrans` failure.
+If a warm build stops during package registration, check the exact
+package DB path. The 571 recovery configured the affected packages with
+`-j1` and resumed the same build tree. [Release evidence](CHECKPOINTS.md#local-row-callbacks-and-composed-dependent-pair-payloads).
+
+The next R04/R21 candidate publishes a first projection for a
+monomorphic retained constructor. A handwritten second projection can
+then return a value at that index. R17 is investigating inferred local
+capture kinds. The attempted inference let an ill-kinded lambda form in
+`Proxy` until a caller demanded reduction. That prototype is excluded
+from the next build.
+
+The preceding R04 compiler is `aba28b367f`. A dependent pair can select
 its payload type with an associated family. Reading the tag leaves
 the payload lazy. An ordinary client that only typechecks a provider
 interface gets the same missing-class error as one that builds an
@@ -22,13 +41,6 @@ The original driver exited 1 because its package fixture was missing.
 Job 1721 verified the fixture and passed the package checks on the same
 compiler. Use `r04-normal-569-20261123/post-review/verified.pass` for the
 combined results. [Release evidence](CHECKPOINTS.md#associated-families-as-dependent-pair-payloads).
-
-Two component results are ready for combined qualification. R17 accepts
-a lambda in a local row mapper's signature. The enclosing signature
-supplies the kinds of the captured variables. R04 accepts
-`Maybe (Body a tag)` and checks class obligations for tuple components.
-The combined build must check local scope, class domains, the earlier
-readers, and the Showcase.
 
 The preceding R17 compiler is `c4d702c7f4`. A record field can use a type
 lambda that captures the record's error type. Family instance equations
@@ -543,8 +555,8 @@ defaults and an opt-in migration warning.
 
 ## Build and verify
 
-The 569-line Showcase uses the normal two-stage compiler at
-`aba28b367f` in `r04-normal-569-20261123`.
+The 571-line Showcase uses the normal two-stage compiler at
+`203245e124` in `r04-r17-normal-571-20261123`.
 On this host the bootstrap tools are GHC 9.14.1, Cabal 3.18.1.0, Happy 2.1.7
 and Alex 3.5.4.0. A fresh checkout needs the Git submodules at their recorded
 revisions. This build copied the preceding build tree, ran `./boot`
@@ -557,7 +569,7 @@ self-hosted stage 2 compiler in `_build/stage1/bin/ghc`. Both use the
 target libraries in `_build/stage1/lib`. For example, from the main checkout:
 
 ```sh
-stable="$PWD/_build/on-demand/r04-normal-569-20261123/source/_build/stage1"
+stable="$PWD/_build/on-demand/r04-r17-normal-571-20261123/source/_build/stage1"
 queue="$PWD/docs/dependent-haskell/tools/ghc-build-job"
 check="$PWD/docs/dependent-haskell/check-showcase.sh"
 "$queue" showcase-stage2-ghci bash "$check" "$stable/bin/ghc" "$stable/lib" --ghci
@@ -609,4 +621,10 @@ recovered 7,806,869,504 bytes. The archived source pins and recipes remain.
 Replaying 562's original warm build requires rebuilding its standalone R23
 donor first. The live reader tests use the existing 562 compiler directly.
 See `retirement-561-standalone-20261123/retired.tsv`.
+Job 1741 tested seven retained compilers and three package clients with
+seven pre-560 compiler trees removed. The 571 compatibility and focused
+suites then ran with those trees absent. Cleanup recovered
+27,235,835,904 bytes. Rebuilding an original warm donor may be
+necessary to rerun an older qualification. The pins, sources and recipes
+remain. See `retirement-seven-pre560-20261123/retired.tsv`.
 [Retention rules](CHECKPOINTS.md#clean-up-after-each-experiment).

@@ -169,6 +169,45 @@ reuse both the worker and the unchanged consumer. An interface-only
 old worker cannot supply the missing equation.
 [Upgrade runner](../examples/closed-evaluation/check-readback-upgrade.sh).
 
+## Separate named fields and dependent projections
+
+Serokell includes records in which a later field depends on an earlier
+field's value. The fork already supports a record selector that returns
+a whole dependent pair. In `StoredVector`, `Batch a` has a field of
+type `some (n :: Nat) | Vec a n`. That selector returns the length and
+the vector together. [StoredVector](../examples/packed-vector/StoredVector.hs).
+
+Two ordinary GADT record fields can also share a hidden index:
+
+```haskell
+data Named where
+    Named :: { tag :: SLength n, cells :: Vec Char n } -> Named
+
+renderNames :: Named -> String
+renderNames Named { cells = xs } = toList xs
+```
+
+An ordinary client can construct this record and use the field in the
+pattern shown above. It can also consume both fields with a function
+polymorphic in `n`. Applying `cells` to the record as a selector would
+let the hidden index escape. Job 1728 reports GHC-55876 at that use on
+normal 569. Declaring separate Haskell98 fields `storedLength :: Nat`
+and `storedCells :: Vec Char storedLength` reports GHC-45510 at the
+reference to `storedLength` in the type. An ordinary field label does
+not bind a type-level name for its stored value.
+[GHC existential record selectors](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/existential_quantification.html#record-constructors).
+
+An explicit dependent selector has a different result type. The
+handwritten `second` for `DPair` returns its payload at `first q`, where
+`q` is the same pair. Its separate provider supplies the equation for
+`first`. A consumer can check that type without recovering an
+existential index from the caller. General named record projections
+remain open.
+[First projection](../examples/packed-vector/DependentPair.hs),
+[second projection](../examples/packed-vector/DependentProjection.hs),
+[Agda's built-in Sigma type](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type)
+and [Serokell dependent sums](https://ghc.serokell.io/dh#dependent-sums).
+
 ## Sums in constructor fields
 
 [StoredVector](../examples/packed-vector/StoredVector.hs) uses one strict

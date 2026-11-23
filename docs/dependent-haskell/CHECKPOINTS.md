@@ -6,6 +6,61 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Local row callbacks and composed dependent pair payloads
+
+The Showcase uses a local lambda to map error handling over a row.
+It also stores an optional associated payload in a dependent pair.
+A combined client can apply both features in one function:
+
+```haskell
+checkPackets :: forall (e :: Type). Proxy e -> Optional -> Fields '[Either e Optional]
+checkPackets _ packet = check (Field packet End)
+  where
+    check :: forall ys. Fields ys -> Fields (Map (\cell -> Either e cell) ys)
+    check End = End
+    check (Field x xs) = Field (Right x) (check xs)
+```
+
+Here `Optional` is `some (tag :: Bool) | Maybe (FirstBody [Int] tag)`.
+On normal compiler `203245e124`, an ordinary module called
+`checkPackets` with a flag from `readIORef`. Matching `Right (Pair tag _)`
+returned `True` with an undefined payload. The same match returned
+`False` for `Nothing` with the opposite flag. Both runs used stripped
+provider interfaces and passed Core and STG Lint at `-O0` and `-O2`.
+Job 1748 also checked the inferred binding
+`checked = checkPackets (Proxy :: Proxy String)` in a module whose
+overlapping `First [Int]` instance requires `MissingFormat Int`.
+Its associated equations match the earlier instance. GHC-39999 points
+to `checked`, even with deferred type errors. An instance that omits
+the equations is rejected earlier with GHC-90647. The 569 compiler
+rejects the bridge interface at its import with GHC-47808. Its header
+requires both scoped lambdas and composed sum domains.
+[Row mapper](examples/open-evaluation/TypeLambda.hs),
+[payload definitions](examples/packed-vector/ComposedPayloadSum.hs)
+and [ordinary payload client](examples/packed-vector/ComposedPayloadSumClient.hs).
+
+The combined two-stage build passed all 16 qualification groups.
+All 571 Showcase observations matched at native `-O0`, default
+`-O2` and in GHCi. All 22 selected registrations and all 234
+compatibility cases passed. The focused suite passed 137 of 138.
+The complete `MTrans` diagnostic from `deriving-via-compile` matched
+its baseline. The seven polykinds cases recorded under the 566
+checkpoint remain outside these suites.
+
+Job 1726 exited 126 before the build script started. Job 1727 used Bash
+but stopped when `ghc-pkg` could not read the `array` registration
+during parallel package updates. Job 1739 configured the affected
+packages serially, completed the same checkout and passed the original
+qualification. The receipt is `r04-r17-normal-571-20261123/qualified.pass`.
+
+The new writer also reuses the free names it has already collected from
+local interface declarations. In two matched runs with 1,000 generated
+Haskell2010 data declarations and 1,000 value definitions, this saved
+16.31 MB (0.53%) of compilation allocation on the preceding R04 writer.
+The 100-declaration control saved 1.68 MB. Both wrote byte-identical
+ordinary interfaces. These are typecheck-only allocation measurements.
+Jobs 1722 and 1723 record the measurements and reader checks.
+
 ## Associated families as dependent pair payloads
 
 ```haskell
