@@ -2473,7 +2473,7 @@ listBoundaries = do
             (VCons 'r' (VCons 's' VNil))
             (VCons True (VCons False VNil))
     observe "zip two vectors at their shared stored length" (SiblingColumnsClient.readPairs columns)
-    let unpack :: TypeLambda.Fields '[Vec Char n, Vec Bool n] -> (String, [Bool])
+    let unpack :: forall len. TypeLambda.Fields '[Vec Char len, Vec Bool len] -> (String, [Bool])
         unpack (TypeLambda.Field xs (TypeLambda.Field ys TypeLambda.End)) = (toList xs, toList ys)
     observe "put two columns in a row indexed by the record length"
         (unpack (SiblingColumnRow.packRow columns))

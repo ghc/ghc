@@ -6,6 +6,47 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Two vector fields at one stored length
+
+A `Columns` constructor stores one length and two vectors. Their
+element types differ. Both projections use the stored length as their
+index. An ordinary client can therefore apply `zipVec` directly.
+
+```haskell
+readPairs :: Columns -> [(Char, Bool)]
+readPairs p = toList (zipVec (letters p) (flags p))
+```
+
+Selecting the Boolean vector from another record fails with an index
+mismatch. Job 1863 upgraded a provider which already had an older
+equation marker. Native builds and typecheck-only builds recovered the
+new projection equation and reused their outputs on the next run.
+[Ordinary caller](examples/packed-vector/SiblingColumnsClient.hs).
+
+R17 job 1880 checked an inline type lambda that builds a row with
+those same two vector types. A separately compiled client used a typed
+eliminator at both optimization levels. R16 job 1876 installed HaskLib
+and ran the composed proof for the length of a map over zipped lists
+with rewrite rules disabled.
+[Row example](examples/packed-vector/SiblingColumnRow.hs) and
+[composed list law](roadmap/R16-open-term-evaluator.md#map-over-the-result-of-zip).
+
+Normal job 1881 built the bootstrap and self-hosted compilers at
+`893d2ebc06`. All ten selected registrations passed. The ordinary
+replacement, historical reader, warm upgrades, field visibility,
+first-class-families, HaskLib and installed list-law checks passed.
+The Showcase's original row signature used the name of a length
+already in scope. Job 1893 ran the example with `forall len` on the
+same compiler. All 577 observations matched at native `-O0`, default
+`-O2` and in GHCi. [Runnable example](Showcase.hs).
+
+Job 1896 isolated the scoping rule in a small client. With `n` bound
+by `readIORef`, the unquantified signature mentioning `n` failed.
+A fresh name worked. Both `forall n` and `forall len` worked.
+All 234 compatibility registrations passed. The focused suite passed
+137 of 138. Its only failure reproduced the existing transformer kind
+synonym diagnostic in `deriving-via-compile`.
+
 ## Replace a vector after comparing runtime lengths
 
 The 574-observation compiler at `c11b29a399` accepts an ordinary client
