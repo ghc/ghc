@@ -43,6 +43,29 @@ It printed `[True,False,True]` at `-O0` and default `-O2`. The interface
 records the same defining name in both index positions.
 [Design sources](../REFERENCES.md#imported-functions-in-retained-indices).
 
+### Specializing an imported call
+
+The private compiler at `b2cda4061d` checks the first proof below.
+It rejects the second with GHC-83865. The result is the same when a
+client imports the synonym from a compiled interface.
+
+```haskell
+type Title (c :: Char) = Data.Char.toTitle c
+
+direct :: Data.Char.toTitle 'x' :~: 'X'
+direct = Refl
+
+specialized :: Title 'x' :~: Data.Char.toTitle 'x'
+specialized = Refl
+```
+
+This also affects the example above. A client cannot give
+`spaceDecision 'x'` the result type `Decision Char.isSpace (Char.isSpace 'x')`.
+A closed family with an `'X'` branch and a catch-all stays stuck on
+`Title 'x'`. Neither branch equality was accepted. Job 1360 checks all
+three cases. Keep this candidate private until substituting a literal
+agrees with writing the literal at the original call.
+
 ## Supported subset and evidence
 
 A retained callback can use unannotated type parameters in a complete

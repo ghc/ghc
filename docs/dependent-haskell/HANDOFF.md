@@ -131,8 +131,15 @@ The independent R03 release candidate is `b2cda4061d` in
 `r03-named-callbacks-normal-554`. It starts from the published R41
 compiler. Its new example records `Data.Char.isSpace` and its result
 in a decision type. It also contains the tested diagnostic correction
-for an implicit wildcard binder. Job 1345 builds both stages. Job 1346
-checks 95 registrations, 554 Showcase outputs and old and new readers.
+for an implicit wildcard binder. Job 1345 built both stages. Job 1352
+distinguished functions with the same module and occurrence name in two
+packages. Job 1346 passed 95 focused registrations and the 554-line
+Showcase at native `-O0`, default `-O2` and in GHCi. Job 1358 passed
+233 of 234 compatibility registrations.
+The candidate accepted the open call in `NativeClosedCharRigid`. Job
+1360 then found that substituting a literal into that call differs from
+writing the literal directly. Keep the candidate private. See the
+[source and interface examples](roadmap/R03-dependent-products.md#specializing-an-imported-call).
 
 Job 1335 used installed HaskLib on `4d10fdc35f` to check the
 [append counterexample](roadmap/R16-open-term-evaluator.md#append-fusion-and-an-undefined-right-list).
@@ -371,20 +378,16 @@ defaults and an opt-in migration warning.
    records for its old paths. Keep active builds under `_build/on-demand/`.
 3. Restore the [shared WSL build queue](CHECKPOINTS.md#restore-the-shared-wsl-build-queue)
    before submitting work. Use at most two subagents. The coordinator
-   reviews and integrates their results. R41 has landed. R03 and R21
-   share the next two-stage build. See the
-   [two-parameter comparison](roadmap/R21-dependency-analysis.md#a-tree-with-two-type-parameters).
+   reviews and integrates their results. One agent owns the R03
+   substitution check. The other owns the R16 append proof check.
    The group has two slots. All GHC jobs share
    16 logical CPUs, 64,000,000,000 bytes of memory and zero swap.
    Higher-priority jobs pause the queue and freeze the GHC slice.
 
 ## Build and verify
 
-The current 547-line Showcase uses the normal two-stage compiler in
-`_build/on-demand/r19-closure-normal-20261122`. Its driver's
-`--info` revision is `4e0c9b393a`. Job 828 used the published
-HaskLib and the fixture at `a7088dd69f`. The preceding 546-line
-compiler at `a395eea233` is in `_build/on-demand/r23-r03-normal-20261122`.
+The published 553-line Showcase uses the normal two-stage compiler at
+`71e5215115` in `r41-required-normal-553-20261123`.
 On this host the bootstrap tools are GHC 9.14.1, Cabal 3.18.1.0, Happy 2.1.7
 and Alex 3.5.4.0. A fresh checkout needs the Git submodules at their recorded
 revisions. This build used five workers per job.
@@ -398,7 +401,7 @@ self-hosted stage 2 compiler in `_build/stage1/bin/ghc`. Both use the
 target libraries in `_build/stage1/lib`. For example, from the main checkout:
 
 ```sh
-stable="$PWD/_build/on-demand/r19-closure-normal-20261122/source/_build/stage1"
+stable="$PWD/_build/on-demand/r41-required-normal-553-20261123/source/_build/stage1"
 queue="$PWD/docs/dependent-haskell/tools/ghc-build-job"
 check="$PWD/docs/dependent-haskell/check-showcase.sh"
 "$queue" showcase-stage2-ghci bash "$check" "$stable/bin/ghc" "$stable/lib" --ghci

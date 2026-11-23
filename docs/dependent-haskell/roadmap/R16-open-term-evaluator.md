@@ -2491,3 +2491,11 @@ Job 1347 changed the observed count with a rule on each of those names.
 On guarded compiler `4d10fdc35f`, a direct singleton client and a
 client of a separate re-export both rejected at the proof use under
 default `-O2`. Both passed with rewriting disabled.
+
+Jobs 1359 and 1361 examined the solved Core before simplification.
+In the maintained `lengthAppend` proof, both append equations take
+their seed from the second argument. The prototype also found a
+recursive proof use under `congSucc`. It could not identify the seed
+at that use. The result was the same at `-O0` and `-O2`. A client of
+a separately compiled re-export still lacks the argument mapping.
+The guard continues to reject that call at default `-O2`.
