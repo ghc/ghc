@@ -12,9 +12,12 @@ module GHCi.Message.Async
 
     -- * Interface for async bidirectional RPC
   , remoteAsyncReq, handleAsyncReq
-  , remoteAsyncReqWithResponse
-  , AsyncReqResult(..), getAsyncReqReply
   , RemoteProcessException(..), DecodeAsyncReqException(..)
+
+    -- ** Lower-level req/reply interface
+  , AsyncReqResult(..)
+  , remoteAsyncReqWithResponse
+  , getAsyncReqReply
 
     -- ** Mailboxes
   , InboxId(..)
@@ -203,11 +206,6 @@ instance Exception PipeClosedException
 -- All messages on the wire are 'IddMsg', which contain a correlation header
 -- and identify whether they are requests or replies.
 
-_writePipe :: Pipe -> IddMsg -> IO ()
-_writePipe p msg = do
-  var <- maybe (throwIO PipeWriteClosedException) pure =<< atomically (writePipeAsync p msg)
-  either throwIO pure =<< atomically (takeTMVar var)
-
 -- | Enqueues the message for writing.
 --
 -- The returned TMVar can be checked for the outcome.
@@ -269,58 +267,6 @@ remoteAsyncReq :: Pipe -> Put -> Maybe InboxId
                -> IO (Either SomeException LB.ByteString)
 remoteAsyncReq pipe msg ii dispose = mask_ $
   getAsyncReqReply (pure ()) dispose =<< remoteAsyncReqWithResponse pipe msg ii
-
-
-getAsyncReqReply :: IO ()
-                 -> (Either SomeException LB.ByteString -> IO ())
-                 -> AsyncReqResult
-                 -> IO (Either SomeException LB.ByteString)
-getAsyncReqReply middle dispose = \case
-  NotWritten e -> throwIO e
-  MaybeWritten written waitRes cancel ->
-    (do atomically (written >>= either throwSTM pure)
-        middle
-        atomically waitRes)
-      `onException` do
-         -- Do not care about write outcome, since reply could be coming either way.
-         void $ atomically cancel
-         -- exception must be happening while stuck in waitRes at the latest,
-         -- so waitRes can be called again.
-         --
-         -- We forkIO to wait, to keep cleanup bounded. If the pipe is
-         -- irrecoverable it will close eventually and this thread will terminate.
-         void $ forkIO (atomically waitRes >>= dispose)
-
-
-data AsyncReqResult
-     = NotWritten PipeClosedException
-     | MaybeWritten
-          (STM (Either SomeException ()))  -- ^ block for write outcome
-          (STM (Either SomeException LB.ByteString))   -- ^ block for reply
-          (STM (Maybe (STM (Either SomeException ())))) -- ^ send cancel
-
-
-remoteAsyncReqWithResponse :: Pipe
-                           -> Put
-                           -> Maybe InboxId
-                           -> IO AsyncReqResult
-remoteAsyncReqWithResponse pipe msg ii = do
-  -- Mark pending request
-  uq <- freshId (pipeAsyncMngr pipe)
-  wv <- newEmptyTMVarIO
-
-  atomically $ readTVar (pipeReadStatus pipe) >>= \ readEnd -> case isActive readEnd of
-    False  -> pure $ NotWritten PipeReadClosedException
-    True -> writePipeAsync pipe (Request uq ii (runPut msg)) >>= \case
-      Nothing -> pure $ NotWritten PipeWriteClosedException
-      Just waitWritten -> do
-        -- request queued, so we register a pending reply. After this tx we
-        -- always expect a reply, and when it arrives 'drainPipe' will clean up 'pendingReplies'.
-        modifyTVar pendingReplies (IntMap.insert uq wv)
-        pure (MaybeWritten (takeTMVar waitWritten) (takeTMVar wv)
-                           (fmap takeTMVar <$> writePipeAsync pipe (Cancel uq)))
-  where
-    pendingReplies = pendingReply (pipeAsyncMngr pipe)
 
 -- | Receive a single asynchronous request and send a matching reply
 -- asynchronously (the handler may fork a computation that eventually replies
@@ -384,6 +330,10 @@ handleAsyncReq pipe getit mii k = mask $ \restore -> do
                 void $ reply (Left e)
                 throwIO e
 
+-- | 'handleSyncReq' failed to decode an incoming request payload using the given @'Get' a@
+newtype DecodeAsyncReqException = DecodeAsyncReqException String deriving Show
+instance Exception DecodeAsyncReqException
+
 replyToReqAsync :: Pipe -> CorrelationId -> Either SomeException Put
                 -> STM (Maybe (TMVar (Either SomeException ())))
 replyToReqAsync pipe uq p = do
@@ -392,15 +342,61 @@ replyToReqAsync pipe uq p = do
   where
     am = pipeAsyncMngr pipe
 
-_replyToReq :: Pipe -> CorrelationId -> Either SomeException Put -> IO ()
-_replyToReq pipe uq p = atomically (replyToReqAsync pipe uq p) >>= \case
-  Nothing -> throwIO PipeWriteClosedException
-  Just written -> atomically (readTMVar written) >>= either throwIO pure
+-- ** Lower-level req/reply interface ------------------------------------------
 
--- | 'handleSyncReq' failed to decode an incoming request payload using the given @'Get' a@
-newtype DecodeAsyncReqException = DecodeAsyncReqException String deriving Show
-instance Exception DecodeAsyncReqException
+data AsyncReqResult
+     = NotWritten PipeClosedException
+     | MaybeWritten
+          (STM (Either SomeException ()))  -- ^ block for write outcome
+          (STM (Either SomeException LB.ByteString))   -- ^ block for reply
+          (STM (Maybe (STM (Either SomeException ())))) -- ^ send cancel
 
+-- | Like 'remoteAsyncReq', but instead of blocking waiting for a reply, return
+-- the 'AsyncReqResult' which can be given to 'getAsyncReqReply' to block
+-- waiting for a reply later.
+remoteAsyncReqWithResponse :: Pipe
+                           -> Put
+                           -> Maybe InboxId
+                           -> IO AsyncReqResult
+remoteAsyncReqWithResponse pipe msg ii = do
+  -- Mark pending request
+  uq <- freshId (pipeAsyncMngr pipe)
+  wv <- newEmptyTMVarIO
+
+  atomically $ readTVar (pipeReadStatus pipe) >>= \ readEnd -> case isActive readEnd of
+    False  -> pure $ NotWritten PipeReadClosedException
+    True -> writePipeAsync pipe (Request uq ii (runPut msg)) >>= \case
+      Nothing -> pure $ NotWritten PipeWriteClosedException
+      Just waitWritten -> do
+        -- request queued, so we register a pending reply. After this tx we
+        -- always expect a reply, and when it arrives 'drainPipe' will clean up 'pendingReplies'.
+        modifyTVar pendingReplies (IntMap.insert uq wv)
+        pure (MaybeWritten (takeTMVar waitWritten) (takeTMVar wv)
+                           (fmap takeTMVar <$> writePipeAsync pipe (Cancel uq)))
+  where
+    pendingReplies = pendingReply (pipeAsyncMngr pipe)
+
+-- | Block waiting for the given 'AsyncReqResult': a result which will be
+-- delivered asynchronously in reply to a 'remoteAsyncReqWithResponse' request.
+getAsyncReqReply :: IO ()
+                 -> (Either SomeException LB.ByteString -> IO ())
+                 -> AsyncReqResult
+                 -> IO (Either SomeException LB.ByteString)
+getAsyncReqReply middle dispose = \case
+  NotWritten e -> throwIO e
+  MaybeWritten written waitRes cancel ->
+    (do atomically (written >>= either throwSTM pure)
+        middle
+        atomically waitRes)
+      `onException` do
+         -- Do not care about write outcome, since reply could be coming either way.
+         void $ atomically cancel
+         -- exception must be happening while stuck in waitRes at the latest,
+         -- so waitRes can be called again.
+         --
+         -- We forkIO to wait, to keep cleanup bounded. If the pipe is
+         -- irrecoverable it will close eventually and this thread will terminate.
+         void $ forkIO (atomically waitRes >>= dispose)
 
 -- ** Mailboxes ----------------------------------------------------------------
 
@@ -640,11 +636,9 @@ receivedRequest am uq = do
     Just Canceling  -> error "impossible"
 
 
-
 {-
 Note [Exceptions during serialization]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For efficiency reasons, any `IddMsg` to be sent is forced only when already
 writing onto the Pipe, so we cannot discern whether a partial write already
 occurred. The only option then is to tear down the write end of the pipe.
