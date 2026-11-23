@@ -285,6 +285,7 @@ project the vector at the length stored in its own package: "ab"
 project each field using a local retained witness: (1,"r",True)
 replace a vector after checking the stored lengths: (Just "b",True)
 zip two vectors at their shared stored length: [('r',True),('s',False)]
+zip two named fields at their stored length: [('x',True)]
 put two columns in a row indexed by the record length: ("rs",[True,False])
 project the length of a known dependent package in a type: Refl
 project from two payload families with the same dependent function: ("xx",7)

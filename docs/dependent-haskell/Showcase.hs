@@ -228,6 +228,8 @@ import qualified RetainedCharClient
 import qualified SiblingColumnRow
 import qualified SiblingColumns
 import qualified SiblingColumnsClient
+import qualified NamedSiblingColumns as Named
+import qualified NamedSiblingColumnsClient
 import qualified QualifiedPiLibrary as Qualified
 import qualified QuantifiedGadtIndex as QuantifiedIndex
 import qualified ReadNatural
@@ -2475,6 +2477,12 @@ listBoundaries = do
             (VCons 'r' (VCons 's' VNil))
             (VCons True (VCons False VNil))
     observe "zip two vectors at their shared stored length" (SiblingColumnsClient.readPairs columns)
+    let named = Named.NamedColumns
+            { Named.namedFlags = VCons True VNil
+            , Named.storedLength = S Z
+            , Named.namedLetters = VCons 'x' VNil
+            }
+    observe "zip two named fields at their stored length" (NamedSiblingColumnsClient.readPairs named)
     let unpack :: forall len. TypeLambda.Fields '[Vec Char len, Vec Bool len] -> (String, [Bool])
         unpack (TypeLambda.Field xs (TypeLambda.Field ys TypeLambda.End)) = (toList xs, toList ys)
     observe "put two columns in a row indexed by the record length"
