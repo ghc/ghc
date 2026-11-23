@@ -2249,11 +2249,13 @@ stripLiftedTypeOwner prefix occurrence = do
     (_ : _, ':' : owner) | not (null owner) -> Just (reverse owner)
     _ -> Nothing
 
--- | Identify the signature or open family equation that contains a lifted lambda.
+-- | Identify the source declaration that contains a lifted lambda.
 pprLiftedTypeLambdaSite :: String -> Maybe SDoc
 pprLiftedTypeLambdaSite occurrence
   | Just value <- stripLiftedTypeOwner "$signature-lambda:" owner
   = Just (text "type lambda in the signature for" <+> quotes (text value))
+  | Just constructor <- stripLiftedTypeOwner "$field-lambda:" owner
+  = Just (text "type lambda in a field of" <+> quotes (text constructor))
   | Just family <- stripLiftedTypeOwner "R:$callback:" owner
   = Just (text "type lambda in an instance of" <+> quotes (text family))
   | otherwise = Nothing

@@ -1,12 +1,14 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, Modifiers, PolyKinds, StandaloneKindSignatures #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, Modifiers, PolyKinds, StandaloneKindSignatures #-}
 {-# LANGUAGE TypeFamilies, TypeOperators, UndecidableInstances #-}
 module NativeTypeLambdaScope
   ( Levels, Adjacent, InferredLevels, UsesKind, LetKind
   , Selected, Siblings, OrdinaryCases, Consed, SelectedFirst
+  , CheckedField(..), IndexedField(..)
   ) where
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
 import GHC.Exts (U)
+import TypeLambda (Fields, Map)
 
 type ApplyTwo :: (Type %U -> Type %U -> Type) -> Type -> Type -> Type
 type family ApplyTwo f a b where ApplyTwo f a b = f a b
@@ -46,3 +48,10 @@ type Consed (b :: Bool) =
 
 type SelectedFirst b t = Maybe ((\tag x ->
   case tag of { True -> Either x Bool; False -> Either Bool x }) b t)
+
+data CheckedField (e :: Type) (xs :: [Type]) =
+  CheckedField { checkedFields :: Fields (Map (\a -> Either e a) xs) }
+
+data IndexedField (k :: Type) (a :: k) where
+  IndexedField :: forall (k :: Type) (a :: k).
+    Fields (Map (\k -> Either k (Proxy a)) '[Char]) -> IndexedField k a

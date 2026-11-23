@@ -1181,7 +1181,7 @@ instance Diagnostic TcRnMessage where
            text "A type case needs a supported position in a top-level type synonym, a closed type family equation RHS, a top-level value signature, or a constructor field."
     TcRnTypeLambdaContext
       -> mkSimpleDecorated $
-           text "A type lambda needs a supported position in a top-level type synonym, the right-hand side of a type family equation, or a top-level value signature."
+           text "A type lambda needs a supported position in a top-level type synonym, the right-hand side of a type family equation, a top-level value signature, or an ordinary constructor field."
 
     TcRnInvalidVisibleKindArgument arg ty
       -> mkSimpleDecorated $
