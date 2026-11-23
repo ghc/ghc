@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LambdaCase, TypeOperators #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LambdaCase, ScopedTypeVariables, TypeApplications, TypeOperators #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 
 -- | Length laws for the installed Prelude functions on ordinary lists.
@@ -63,9 +63,7 @@ lengthTakeSize (Succ n) (_ : xs) = congSucc (lengthTakeSize n xs)
 lengthMapZip :: forall a b c. foreach (f :: (a, b) -> c)
              -> foreach (xs :: [a]) -> foreach (ys :: [b])
              -> size (map f (zip xs ys)) :~: minSize (size xs) (size ys)
-lengthMapZip _ [] _ = Refl
-lengthMapZip _ (_ : _) [] = Refl
-lengthMapZip f (_ : xs) (_ : ys) = congSucc (lengthMapZip f xs ys)
+lengthMapZip f xs ys = trans (lengthMap f (zip @a @b xs ys)) (lengthZip xs ys)
 
 -- | Count the result of the reverse worker with any accumulator.
 lengthReverseOnto :: forall a. foreach (xs :: [a]) -> foreach (acc :: [a])

@@ -2648,3 +2648,9 @@ Direct composition still needs compiler work. Job 1860 rejected
 `lengthMap f (zip xs ys)` with GHC-83605 at the retained argument.
 Job 1870 gave the intermediate list a local name. The resulting
 composition failed with GHC-83865. [List laws](../hasklib/HaskLib/List.hs).
+
+Job 1875 supplied the missing element types directly. With
+`ScopedTypeVariables` and `TypeApplications`, the same client compiled
+`trans (lengthMap f (zip @a @b xs ys)) (lengthZip xs ys)`. Supplying
+only `@a` still failed. The first list fixes `a`. The second list has
+the information needed for `b`.
