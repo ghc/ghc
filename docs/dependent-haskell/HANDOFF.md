@@ -11,7 +11,15 @@ and its [expected output](Showcase.stdout) are the executable examples.
 Updated 23 November 2026. The development branch is
 `dependent-haskell`. Use the fork command below to find its latest commit.
 
-The published compiler implementation is `5d6ac951f6`. An inferred
+The published R18 implementation is `9daa85cf02`. A type-level `let`
+can bind the fields of a named product. The Showcase adds two dimensions
+while leaving a third unknown. Normal job 1572 built both stages and
+matched 561 outputs at native `-O0`, default `-O2` and in GHCi.
+All 234 compatibility cases passed. Of 131 focused tests, 130 passed.
+`deriving-via-compile` still reports the same errors as 560.
+[Product-let verification](CHECKPOINTS.md#constructor-patterns-in-type-level-lets).
+
+The preceding compiler implementation is `5d6ac951f6`. An inferred
 type synonym can take both a data constructor and a type family.
 All 560 Showcase outputs matched at native `-O0`, default `-O2`
 and in GHCi. The migrated `first-class-families` package compiled
@@ -160,11 +168,13 @@ though ordinary runtime clients passed. The published fix lets a
 client give `spaceDecision 'x'` the type `Decision Char.isSpace (Space 'x')`.
 [Substitution example](roadmap/R03-dependent-products.md#specializing-an-imported-call).
 
-The next normal build is for R18 product patterns in type-level
-`let` expressions. The private source at `e9c33bede8` checks a
-user-defined constructor and projects fields without forcing ignored
-fields. The source archive is `2026-11-23/r18-general-product-let`.
-See `r18-product-let-normal-561-20261123` for the integration.
+The next integration combines structured R18 constructor diagnostics
+with the standalone R23 flag. Normal job 1574 built the separate flag
+candidate at `4215377781`. Jobs 1576 and 1578 checked its real enum,
+flag order, the old interface reader, changes to the provider flag, and
+the new extension hint. With the standalone flag alone, a module can
+use partial type functions. It does not also gain `foreach` or `some`.
+The ordinary `MTrans` default is a separate open decision.
 
 Job 1335 used installed HaskLib on `4d10fdc35f` to check the
 [append counterexample](roadmap/R16-open-term-evaluator.md#append-fusion-and-an-undefined-right-list).
@@ -198,6 +208,15 @@ The 560 compiler includes the R04 coverage correction. Incomplete
 patterns on a source sum now show the source alias, such as
 `Packed Bool`, and the missing pattern. Job 1508 compared the new
 warning with 558. The maintained regression passed again on 560.
+
+The R23 compatibility decision for old, unannotated transformer kind
+synonyms is pending. Private `6048ccc04b` accepts the untouched
+`MTrans` program and preserves ordinary function uses. Its
+reify-and-splice test fails with three out-of-scope inferred variables.
+An old provider needs a rebuild to expose the new inferred indices.
+The public compiler still requires the explicit `%M` migration. See
+`r23-mtrans-compatibility-20261123/DESIGN.md` for the comparison and
+`2026-11-23/r23-legacy-kind-experiment` for the archived source.
 
 The local archive refs `r19-r41-normal-552`, `r16-hasklib-tree-553`
 and `r27-legacy-transition-normal` are under
@@ -436,8 +455,8 @@ defaults and an opt-in migration warning.
 
 ## Build and verify
 
-The published 560-line Showcase uses the normal two-stage compiler at
-`5d6ac951f6` in `r04-r23-bare-callback-normal-560-20261123`.
+The published 561-line Showcase uses the normal two-stage compiler at
+`9daa85cf02` in `r18-product-let-normal-561-20261123`.
 On this host the bootstrap tools are GHC 9.14.1, Cabal 3.18.1.0, Happy 2.1.7
 and Alex 3.5.4.0. A fresh checkout needs the Git submodules at their recorded
 revisions. This build used five workers per job.
@@ -451,7 +470,7 @@ self-hosted stage 2 compiler in `_build/stage1/bin/ghc`. Both use the
 target libraries in `_build/stage1/lib`. For example, from the main checkout:
 
 ```sh
-stable="$PWD/_build/on-demand/r04-r23-bare-callback-normal-560-20261123/source/_build/stage1"
+stable="$PWD/_build/on-demand/r18-product-let-normal-561-20261123/source/_build/stage1"
 queue="$PWD/docs/dependent-haskell/tools/ghc-build-job"
 check="$PWD/docs/dependent-haskell/check-showcase.sh"
 "$queue" showcase-stage2-ghci bash "$check" "$stable/bin/ghc" "$stable/lib" --ghci
@@ -481,4 +500,9 @@ in 5,873 loose compilation objects. Job 1516 ran native programs with both
 preserved stages and GHCi with stage 2. The bootstrap driver's interactive
 mode matched the untrimmed 556 control. See
 `retirement-554-checked-callbacks-20261123/retired.tsv`.
+After 561, four superseded 543, 544, 546 and 554 build trees released
+7,674,286,080 allocated bytes. Their exact source revisions are in Git.
+Their build recipes and test results remain. The R18 and standalone R23
+compilers ran their reader checks while those trees were absent.
+See `retirement-legacy-normal-products-20261123/retired.tsv`.
 [Retention rules](CHECKPOINTS.md#clean-up-after-each-experiment).

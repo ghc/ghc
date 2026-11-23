@@ -6,6 +6,33 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Constructor patterns in type-level lets
+
+A source type can unpack a regular, single-constructor product in a
+`let` binding. For example, `ProductDimensionSum` selects two fields
+of `Dimensions` and adds them. Applying it to
+`'Dimensions 2 3 UnknownDepth` gives `5` while the final field remains
+unknown. An ordinary client can use the equality from the interface.
+Every written field counts toward the constructor arity, including
+wildcards. The checked implementation supports flat named-constructor
+patterns. Type quotations reject them at the constructor because
+Template Haskell's `LetT` cannot retain the constructor check.
+[Source](examples/open-evaluation/TypeLet.hs) and
+[R18 scope and provenance](roadmap/R18-type-level-lets.md#a-named-product-binding).
+
+Job 1572 built both stages from `9daa85cf02`. All 561 Showcase
+lines matched at native `-O0`, default `-O2` and in GHCi. Removing
+the new dimension-sum line reproduces the previous golden output.
+The focused run passed 130 of 131 registrations, including
+`NativeTypeLet`, `NativeTypeLetQuote`, `NativeSynonymReify` and
+`TypeLetPrint`. The last test checks exact printing and parsing.
+The unchanged `deriving-via-compile` failure matched the previous
+compiler byte for byte. All 234 compatibility registrations passed.
+The 34 specialization cases, package identity tests, GHC API
+producer-change check and guide build passed. The migrated
+`first-class-families` package built all 17 modules, passed its
+test suite and ran its three source-hidden clients.
+
 ## Inferred matchability in type synonyms
 
 With `ExperimentalDependentTypes`, the inferred synonym
