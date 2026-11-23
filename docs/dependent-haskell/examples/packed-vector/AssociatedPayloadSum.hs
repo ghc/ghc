@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, FlexibleInstances, GADTs, LambdaCase, TypeFamilies, UndecidableInstances #-}
-module NativeAssociatedPayloadSumProvider (PayloadFormat (Body, Packet), Allowed, Permit (Permit), makeGlobal, makePermitted) where
+module AssociatedPayloadSum (PayloadFormat (Body, Packet), Allowed, Permit (Permit), makeGlobal, makePermitted) where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy)

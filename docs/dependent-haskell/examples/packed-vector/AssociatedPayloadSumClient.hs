@@ -1,10 +1,8 @@
 {-# LANGUAGE CPP, DataKinds, GADTs, ImpredicativeTypes, NoExperimentalDependentTypes, TypeFamilies #-}
-module Main where
-
-import Data.IORef (newIORef, readIORef)
+module AssociatedPayloadSumClient (observePayload) where
 import Data.Proxy (Proxy (Proxy))
 import GHC.Sigma (Sigma (Pair))
-import NativeAssociatedPayloadSumProvider (Allowed, Permit (Permit), PayloadFormat (Packet), makeGlobal, makePermitted)
+import AssociatedPayloadSum (Allowed, Permit (Permit), PayloadFormat (Packet), makeGlobal, makePermitted)
 
 readGlobal :: Packet Bool -> (Bool, String)
 readGlobal (Pair False n) = (False, show (n :: Int))
@@ -41,10 +39,10 @@ missingTypeDomain :: Packet [Int] -> Bool
 missingTypeDomain _ = False
 #endif
 
-main :: IO ()
-main = do
-    tag <- readIORef =<< newIORef True
-    print ( readGlobal (Pair tag (makeGlobal tag))
-          , globalTag (Pair tag (error "forced global associated payload"))
-          , observeGiven Permit (Proxy :: Proxy Bool) (not tag)
-          )
+-- | Read selected payloads and read both tags with undefined payloads.
+observePayload :: Bool -> ((Bool, String), Bool, ((Bool, String), Bool))
+observePayload tag =
+    ( readGlobal (Pair tag (makeGlobal tag))
+    , globalTag (Pair tag (error "forced global associated payload"))
+    , observeGiven Permit (Proxy :: Proxy Bool) (not tag)
+    )

@@ -457,7 +457,8 @@ test('NativeConstrainedSum',
 
 test('NativeAssociatedPayloadSum',
      [req_host_target_ghc, only_ways(['normal']),
-      extra_files(['NativeAssociatedPayloadSumProvider.hs', 'NativeAssociatedPayloadSumClient.hs'])],
+      extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/' + f
+                   for f in ['AssociatedPayloadSum.hs', 'AssociatedPayloadSumClient.hs']])],
      run_command, ['bash NativeAssociatedPayloadSum.sh "{compiler}" "{libdir}"'])
 
 test('NativeAlternatingBinders',

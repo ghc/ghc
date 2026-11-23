@@ -6,8 +6,8 @@ out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
 ghc=("$1" "-B$2" -package-env - -v0 -i -i. -dcore-lint -dstg-lint
      -fdiagnostics-color=never -ferror-spans)
-provider=NativeAssociatedPayloadSumProvider
-client=NativeAssociatedPayloadSumClient
+provider=AssociatedPayloadSum
+client=AssociatedPayloadSumClient
 
 reject() {
     local code=$1 message=$2
@@ -31,7 +31,17 @@ for opt in -O0 -O2; do
 
     cd ../client
     "${ghc[@]}" "$opt" -c "$client.hs"
-    "${ghc[@]}" "$client.o" "../provider/$provider.o" -o observe
+    cat > Main.hs <<'END'
+module Main where
+import AssociatedPayloadSumClient (observePayload)
+import Data.IORef (newIORef, readIORef)
+main :: IO ()
+main = do
+    tag <- readIORef =<< newIORef True
+    print (observePayload tag)
+END
+    "${ghc[@]}" "$opt" -c Main.hs
+    "${ghc[@]}" "$client.o" "../provider/$provider.o" Main.o -o observe
     timeout 15 ./observe > actual
     grep -Fxq "((True,\"x\"),True,((False,\"43\"),False))" actual
 

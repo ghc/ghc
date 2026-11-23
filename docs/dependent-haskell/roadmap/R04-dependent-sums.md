@@ -703,13 +703,20 @@ instance or from a GADT pattern. Reading the tag leaves an unused
 payload unevaluated in both cases. The source controls reject a wrong
 payload, a missing domain and an associated equation whose owning class
 does not supply the payload domain.
+The Showcase reads both runtime tags with undefined payloads.
+[Provider](../examples/packed-vector/AssociatedPayloadSum.hs).
+[Ordinary client](../examples/packed-vector/AssociatedPayloadSumClient.hs).
 [Regression](../../../testsuite/tests/dependent/should_run/NativeAssociatedPayloadSum.sh).
 
 Interfaces that expose the checked payload carry the
 `scoped-sum-domain-v1` requirement. It applies to a generated
 payload, an inferred type that refers to it, and a re-export. The
 567 reader rejects those interfaces at the header. It can still read
-an unrelated sum. A source-hidden control adds a more specific
+an unrelated sum and can open an interface that only re-exports an
+unrelated `Bool` binding. A client that uses the re-exported binding
+still loads its defining interface. If that interface requires
+`scoped-sum-domain-v1`, the 567 reader rejects it there.
+A source-hidden control adds a more specific
 instance with a new premise. The current reader reports that premise
 in both a signature naming the sum and an inferred result that refers
 to its payload family.

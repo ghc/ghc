@@ -104,6 +104,7 @@ import qualified IndexedMark
 import qualified IndexedVec
 import qualified CertifiedSplitClient
 import qualified CursorClient
+import qualified AssociatedPayloadSumClient
 import qualified RuntimeMessageClient
 import qualified RuntimeTypeColumn as Column
 import qualified FinitePositionClient
@@ -427,6 +428,7 @@ vectors = do
     modeCell <- newIORef True
     mode <- readIORef modeCell
     observe "package a runtime mode with its associated payload" (RuntimeMessageClient.observeMessage mode)
+    observe "read runtime tags with undefined associated payloads" (AssociatedPayloadSumClient.observePayload mode)
     case unconsPacked package of
         Nothing -> fail "expected a nonempty package"
         Just (x, rest) -> observe "uncons retains the runtime predecessor" (x, renderPacked rest)
