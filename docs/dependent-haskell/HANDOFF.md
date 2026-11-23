@@ -30,15 +30,19 @@ the next invocation.
 Run `accept-publication.py` in
 `_build/on-demand/r04-r17-combined-quoted-columns-20261123` to check
 the original and replay receipts. The original job exits with status 1.
-The verifier checks both sets of evidence, including the known optimized
-proof failure. The [compiled count and witness example](roadmap/R16-open-term-evaluator.md#the-optimized-client-of-the-composed-proof)
+The verifier checks both sets of evidence, including the original optimized
+proof failure. Job 1966 qualified the rewritten HaskLib proof and tested
+all 578 Showcase observations at native `-O0`, default `-O2` and GHCi.
+Job 1965 passed the independently written worker regression in all four
+combinations of native or typecheck-only compilation and fixed or
+upgraded libraries. The [compiled count and witness example](roadmap/R16-open-term-evaluator.md#the-optimized-client-of-the-composed-proof)
 records that failure on both 577 and 578.
 
 ## Next compiler work
 
 | Area | Verified result and next step |
 | --- | --- |
-| R04, R17 and R19 | The 581 source `156cd84633` combines named dependent record fields, wildcard patterns in quoted type cases and inline lambdas in visible type arguments. Job 1937 stopped on the Haddock conversion of H98 constructors. Commit `573a021142` corrected the optional renamed field. Job 1959 stopped before qualification to replace the proof and upgrade-test sources. Reuse the warm tree in `r04-r19-following-quoted-578-20261123`. Check `qualification/gates.tsv`, `cohorts/gates.tsv` and `run-all.exit`. |
+| R04, R17 and R19 | The 581 source `156cd84633` combines named dependent record fields, wildcard patterns in quoted type cases and inline lambdas in visible type arguments. Job 1937 stopped on the Haddock conversion of H98 constructors. Commit `573a021142` corrected the optional renamed field. Job 1959 stopped before qualification to replace the proof and upgrade-test sources. Job 1972 resumes the warm tree at `3744f3820d` with the independent qualification programs in `r04-r19-following-quoted-578-20261123`. Check `qualification/gates.tsv`, `cohorts/gates.tsv` and `run-all.exit`. |
 | R04 omitted record fields | Job 1946 qualified `f2ab5c36a1` at both optimization levels. A supplied witness permits an omitted lazy sibling. Omitting the witness reports GHC-83605 at the constructor and names the required field. An omitted ordinary strict field still reports GHC-95909. Job 1954 exercised the exact additional Showcase row from `322b680d53` with the component compiler. The combined source still needs its normal build. |
 | R05 Specialise | On both 577 and 578, default `-O2` replaced an indexed `zip` operand with `build`. Job 1948 preserved the checked operand, passed Core and STG Lint, and returned `Refl`. Job 1956 reproduced the repair with only `base`, a retained `Proxy` result and a vacuous binder. See `r05-specialise-retained-zip-20261123`. |
 | R16 proof validity | Independent count expressions can produce `Zero` and bottom under stock fusion. Both shared counts produced `Zero`. The private Specialise repair leaves that distinction observable. In job 1957, rebuilding HaskLib with private `4c4cc16244` recorded the `map` dependency on the composed proof. The optimized client then reported GHC-83605 at the call to `lengthMapZip`. The same diagnostic occurred with a producer that simply constructs one cell. The old installed interface still reached Core Lint. The consumer-side policy remains open. |
