@@ -275,7 +275,7 @@ mkHsAppsWith
 mkHsAppsWith mkLocated = foldl' (mkHsAppWith mkLocated)
 
 mkHsAppType :: LHsExpr GhcRn -> LHsWcType GhcRn -> LHsExpr GhcRn
-mkHsAppType e t = addCLocA t_body e (HsAppType noExtField e paren_wct)
+mkHsAppType e t = addCLocA t_body e (HsAppType Nothing e paren_wct)
   where
     t_body    = hswc_body t
     paren_wct = t { hswc_body = t_body }

@@ -54,7 +54,9 @@ mkdir conflict
 cp Captured.hs RowBuilder.hi TypeLambda.hi conflict/
 if (cd conflict && "${ghc[@]}" -DCONFLICT -c Captured.hs) >conflict.log 2>&1 ||
    ! grep -Fq 'Captured.hs:14:17: error: [GHC-25897]' conflict.log ||
-   ! grep -Eq ".err. is a rigid type variable" conflict.log; then
+   ! grep -Eq ".err. is a rigid type variable" conflict.log ||
+   ! grep -Fq 'rowFor @(\cell -> Either err cell)' conflict.log ||
+   grep -Fq '$signature-lambda:' conflict.log; then
     cat conflict.log >&2
     status=1
 fi
