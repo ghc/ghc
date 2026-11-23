@@ -127,7 +127,7 @@ HS
     "${ghc[@]}" MissingPayloads.o ../provider/{PackedVecLibrary,NamedSiblingColumns}.o -o missing
     timeout 15 ./missing > actual
     printf '%s\n' '[True]' 'namedLetters' '1' 'namedLetters' 'namedFlags' | cmp - actual
-    reject 'GHC-20125.*-Werror=missing-fields' -fforce-recomp -Werror=missing-fields MissingPayloads.hs
+    reject 'GHC-20125.*Werror=missing-fields' -fforce-recomp -Werror=missing-fields MissingPayloads.hs
 
     cat > MissingAtVariable.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes #-}
