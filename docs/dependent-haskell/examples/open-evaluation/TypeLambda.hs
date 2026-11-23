@@ -1,10 +1,10 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, Modifiers, PolyKinds, RankNTypes, StandaloneKindSignatures,
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, Modifiers, PolyKinds, RankNTypes, ScopedTypeVariables, StandaloneKindSignatures,
              TypeApplications, TypeFamilies, TypeOperators, UndecidableInstances #-}
 -- | Apply a type lambda to a list of type constructors.
 module TypeLambda
   ( L, Captured, Shadowed, WithError, Prefixes, ScopedRow, Mixed, Held, CaseShadow, Rebuild
   , Fields(..), CheckedRow(..), Map, Columns, Optional, withErrors, IndexedTag(..), IndexedCase, IndexedCaseInferred
-  , RankedReader, rankedReader, rankedReaderAt
+  , withScopedErrors, RankedReader, rankedReader, rankedReaderAt
   , roadmap, partial, optionalColumns, sameColumnReader, prefixes, mixed, indexedFields
   ) where
 
@@ -40,6 +40,15 @@ data CheckedRow e (xs :: [Type]) = CheckedRow
 withErrors :: Proxy e -> Fields xs -> Fields (Map (\a -> Either e a) xs)
 withErrors _ End = End
 withErrors p (Field x xs) = Field (Right x) (withErrors p xs)
+
+-- | Wrap each cell using the error type from the enclosing signature.
+withScopedErrors :: forall (e :: Type) xs.
+                    Proxy e -> Fields xs -> Fields (Map (\cell -> Either e cell) xs)
+withScopedErrors witness = go
+  where
+    go :: Fields xs -> Fields (Map (\cell -> Either e cell) xs)
+    go End = End
+    go (Field x rest) = Field (Right x) (withScopedErrors witness rest)
 
 -- | Give a cell the table and column indices.
 type RankedReader (k :: Type) (table :: k) =

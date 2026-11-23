@@ -1707,6 +1707,9 @@ main = do
     case TypeLambda.withErrors (Proxy @String) fields of
         TypeLambda.Field x (TypeLambda.Field y TypeLambda.End) ->
             observe "give every field in a row the same error type" (x, y)
+    case TypeLambda.withScopedErrors (Proxy @Ordering) fields of
+        TypeLambda.Field x (TypeLambda.Field y TypeLambda.End) ->
+            observe "map row cells with a lambda in a local signature" (x, y)
     let lazyFields = TypeLambda.Field 'x' (TypeLambda.Field (error "unused field" :: Bool) TypeLambda.End)
     case TypeLambdaClient.forwardErrors (Proxy @String) lazyFields of
         TypeLambda.Field first _ ->

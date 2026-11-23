@@ -39,6 +39,18 @@ if "${g[@]}" -c Termination.hs >termination.log 2>&1 ||
     cat termination.log >&2
     exit 1
 fi
+
+sed -e 's/^module TypeLambda$/module MissingCaptureKind/' \
+    -e 's/^withScopedErrors :: forall (e :: Type) xs[.]$/withScopedErrors :: forall e xs./' \
+    TypeLambda.hs >MissingCaptureKind.hs
+capture_line=$(grep -nFx '    go :: Fields xs -> Fields (Map (\cell -> Either e cell) xs)' MissingCaptureKind.hs |
+    cut -d: -f1)
+if "${g[@]}" -c MissingCaptureKind.hs >capture-kind.log 2>&1 ||
+   ! grep -Fq "MissingCaptureKind.hs:$capture_line:37: error: [GHC-27185]" capture-kind.log ||
+   ! grep -Fq "Add a kind annotation for \`e'." capture-kind.log; then
+    cat capture-kind.log >&2
+    exit 1
+fi
 cp TypeLambda.hi SchemaColumns.hi OpenTypeLambda.hi NativeTypeLambdaScope.hi RepeatedProvider.hi "$out/client/"
 cd "$out/client"
 test ! -e TypeLambda.hs
@@ -166,7 +178,7 @@ module Main where
 import Data.Type.Equality ((:~:)(Refl))
 import Ordinary (capturedRow, independentRow, rankedSignature, rankedSynonym, scopedRow)
 import Data.Proxy (Proxy(..))
-import TypeLambda (Columns, Fields(..), Optional, Prefixes, ScopedRow)
+import TypeLambda (Columns, Fields(..), Optional, Prefixes, ScopedRow, withScopedErrors)
 import SchemaColumns (Callable, Checked)
 import TypeLambdaClient (forwardErrors)
 
@@ -192,6 +204,8 @@ main = case (capturedRow, independentRow, withError, withoutError) of
     let input = Field 'x' (Field (error "unused field" :: Bool) End)
     case forwardErrors (Proxy :: Proxy String) input of
       Field x (Field _ End) -> print x
+    case withScopedErrors (Proxy :: Proxy Ordering) input of
+      Field x (Field _ End) -> print x
     let optional :: Fields (Columns Optional '[Int])
         optional = Field (Just 42) End
         checked :: Fields (Columns (Checked String) '[Bool])
@@ -208,7 +222,7 @@ HS
 "${g[@]}" RowsMain.o Ordinary.o TypeLambdaClient.o ../provider/TypeLambda.o \
     ../provider/SchemaColumns.o ../provider/NativeTypeLambdaScope.o -o rows
 printf '%s\n' "(Left GT,Right True,Just 'a',Just True)" "(Just 'x',Right True)" "Right 'x'" \
-    '(Just 42,Left "missing")' "Right True" "('r','s')" >rows.expected
+    "Right 'x'" '(Just 42,Left "missing")' "Right True" "('r','s')" >rows.expected
 ./rows >rows.actual
 cmp rows.expected rows.actual
 
@@ -482,16 +496,16 @@ if "${g[@]}" -c Disabled.hs >disabled.log 2>&1 ||
 fi
 
 cat >Signature.hs <<'HS'
-{-# LANGUAGE ExperimentalDependentTypes #-}
+{-# LANGUAGE ExperimentalDependentTypes, RankNTypes #-}
 module Signature where
 import Data.Proxy (Proxy(..))
 outer = witness where
-  witness :: Proxy (\x -> x)
-  witness = Proxy
+  witness :: () -> (forall a. Proxy (\x -> x) -> Proxy a)
+  witness _ _ = Proxy
 HS
 if "${g[@]}" -c Signature.hs >context.log 2>&1 ||
-   ! grep -Eq '^Signature[.]hs:5:21: error: \[GHC-27185\]' context.log ||
-   ! grep -Fq 'top-level value signature' context.log; then
+   ! grep -Eq '^Signature[.]hs:5:38: error: \[GHC-27185\]' context.log ||
+   ! grep -Fq 'Local value signatures can use a type lambda during ordinary compilation' context.log; then
     cat context.log >&2
     exit 1
 fi
