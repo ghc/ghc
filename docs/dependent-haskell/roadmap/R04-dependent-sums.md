@@ -419,9 +419,15 @@ receiver `p`. Job 1968 passed the source-hidden test at `-O0` and `-O2`.
 It checked the unchanged length, the laziness of the fields, and the
 GHC-83865 error for a vector at a separate record's witness.
 The receiver must be a supported retained operand, such as a local
-variable. To change the witness or replace several fields, construct
-a new record.
+variable. An update that keeps the witness can replace one payload.
 [Record update in Haskell and Agda](../REFERENCES.md#updating-a-payload-at-its-stored-witness).
+
+To change the witness, supply a replacement for every payload. For
+example, `p { storedLength = Z, namedLetters = VNil, namedFlags = VNil }`
+changes a nonempty record to an empty one. The constructor match demands
+the old record and leaves its fields unevaluated. GHC checks each new
+vector at `Z`. If an update omits a payload, GHC reports GHC-83605 at
+the witness field and names the missing replacement.
 
 ## Sums in constructor fields
 

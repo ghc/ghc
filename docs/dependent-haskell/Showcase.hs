@@ -2508,6 +2508,13 @@ listBoundaries = do
             }
     observe "replace a named field at the original stored length"
         (natToInt (Named.storedLength updated), NamedSiblingColumnsClient.readPairs updated)
+    let emptied = updated
+            { Named.storedLength = Z
+            , Named.namedLetters = VNil
+            , Named.namedFlags = VNil
+            }
+    observe "replace the stored length and both named payloads"
+        (natToInt (Named.storedLength emptied), NamedSiblingColumnsClient.readPairs emptied)
     let unpack :: forall len. TypeLambda.Fields '[Vec Char len, Vec Bool len] -> (String, [Bool])
         unpack (TypeLambda.Field xs (TypeLambda.Field ys TypeLambda.End)) = (toList xs, toList ys)
     observe "put two columns in a row indexed by the record length"

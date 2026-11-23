@@ -3966,8 +3966,13 @@ pprRetainedQuantificationError reason = case reason of
   RetainedRecordPatternOrder ->
     text "Match the fields of a retained record in declaration order."
   RetainedRecordUpdate ->
-    vcat [ text "Record update of a retained record must replace one payload field."
-         , text "To change its witness, construct a new record." ]
+    vcat [ text "Record update of a retained record can replace one payload field."
+         , text "To replace its witness, also replace every payload field." ]
+  RetainedRecordUpdateWitness con witness missing ->
+    hang (fsep [ text "Updating witness field", quotes (ppr witness)
+               , text "of constructor", quotes (ppr con) ]) 2 $
+      fsep [ text "requires replacement", text "for field" <> plural missing
+           , pprQuotedList missing <> dot ]
 
 pprTcRnBadlyLevelled :: LevelCheckReason -> Set.Set ThLevelIndex -> ThLevelIndex -> Maybe ErrorItem -> DecoratedSDoc
 pprTcRnBadlyLevelled reason bind_lvls use_lvl lift_attempt = mkDecorated $
