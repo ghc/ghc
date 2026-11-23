@@ -455,6 +455,11 @@ test('NativeConstrainedSum',
                    'NativeConstrainedSumProvider.hs', 'NativeConstrainedSumClient.hs'])],
      run_command, ['bash NativeConstrainedSum.sh "{compiler}" "{libdir}"'])
 
+test('NativeAssociatedPayloadSum',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeAssociatedPayloadSumProvider.hs', 'NativeAssociatedPayloadSumClient.hs'])],
+     run_command, ['bash NativeAssociatedPayloadSum.sh "{compiler}" "{libdir}"'])
+
 test('NativeAlternatingBinders',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeAlternatingBindersProvider.hs', 'NativeAlternatingBindersClient.hs'])],

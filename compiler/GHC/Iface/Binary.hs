@@ -18,7 +18,7 @@ module GHC.Iface.Binary (
         TraceBinIFace(..),
         getIfaceWithExtFields,
         putIfaceWithExtFields,
-        sourceTableLocations,
+        sourceTableLocations, scopedSumDomainField,
         couldInferLiberalSynonymMatchability,
         getWithUserData,
         putWithUserData,
@@ -59,7 +59,7 @@ import GHC.Unit.Module.ModIface
 import GHC.Platform.Profile
 import GHC.Platform
 import GHC.Settings.Constants
-import GHC.Iface.Ext.Fields (readFieldWith, writeFieldWith, deleteField)
+import GHC.Iface.Ext.Fields (getExtensibleFields, readFieldWith, writeFieldWith, deleteField)
 import GHC.Iface.Syntax (IfaceDecl(..), IfaceExport, IfaceFamTyConFlav(..), IfaceClassBody(..), IfaceAT(..), IfaceIdDetails(..))
 import GHC.Types.Basic (SourceTableOrigin(ExecutableSourceTable, FinalCoreSourceTable))
 import GHC.Iface.Type (IfaceType(..), IfaceBndr(..), IfaceAppArgs(..), IfaceTyCon(..), IfaceTyConBinder,
@@ -79,6 +79,7 @@ import Data.Char
 import Data.IORef
 import Data.List (find, intercalate, stripPrefix)
 import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.Word
 import qualified Data.ByteString as BS
@@ -372,7 +373,7 @@ evidenceSuffix requirements
     || needs ScopedConstructorCaseEvidence || needs ScopedCaseResultEvidence
     || needs OrderedNewtypeTelescopeEvidence || needs ScopedOrderedCaseEvidence
     || needs OrderedRepPolyNewtypeEvidence || needs OrderedTypeDataTelescopeEvidence
-    || needs NamedRetainedCallbackEvidence = feature_set
+    || needs NamedRetainedCallbackEvidence || needs ScopedSumDomainEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -439,6 +440,7 @@ legacyEvidenceSuffix SourceProofRuleArgumentsEvidence = featureSetPrefix ++ "sou
 legacyEvidenceSuffix PolymorphicSourceMethodEvidence = featureSetPrefix ++ "polymorphic-source-method"
 legacyEvidenceSuffix SourceProofRuleBranchesEvidence = featureSetPrefix ++ "source-proof-rule-branches"
 legacyEvidenceSuffix GeneralIndexedConstructorOperandEvidence = featureSetPrefix ++ "general-indexed-constructor-operand"
+legacyEvidenceSuffix ScopedSumDomainEvidence = featureSetPrefix ++ "scoped-sum-domain-v1"
 legacyEvidenceSuffix NamedRetainedCallbackEvidence = featureSetPrefix ++ "named-retained-callback-v1"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
@@ -513,7 +515,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("ordered-rep-poly-newtype", OrderedRepPolyNewtypeEvidence)
                       , ("ordered-type-data-telescope", OrderedTypeDataTelescopeEvidence)
                       , ("named-retained-callback-v1", NamedRetainedCallbackEvidence)
-                      , ("partial-builtin-family-v1", PartialBuiltinFamilyEvidence) ]
+                      , ("partial-builtin-family-v1", PartialBuiltinFamilyEvidence)
+                      , ("scoped-sum-domain-v1", ScopedSumDomainEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion
@@ -576,6 +579,12 @@ forall premise without an existential type tag. Select the version when
 writing either of its built-in rule names. The dot existential reader also
 knows the bar tags. It predates scoped sums and compulsory retained defaults.
 Record the separate requirements when either occurs with a dot existential.
+
+A generated retained-sum payload can have a class domain. Record its
+independent requirement even when interface pragmas are omitted. An
+older reader can decode the existing family shape but cannot check
+that domain. A re-export or inferred type can expose the affected
+payload without declaring the private family again.
 
 A retained-sum codomain uses a scoped family tag. A consumer can also
 publish a proof that refers to the scoped equality rule. Either feature
@@ -733,7 +742,11 @@ putIfaceWithExtFields traceBinIface compressionLevel bh mod_iface =
             if any home_rule_interface_usage (mi_sr_usages info)
               then Set.singleton HomeRuleInterfaceEvidence
               else Set.empty
-      found <- newIORef usage_version
+          scoped_sum_version
+            | Map.member scopedSumDomainField (getExtensibleFields fields) =
+                Set.insert ScopedSumDomainEvidence usage_version
+            | otherwise = usage_version
+      found <- newIORef scoped_sum_version
       let notify _ required = modifyIORef' found (Set.insert required)
           feature_bh = addWriterToUserData (mkWriter notify) bh
       forwardPutRel_ feature_bh (\_ -> put_ feature_bh fields') $
@@ -759,6 +772,10 @@ to rewrite its interface when a clause moves, even with -fno-write-if-self-recom
 A client still checks the unchanged ABI of the equations. See addFingerprints
 in GHC.Iface.Recomp.
 -}
+
+-- | The semantic interface requirement for checking generated payload domains.
+scopedSumDomainField :: String
+scopedSumDomainField = "ghc.scoped-sum-domain.v1"
 
 sourceTableField :: String
 sourceTableField = "ghc.source-table-locations.v1"

@@ -27,6 +27,7 @@ import GHC.StgToCmm.Types (CmmCgInfos (..))
 
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Monad
+import GHC.Tc.Validity (hasScopedSumDomain)
 
 import GHC.Iface.Warnings
 import GHC.Iface.Decl
@@ -93,6 +94,7 @@ import GHC.Unit.Module.WholeCoreBindings (encodeIfaceForeign, emptyIfaceForeign)
 
 import Data.Function
 import Data.List ( sortBy )
+import qualified Data.Map.Strict as Map
 import Data.Ord
 import Data.IORef
 import Data.Traversable
@@ -367,6 +369,13 @@ mkIface_ hsc_env
         icomplete_matches = map mkIfaceCompleteMatch complete_matches
         !rdrs = mkIfaceTopEnv rdr_env
 
+    let scoped_roots = mkNameSet (map ifName decls ++ concatMap availNames exports)
+          `unionNameSet` unionNameSets (map freeNamesIfDecl decls ++ map freeNamesIfRule iface_rules)
+    needs_scoped_sum_domains <- ifaceNeedsScopedSumDomains hsc_env type_env scoped_roots
+    fields <- if needs_scoped_sum_domains
+      then writeField scopedSumDomainField () emptyExtensibleFields
+      else pure emptyExtensibleFields
+
     pure $ emptyPartialModIface this_mod
           -- Need to record this because it depends on the -instantiated-with flag
           -- which could change
@@ -397,7 +406,7 @@ mkIface_ hsc_env
           & set_mi_complete_matches (icomplete_matches)
           & set_mi_docs             docs
           & set_mi_abi_hashes       ()
-          & set_mi_ext_fields       emptyExtensibleFields
+          & set_mi_ext_fields       fields
           & set_mi_hi_bytes         PartialIfaceBinHandle
 
   where
@@ -422,6 +431,40 @@ mkIface_ hsc_env
            in IfaceTopEnv exports imports
 
      ifFamInstTcName = ifFamInstFam
+
+-- | Check types and re-exports for the exact generated payload families.
+ifaceNeedsScopedSumDomains :: HscEnv -> TypeEnv -> NameSet -> IO Bool
+ifaceNeedsScopedSumDomains env local roots = go emptyNameSet (nameSetElemsStable roots)
+  where
+    go _ [] = pure False
+    go seen (name : rest)
+      | not (isExternalName name) || isWiredInName name || name `elemNameSet` seen =
+          go seen rest
+      | otherwise = do
+          thing <- case lookupTypeEnv local name of
+            Just thing -> pure (Just thing)
+            Nothing -> lookupImported name
+          let next = extendNameSet seen name
+          case thing of
+            Just (ATyCon tc) | hasScopedSumDomain tc -> pure True
+            Just thing -> go next (declarationNames thing ++ rest)
+            Nothing -> go next rest
+
+    -- Imported declarations cannot expose a checked payload unless their
+    -- producer records the requirement. Avoid descending into ordinary imports.
+    lookupImported name = do
+      iface <- lookupIfaceByModuleHsc env (nameModule name)
+      case iface of
+        Just imported
+          | Map.notMember scopedSumDomainField (getExtensibleFields (mi_ext_fields imported)) ->
+              pure Nothing
+        _ -> lookupType env name
+
+    declarationNames thing = nameSetElemsStable (freeNamesIfDecl signature)
+      where
+        signature = case tyThingToIfaceDecl thing of
+          decl@IfaceId{} -> decl { ifIdInfo = [], ifIdDetails = IfVanillaId }
+          decl -> decl
 
 --------------------------
 defaultsToIfaceDefaults :: DefaultEnv -> [IfaceDefault]

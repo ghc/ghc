@@ -13,7 +13,7 @@ module GHC.Tc.Validity (
   checkValidCoAxiom, checkValidCoAxBranch,
   checkFamPatBinders, checkTyFamEqnValidityInfo, typeCasePatternView,
   checkValidTyFamEqn, checkValidAssocTyFamDeflt, checkConsistentFamInst,
-  checkTyConTelescope,
+  checkTyConTelescope, hasScopedSumDomain,
   ) where
 
 import GHC.Prelude
@@ -684,25 +684,77 @@ checkNoConstrainedFamilyApps ty
 unsupportedFamilySite :: SDoc
 unsupportedFamilySite = text "Use the family in a value signature, type synonym, expression annotation, constructor field, or explicit type argument."
 
+-- | Does this private payload family impose a domain on its enclosing sum?
+hasScopedSumDomain :: TyCon -> Bool
+hasScopedSumDomain = isJust . scopedSumDomain
+
+-- | Read a class domain that can be checked on formation of a retained sum.
+-- See Note [Class domains in generated sum payloads].
+scopedSumDomain :: TyCon -> Maybe (TyCon, [TyVar], PredType)
+scopedSumDomain tc = do
+    (_, True) <- closedFamilyScope_maybe tc
+    axiom <- closedFamilyTyConCoAxiom_maybe tc
+    [branch] <- pure (fromBranches (coAxiomBranches axiom))
+    guard (null (coAxBranchCoVars branch))
+    parameters <- traverse getTyVar_maybe (coAxBranchLHS branch)
+    let bound = coAxBranchTyVars branch
+    guard (length parameters == tyConArity tc &&
+           parameters `equalLength` bound &&
+           length parameters == sizeVarSet (mkVarSet parameters) &&
+           all (`elem` bound) parameters)
+    witness : captures <- pure (reverse parameters)
+    TyConApp fam args <- pure (coAxBranchRHS branch)
+    guard (isConstrainedFamilyTyCon fam && all plain args)
+    Right (0, predicate) <- pure (associatedFamilyDomain fam args)
+    guard (not (witness `elemVarSet` tyCoVarsOfType predicate))
+    pure (fam, reverse captures, predicate)
+  where
+    plain TyVarTy{} = True
+    plain (TyConApp tc []) | tyConName tc == liftedTypeKindTyConName = True
+    plain (TyConApp tc args) = not (isFamilyTyCon tc || isTypeSynonymTyCon tc) && all plain args
+    plain _ = False
+
+{- Note [Class domains in generated sum payloads]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A written retained sum has a private family for its payload. Its
+equation does not carry the class scope of the written sum. For a
+single variable-only equation whose result is a direct constrained
+family application, recover its domain from the checked equation.
+The domain must use only the captured parameters. It must not depend
+on the witness, and the payload arguments may contain no further
+type family applications or user synonyms. This lets the formation checker
+check the payload domain even though the sum applies the private
+family to its captures only.
+
+Check the domain where the program forms the sum type. An ordinary
+type synonym uses the existing signature check. A marked associated
+equation uses its owning class and the existing Given-only check.
+Inspect the private family when finding constrained applications and
+when collecting obligations. The check also covers inferred types
+that contain the private payload family directly. All other family
+branches keep their existing checks.
+-}
+
 -- Find marked families without substituting or allocating scoped predicates.
 constrainedFamilyApps :: Type -> [TyCon]
 constrainedFamilyApps ty = State.evalState (go ty) emptyUniqSet
   where
     go (TyConApp tc args) = do
       nested <- descend args
-      if isConstrainedFamilyTyCon tc
-        then pure (tc : nested)
-        else if isFamFreeTyCon tc
-          then pure nested
-          else case synTyConRhs_maybe tc of
-            Nothing -> pure nested
-            Just rhs -> do
-              seen <- State.get
-              if tc `elementOfUniqSet` seen
-                then pure nested
-                else do
-                  State.put $! addOneToUniqSet seen tc
-                  (++ nested) <$> go rhs
+      case scopedSumDomain tc of
+        Just (fam, _, _) -> pure (fam : nested)
+        Nothing
+          | isConstrainedFamilyTyCon tc -> pure (tc : nested)
+          | isFamFreeTyCon tc -> pure nested
+          | otherwise -> case synTyConRhs_maybe tc of
+              Nothing -> pure nested
+              Just rhs -> do
+                seen <- State.get
+                if tc `elementOfUniqSet` seen
+                  then pure nested
+                  else do
+                    State.put $! addOneToUniqSet seen tc
+                    (++ nested) <$> go rhs
     go (AppTy f x) = descend [f, x]
     go (FunTy _ ma mult a b) = descend [ma, mult, a, b]
     go (ForAllTy ma b ty) = descend [ma, binderType b, ty]
@@ -771,18 +823,24 @@ familyDomainObligations ty = State.evalStateT (go ty) emptyUFM
   where
     go (TyConApp tc args) = do
       written <- children args
-      if isConstrainedFamilyTyCon tc
-        then pure (domain tc args : written)
-        else if isFamFreeTyCon tc
-          then pure written
-          else case synTyConDefn_maybe tc of
-            Nothing -> pure written
-            Just (tvs, rhs) -> do
-              uses <- templates tc rhs
-              let (actuals, _) = splitAtList tvs args
-              pure $ written ++ if equalLength actuals tvs
-                then map (mapSigma (substTyWith tvs actuals)) uses
-                else map refuse uses
+      case scopedSumDomain tc of
+        Just (fam, captures, predicate) ->
+          let (actuals, _) = splitAtList captures args
+              use | equalLength captures actuals =
+                      ScopedFamily fam 0 (substTyWith captures actuals predicate)
+                  | otherwise = UnsupportedFamily fam unsupportedFamilySite
+          in pure (use : written)
+        Nothing
+          | isConstrainedFamilyTyCon tc -> pure (domain tc args : written)
+          | isFamFreeTyCon tc -> pure written
+          | otherwise -> case synTyConDefn_maybe tc of
+              Nothing -> pure written
+              Just (tvs, rhs) -> do
+                uses <- templates tc rhs
+                let (actuals, _) = splitAtList tvs args
+                pure $ written ++ if equalLength actuals tvs
+                  then map (mapSigma (substTyWith tvs actuals)) uses
+                  else map refuse uses
     go (ForAllTy ma b body) = do
       kinds <- forbidden [ma, binderType b]
       uses <- go body
@@ -3148,6 +3206,7 @@ checkTyFamEqnWithSelectors selectors fam_tc typats rhs
 -- See Note [Class evidence in associated family equations].
 checkEquationFamilyDomains :: TyCon -> [Type] -> Type -> TcM ()
 checkEquationFamilyDomains family pats rhs
+  | isJust (scopedSumDomain family) = pure ()
   | null (constrainedFamilyApps rhs) = pure ()
   | not (isConstrainedFamilyTyCon family) = checkNoConstrainedFamilyApps rhs
   | otherwise = do

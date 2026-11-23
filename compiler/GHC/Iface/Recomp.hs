@@ -34,7 +34,8 @@ import GHC.Driver.Plugins
 
 
 import GHC.Iface.Syntax
-import GHC.Iface.Binary (sourceTableLocations, couldInferLiberalSynonymMatchability)
+import GHC.Iface.Binary (sourceTableLocations, couldInferLiberalSynonymMatchability,
+                         scopedSumDomainField)
 import GHC.Iface.Ext.Fields (getExtensibleFields, writeField)
 import GHC.Iface.Recomp.Binary
 import GHC.Iface.Recomp.Types
@@ -3190,6 +3191,8 @@ addFingerprints hsc_env iface0 = do
                     ++ [structuralCasesField | stamp_structural_cases]
                     ++ [sizeListCasesField | stamp_size_list_cases]
                     ++ [sourceProofBranchesField | stamp_source_proof_branches]
+                    ++ [scopedSumDomainField |
+                           Map.member scopedSumDomainField (getExtensibleFields (mi_ext_fields iface0))]
       checked_hash = foldl' (\fp field -> computeFingerprint putNameLiterally (fp, field))
                             base_hash checked_fields
       !iface_hash = case sourceTableLocations sorted_decls of

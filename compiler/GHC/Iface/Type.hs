@@ -3139,6 +3139,7 @@ data IfaceEvidence
   | OrderedTypeDataTelescopeEvidence
   | NamedRetainedCallbackEvidence
   | PartialBuiltinFamilyEvidence
+  | ScopedSumDomainEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]
