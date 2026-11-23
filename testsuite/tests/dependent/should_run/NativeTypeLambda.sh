@@ -47,17 +47,17 @@ sed -e 's/^module TypeLambda$/module InferredCaptureKind/' \
 # The lambda can be stored in Proxy without applying its family. Its body
 # must still check against the real kinds of these unannotated captures.
 cp "$src/NativeTypeLambdaFormation.hs" .
-for form in ASCRIPTION CONSTRUCTOR FAMILY; do
+for form in ASCRIPTION CONSTRUCTOR FAMILY ANNOTATION; do
     "${g[@]}" -fno-code -fforce-recomp -D"$form" -c NativeTypeLambdaFormation.hs
     if "${g[@]}" -fno-code -fforce-recomp -D"$form" -DSHADOW \
         -c NativeTypeLambdaFormation.hs >formation.log 2>&1 ||
-        ! grep -Eq '^NativeTypeLambdaFormation.hs:(23|25|27):[0-9]+: error: \[GHC-25897\]' formation.log ||
+        ! grep -Eq '^NativeTypeLambdaFormation.hs:(23|25|27|29):[0-9]+: error: \[GHC-25897\]' formation.log ||
         ! grep -Fq 'has kind' formation.log; then
         cat formation.log >&2
         exit 1
     fi
 done
-"${g[@]}" -fomit-interface-pragmas -c NativeTypeLambdaFormation.hs
+"${g[@]}" -DANNOTATION -fomit-interface-pragmas -c NativeTypeLambdaFormation.hs
 cp NativeTypeLambdaFormation.{hi,o} "$out/client/"
 cp TypeLambda.hi SchemaColumns.hi OpenTypeLambda.hi NativeTypeLambdaScope.hi RepeatedProvider.hi "$out/client/"
 cd "$out/client"

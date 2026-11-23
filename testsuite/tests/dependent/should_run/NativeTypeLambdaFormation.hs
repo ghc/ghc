@@ -19,11 +19,15 @@ formed _ = go (Proxy :: Proxy Char)
 #endif
     go _ = const True witness
       where
-#if defined(CONSTRUCTOR)
+#if defined(ANNOTATION)
+        witness = (Proxy :: Proxy (\cell -> (At k tag, cell)))
+#elif defined(CONSTRUCTOR)
         witness :: Proxy (\cell -> (At k tag, cell))
 #elif defined(FAMILY)
         witness :: Proxy (\cell -> (Tag k tag, cell))
 #else
         witness :: Proxy (\cell -> (Proxy (tag :: k), cell))
 #endif
+#ifndef ANNOTATION
         witness = Proxy
+#endif
