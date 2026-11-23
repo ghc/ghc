@@ -274,7 +274,10 @@ through the public module. In job 1788 an ordinary client read a vector
 through this interface at `-O0` and `-O2`. Both runs printed `(1,"r")`.
 The client could neither name the hidden constructor nor import its
 module. A dependent client could return `Vec Char (witness p)` from
-`cells p`. Replacing the index with `Z` failed with GHC-83865.
+`cells p`. Job 1793 checks the stronger ordinary-client case with
+`ExperimentalDependentTypes` disabled. The claimed signature
+`CharVector -> Vec Char 'Z` fails with GHC-83865 at `storedCells p`.
+The test registers a package that exposes only the public module.
 
 Still open is defining the datatype and both projections in a single
 module that hides the constructor. A caller needs only the signature

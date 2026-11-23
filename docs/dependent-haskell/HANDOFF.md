@@ -23,36 +23,27 @@ If a warm build stops during package registration, check the exact
 package DB path. The 571 recovery configured the affected packages with
 `-j1` and resumed the same build tree. [Release evidence](CHECKPOINTS.md#local-row-callbacks-and-composed-dependent-pair-payloads).
 
-Job 1756 is building candidate `3d95b04b27` in
-`_build/on-demand/r04-retained-projection-normal-572-20261123`.
-It checks two handwritten projections in either source order. The
-package datatype comes from an imported module. Check `build.exit`,
-`qualification/gates.tsv`, `cohorts/gates.tsv` and `run-all.exit`.
-A successful run writes `qualified.pass`. The GHC priority service can
-freeze an active job while another queue has work. Pueue continues to
-list that job as running. Check the slice's `cgroup.events` before
-diagnosing a stalled build. The ordinary replacement check records
-its job in `r04-projection-replacement-572-20261123/normal.pueue.id`.
+Job 1756 qualified both stages of the private compiler `3d95b04b27`.
+All 572 Showcase observations matched in three modes. All 24 selected
+registrations and 234 compatibility cases passed. The focused suite
+passed 137 of 138 with the existing `MTrans` failure. Job 1837 ran the
+ordinary replacement client at both optimization levels on this compiler.
 
-Job 1818 checks an incremental upgrade from 571. It keeps the old
-ordinary length worker's source, object and interface in place, then
-adds the dependent consumer and invokes `--make`. Read the outcome
-under `r04-warm-projection-572-20261123/component`. The older-reader
-check in job 1752 started with a newly compiled provider.
+Hold this checkpoint for the incremental-build fix. Job 1818 upgraded
+a 571 build with an unchanged ordinary length worker. GHC reused its
+interface without the new equation and rejected the dependent consumer
+with GHC-68947. Rebuilding the worker repaired the client. The same
+failure occurred with `-fno-code -fwrite-interface`. Jobs 1843 and 1848
+tested the correction. Three eligible workers acquired equations, three
+ineligible workers recorded the review, and six other modules kept their
+objects and interfaces. The second build reused all twelve modules.
 
-After 572, check jobs 1793, 1799 and 1801 before scheduling another
-full build. They cover an installed abstract vector package, inline type
-lambdas in expression annotations, and an ordinary vector replacement
-using projections defined beside the datatype.
-The current private source and test revisions have local recovery refs
-under `refs/archive/dependent-haskell/2026-11-23/`.
-
-The staged 573 compiler checks lambda formation under the enclosing
-signature's type variables, passive-field visibility and diagnostics
-for non-injective source functions. Its runner needs the published 572
-revision and receipts. The integration plan for a single later build is
-`_build/on-demand/r04-r21-r17-integration-after-573-20261123/QUALIFICATION.md`.
-Run the compatibility suites and the new cases on the combined compiler.
+The next combined source is `e1e824d935`. The runner is
+`_build/on-demand/r04-r17-r21-normal-after-572-20261123`. Job 1799
+checked type lambdas inside expression annotations. Jobs 1793 and 1801
+checked the installed abstract vector and ordinary vector replacement.
+See the [checkpoint](CHECKPOINTS.md#a-vector-projection-indexed-by-an-ordinary-length-function).
+Private recovery refs are under `refs/archive/dependent-haskell/2026-11-23/`.
 
 The preceding R04 compiler is `aba28b367f`. A dependent pair can select
 its payload type with an associated family. Reading the tag leaves

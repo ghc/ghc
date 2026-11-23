@@ -40,6 +40,15 @@ payloads. GHC-83865 points to `localCells source` when the client
 omits the equality check.
 [Client and expected diagnostic](roadmap/R04-dependent-sums.md#replace-a-vector-after-checking-its-runtime-length).
 
+Job 1756 built both compiler stages. All 18 qualification groups passed,
+including all 572 Showcase observations at `-O0`, default `-O2` and
+GHCi. The normal compiler passed all 24 selected registrations and all
+234 compatibility cases. The focused suite retained its existing
+`MTrans` failure (137/138). Job 1837 passed the replacement check on
+the same compiler. This checkpoint stayed private after job 1818 found
+that upgrading an unchanged length worker from 571 required a manual
+rebuild. The fix must pass on the next combined compiler.
+
 ## Local row callbacks and composed dependent pair payloads
 
 The Showcase uses a local lambda to map error handling over a row.
