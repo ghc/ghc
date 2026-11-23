@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ghc=("$1" "-B$2" -v0 -fno-code -fforce-recomp -fdiagnostics-color=never)
+ghc=("$1" "-B$2" -v0 -package-env - -fno-code -fforce-recomp -ferror-spans -fdiagnostics-color=never)
 implied=-XExperimentalDependentTypes
 explicit=-XRequiredTypeArguments
 off=-XNoRequiredTypeArguments
+vdq='[GHC-51580]'
+
+check_location() {
+    grep -F "GadtEmptyRequiredOff.hs:$2" "$1" | grep -Fq "$vdq" || { cat "$1"; return 1; }
+}
 
 check() {
     local shape=$1 name=$2 expected=$3 status=0
@@ -15,13 +20,23 @@ check() {
         test "$status" -eq 0 || { cat "$log"; return 1; }
     else
         test "$status" -eq 1 && grep -Fq "$expected" "$log" || { cat "$log"; return 1; }
+        case "$shape" in
+            SOURCE)
+                check_location "$log" 10:14
+                check_location "$log" 13:20
+                ;;
+            QUOTE)
+                check_location "$log" 19:33
+                check_location "$log" 20:39
+                ;;
+        esac
     fi
 }
 
-vdq='[GHC-51580]'
 for shape in SOURCE QUOTE SPLICE TYPE_DATA TERM_REQUIRED; do
     check "$shape" default "$vdq"
     check "$shape" explicit '' "$explicit"
+    check "$shape" off "$vdq" "$off"
     check "$shape" implied '' "$implied"
     check "$shape" override "$vdq" "$implied" "$off"
     check "$shape" reverse '' "$off" "$implied"

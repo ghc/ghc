@@ -1,4 +1,8 @@
-{-# LANGUAGE CPP, GADTs, TemplateHaskell, TypeData #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeData #-}
+
 module GadtEmptyRequiredOff where
 
 #if defined(CHECK_SOURCE)

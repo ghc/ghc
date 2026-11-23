@@ -4825,8 +4825,16 @@ rnConDecl (ConDeclGADT { con_names   = names
                               , con_doc = new_mb_doc, con_modifiers = mods' },
                   all_fvs) } }
 
--- | Check empty visible groups before they disappear from the constructor type.
--- The validity check on the constructor type handles nonempty groups.
+{- Note [Required type arguments in empty GADT groups]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+checkValidType checks nonempty visible groups in the constructor type and
+reports the existing validity errors. An empty group contributes no Core
+binder, so check it on the parsed signature before the type checker removes
+it. The parser stores leading groups in the prefix and later groups on the
+right spine of the remaining type. Check both in the constructor renamer,
+which also handles Template Haskell constructors. Do not descend into field
+types or contexts. They use the ordinary rules for types.
+-}
 checkEmptyGadtRequiredGroups :: HsDocContext -> [LHsGadtTelescope GhcPs]
                              -> LHsType GhcPs -> RnM ()
 checkEmptyGadtRequiredGroups ctxt prefix suffix =
