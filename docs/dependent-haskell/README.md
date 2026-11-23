@@ -69,6 +69,18 @@ the functions' equations. The proof involving `map` still disables
 rewrite rules in its own module. [Zipper proofs](examples/open-evaluation/PreludeZipRuntime.hs)
 and [map pipeline](examples/open-evaluation/PreludeZipMapRuntime.hs).
 
+For a bounded prefix the result type records both inputs.
+
+```haskell
+lengthTakeSize :: forall a. foreach (n :: Size) -> foreach (xs :: [a])
+               -> size (takeSize n xs) :~: minSize n (size xs)
+```
+
+At a zero bound an ordinary caller can obtain both the empty prefix
+and its length witness without evaluating the input list. At a finite
+bound the witness can also terminate on an infinite list.
+[Proof and Agda precedent](REFERENCES.md#length-of-a-bounded-list-prefix).
+
 The proofs use the ordinary definitions of `size`, `plus` and `minSize`.
 Forcing a proof can traverse the list spines. The empty-left zip case
 leaves the right list unevaluated. The list elements and the `zipWith`

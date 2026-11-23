@@ -5970,6 +5970,26 @@ source, those bytes cannot identify the original method. The R16
 upgrade instructions describe how to rebuild a local Cabal dependency.
 [Method proofs in family equations](roadmap/R16-open-term-evaluator.md#a-proof-whose-method-is-reduced-in-a-type-synonym).
 
+### Length of a bounded list prefix
+
+The Agda standard library proves `length-take` by matching the bound
+first. Zero and the empty list each give reflexivity. For a successor
+and a cons cell, congruence takes the induction hypothesis through
+successor. HaskLib uses this proof with its `Size`, `minSize` and
+ordinary Haskell lists. The bound has a natural-number type.
+`Prelude.take` has a signed `Int` bound.
+
+Haskell also specifies which input the function demands first.
+`takeSize Zero xs` returns the empty list without inspecting `xs`.
+`takeSize (Succ n) []` returns the empty list without inspecting `n`.
+An undefined bound is demanded even when the list is empty. The
+compiler checks that recursive calls use the original operands or
+their recursive fields, and that at least one operand decreases.
+[Agda standard library, Data.List.Properties](https://agda.github.io/agda-stdlib/v2.3/Data.List.Properties.html),
+[ordinary Haskell definition](hasklib/HaskLib/List/Prefix.hs),
+[HaskLib induction](hasklib/HaskLib/List.hs) and
+[demand tests](hasklib-test/Main.hs).
+
 ### Parametricity and the list length laws
 
 Relational parametricity relates two instantiations of a polymorphic
