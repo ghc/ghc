@@ -173,12 +173,12 @@ uninitialised = panic "Loader not initialised"
 
 modifyLoaderState_ :: SafeInterp -> (Interp -> LoaderState -> IO LoaderState) -> IO ()
 modifyLoaderState_ interp0 f = withInterp interp0 $ \ interp ->
-  modifyMVar_ (loader_state (interpLoader interp))
+  modifyMVarMasked_ (loader_state (interpLoader interp))
     (fmap pure . f interp . fromMaybe uninitialised)
 
 modifyLoaderState :: SafeInterp -> (Interp -> LoaderState -> IO (LoaderState, a)) -> IO a
 modifyLoaderState interp0 f = withInterp interp0 $ \ interp ->
-  modifyMVar (loader_state (interpLoader interp))
+  modifyMVarMasked (loader_state (interpLoader interp))
     (fmapFst pure . f interp . fromMaybe uninitialised)
   where fmapFst f = fmap (\(x, y) -> (f x, y))
 
@@ -245,7 +245,8 @@ loadName interp0 hsc_env name = do
       Just (_,aa) -> return (Just aa)
       Nothing     -> assertPpr (isExternalName name) (ppr name) $
                      -- TODO: does not take loader state lock
-                     lookupClosure interp sym_to_find
+                     interpUninterruptibleMask_ interp $
+                       lookupClosure interp sym_to_find
     return (pls, (ok, m, links, pkgs))
 
   when (failed ok) $ throwGhcExceptionIO (ProgramError "")
@@ -465,7 +466,7 @@ loadCmdLineLibs'' interp hsc_env pls =
                            ++ map Framework frameworks
       if null cmdline_lib_specs
          then return pls
-         else do
+         else interpUninterruptibleMask_ interp $ do
            -- Add directories to library search paths, this only has an effect
            -- on Windows. On Unix OSes this function is a NOP.
            let all_paths = let paths = takeDirectory (pgm_c dflags)
@@ -814,7 +815,7 @@ loadInternalModuleLinkables interp hsc_env pls linkables  =
 
 loadModuleLinkables :: Interp -> HscEnv -> LoaderState -> KeepModuleLinkableDefinitions -> [Linkable] -> IO (LoaderState, SuccessFlag)
 loadModuleLinkables interp hsc_env pls keep_spec linkables
-  = mask_ $ do  -- don't want to be interrupted by ^C in here
+  = interpUninterruptibleMask_ interp $ do  -- don't want to be interrupted by ^C in here
 
         debugTraceMsg (hsc_logger hsc_env) 3 $
           hang (text "Loading module linkables") 2 $ vcat [
@@ -1168,8 +1169,10 @@ unload interp0 hsc_env
         -- Initialise the linker (if it's not been done already)
         initLoaderState interp0 hsc_env
 
-        withInterp interp0 $ \_ ->
-          modifyLoaderState interp0 unload_wkr >>= mapM_ throwIO
+        withInterp interp0 $ \_ -> do
+          err <- modifyLoaderState interp0 $ \interp ->
+            interpUninterruptibleMask_ interp . unload_wkr interp
+          mapM_ throwIO err
 
 unload_wkr
   :: Interp
@@ -1318,7 +1321,8 @@ loadPackages' :: Interp -> HscEnv -> [UnitId] -> LoaderState -> IO LoaderState
 loadPackages' interp hsc_env new_pks pls = do
   (reverse -> pkgs_info_list, pkgs_almost_loaded) <-
     loadMoreUnits hsc_env new_pks (pkgs_loaded pls)
-  loadPackage interp hsc_env pkgs_info_list (pls { pkgs_loaded = pkgs_almost_loaded })
+  interpUninterruptibleMask_ interp $
+    loadPackage interp hsc_env pkgs_info_list (pls { pkgs_loaded = pkgs_almost_loaded })
 
 
 loadPackage :: Interp -> HscEnv -> [UnitInfo] -> LoaderState -> IO LoaderState

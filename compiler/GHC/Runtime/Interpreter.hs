@@ -49,6 +49,7 @@ module GHC.Runtime.Interpreter
 
   , interpCmd
   , withInterpCmdMasked
+  , interpUninterruptibleMask_
   , withExtInterp
   , withExtInterpStatus
   , withIServ
@@ -211,6 +212,17 @@ interpCmd interp msg = case interpInstance interp of
 -- finalizer or other cleanup.
 withInterpCmdMasked :: Binary a => Interp -> Message a -> (a -> IO b) -> IO b
 withInterpCmdMasked interp msg own = mask_ $ interpCmd interp msg >>= own
+
+interpUninterruptibleMask_ :: Interp -> IO a -> IO a
+interpUninterruptibleMask_ interp act = do
+  case interpInstance interp of
+#if defined(HAVE_INTERNAL_INTERPRETER)
+    InternalInterp     -> pure ()
+#endif
+    -- make sure the external interpreter process is running, so that the
+    -- interpreter is spawned outside the uninterruptibleMask
+    ExternalInterp ext -> withExtInterp ext $ \_ -> pure ()
+  uninterruptibleMask_ act
 
 -- | Passes the `Interp` to the continuation while setting up a
 --  'PipeClosedException' handler that calls 'stopInterp'.
