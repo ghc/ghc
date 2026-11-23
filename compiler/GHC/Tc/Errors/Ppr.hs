@@ -3966,8 +3966,8 @@ pprRetainedQuantificationError reason = case reason of
   RetainedRecordPatternOrder ->
     text "Match the fields of a retained record in declaration order."
   RetainedRecordUpdate ->
-    vcat [ text "Record update is unavailable for a record with a retained witness."
-         , text "Construct a new record with its witness and payload fields." ]
+    vcat [ text "Record update of a retained record must replace one payload field."
+         , text "To change its witness, construct a new record." ]
 
 pprTcRnBadlyLevelled :: LevelCheckReason -> Set.Set ThLevelIndex -> ThLevelIndex -> Maybe ErrorItem -> DecoratedSDoc
 pprTcRnBadlyLevelled reason bind_lvls use_lvl lift_attempt = mkDecorated $

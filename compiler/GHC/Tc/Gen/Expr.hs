@@ -74,7 +74,7 @@ import GHC.Core.DataCon
 import GHC.Core.Class(classTyCon)
 import GHC.Core.TyCon
 import GHC.Core.Type
-import GHC.Core.TyCo.Rep (Type(ExistsTy, ForAllTy, TermVarTy, TyConApp))
+import GHC.Core.TyCo.Rep (Type(DepFunTy, ExistsTy, ForAllTy, TermVarTy, TyConApp))
 import GHC.Core.Coercion
 import GHC.Core.Predicate( decomposeIPPred, mkNomEqPred )
 
@@ -2757,17 +2757,25 @@ expandRecordUpd record_expr@(L lspan _) possible_parents rbnds res_ty
        -- See Note [Disambiguating record updates] in GHC.Rename.Pat.
        ; (cons, rbinds)
            <- disambiguateRecordBinds record_expr record_rho possible_parents rbnds res_ty
-       ; let retained_record (RealDataCon con) = not (null (dataConRepArgBinders con))
-             retained_record _ = False
-       ; when (any retained_record (nonDetEltsUniqSet cons)) $
-           failWithTc (TcRnRetainedQuantificationError RetainedRecordUpdate)
-       ; let sel_ids       = map (unLoc . foLabel . unLoc . hfbLHS . unLoc) rbinds
-             upd_fld_names = map idName sel_ids
+       ; let sel_ids = map (unLoc . foLabel . unLoc . hfbLHS . unLoc) rbinds
              relevant_cons@(relevant_con NE.:| _) =
               case NE.nonEmpty $ nonDetEltsUniqSet cons of
                 Just rel_cons -> rel_cons
                 Nothing -> pprPanic "desugarRecordUpd: no relevant constructors" $
                               vcat [ text "record_expr:" <+> ppr record_expr ]
+             retained_record (RealDataCon con) = not (null (dataConRepArgBinders con))
+             retained_record _ = False
+
+       ; case (relevant_cons, zip sel_ids rbinds) of
+           (RealDataCon con NE.:| [], [(sel, L _ field)])
+             | retained_record relevant_con
+             , DepFunTy DepFunVisible receiver payload_ty <- coreFullView (idType sel)
+             -> expandRetainedRecordUpd con receiver payload_ty sel record_expr (hfbRHS field)
+           _ | any retained_record relevant_cons
+             -> failWithTc (TcRnRetainedQuantificationError RetainedRecordUpdate)
+           _ -> expand_ordinary relevant_cons (map idName sel_ids) rbinds }
+  where
+    expand_ordinary relevant_cons@(relevant_con NE.:| _) upd_fld_names rbinds = do {
 
       -- STEP 2: expand the record update.
       --
@@ -2790,7 +2798,7 @@ expandRecordUpd record_expr@(L lspan _) possible_parents rbnds res_ty
          -- with metavariables to obtain a type for each 'Id'.
          -- This will allow us to have 'Id's with polymorphic types
          -- by using 'IdSig'. See Wrinkle [Using IdSig] in Note [Record Updates].
-       ; let (univ_tvs, ex_tvs, eq_spec, _, _, arg_tys, con_res_ty) = conLikeFullSig relevant_con
+         let (univ_tvs, ex_tvs, eq_spec, _, _, arg_tys, con_res_ty) = conLikeFullSig relevant_con
        ; (subst, tc_tvs) <- newMetaTyVars (univ_tvs ++ ex_tvs)
        ; let (actual_univ_tys, _actual_ex_tys) = splitAtList univ_tvs $ map mkTyVarTy tc_tvs
 
@@ -2914,6 +2922,50 @@ expandRecordUpd record_expr@(L lspan _) possible_parents rbnds res_ty
                  , text "ds_expr:" <+> ppr ds_expr
                  ]
         ; return (ds_expr, ds_res_ty, RecordUpdCtxt relevant_cons upd_fld_names ex_tvs) }
+
+-- | Expand a one-field update at the receiver's stored witness.
+-- See Note [Updating a retained record payload].
+expandRetainedRecordUpd :: DataCon -> Id -> TcType -> Id
+                        -> LHsExpr GhcRn -> LHsExpr GhcRn
+                        -> TcM (HsExpr GhcRn, TcType, HsCtxt)
+expandRetainedRecordUpd con receiver payload_ty sel record_expr value = do
+    update <- newSysName (mkVarOcc "update_payload")
+    replacement <- newSysName (mkVarOcc "replacement")
+    let fresh fld = newSysName (nameOccName (flSelector fld))
+    names <- mapM fresh (dataConFieldLabels con)
+    let con_name = dataConName con
+        result_ty = idType receiver
+        signature = mkDepFunTy receiver (mkVisFunTyMany payload_ty result_ty)
+        update_id = mkLocalId update ManyTy signature
+        field_arg fld name
+          | flSelector fld == idName sel = (genWildPat, genLHsVar replacement)
+          | otherwise = (genVarPat name, genLHsVar name)
+        (pats, args) = zipWithAndUnzip field_arg (dataConFieldLabels con) names
+        binding = genSimpleFunBind update [genSimpleConPat con_name pats, genVarPat replacement]
+                    (wrapGenSpan (genHsApps con_name args))
+        binds = HsValBinds noAnn $ XValBindsLR $
+                  HsVBG [(NonRecursive, [binding])] [wrapGenSpan (XSig (IdSig update_id))]
+        body = wrapGenSpan (genHsApps update [record_expr, value])
+        ctxt = RecordUpdCtxt (RealDataCon con NE.:| []) [idName sel] []
+    pure (genHsLet (wrapGenSpan binds) body, result_ty, ctxt)
+
+{- Note [Updating a retained record payload]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The selector type gives the type of a replacement at the receiver's
+witness. For example, expand @p { namedFlags = ys }@ as @update p ys@,
+with a generated local binding of the following shape:
+
+  update :: foreach (r :: NamedColumns) -> Vec Bool (storedLength r) -> NamedColumns
+  update (NamedColumns n xs _) ys = NamedColumns n xs ys
+
+Check the replacement before opening the receiver's constructor pattern.
+The retained match then refines the replacement type to the constructor's
+witness. The update reuses the other fields without forcing their values.
+Use the selector's checked type after field disambiguation, so the receiver
+in the replacement type has the same witness projection as source code.
+This rule handles one payload field. The witness itself has an ordinary
+selector, and cannot select this rule.
+-}
 
 
 

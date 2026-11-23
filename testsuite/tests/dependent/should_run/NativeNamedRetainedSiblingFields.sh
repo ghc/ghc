@@ -27,6 +27,16 @@ readPairs p = toList (zipVec (namedLetters p) (namedFlags p))
 readOnlyFlags :: NamedColumns -> [Bool]
 readOnlyFlags NamedColumns{namedFlags = xs} = toList xs
 
+negateVec :: Vec Bool n -> Vec Bool n
+negateVec VNil = VNil
+negateVec (VCons b bs) = VCons (not b) (negateVec bs)
+
+negateFlags :: NamedColumns -> NamedColumns
+negateFlags p = p { namedFlags = negateVec (namedFlags p) }
+
+omitFlags :: NamedColumns -> NamedColumns
+omitFlags p = p { namedFlags = undefined }
+
 main :: IO ()
 main = do
     let p = NamedColumns { namedFlags = VCons True VNil
@@ -37,11 +47,15 @@ main = do
     print (readOnlyFlags (NamedColumns { namedFlags = VCons True VNil
                                        , storedLength = S Z
                                        , namedLetters = undefined }))
+    let q = negateFlags p
+    print (natToInt (storedLength q), readPairs q)
+    print (readOnlyFlags (negateFlags (NamedColumns (S Z) undefined (VCons True VNil))))
+    print (toList (namedLetters (omitFlags p)))
 HS
     "${ghc[@]}" "$opt" -c Main.hs
     "${ghc[@]}" Main.o ../provider/{PackedVecLibrary,NamedSiblingColumns}.o -o observe
     timeout 15 ./observe > actual
-    printf '%s\n' "[('r',True)]" "0" '[True]' | cmp - actual
+    printf '%s\n' "[('r',True)]" "0" '[True]' "(1,[('r',False)])" '[False]' '"r"' | cmp - actual
 
     cat > ProjectionType.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes #-}
@@ -51,6 +65,9 @@ import PackedVecLibrary (Vec)
 
 checked :: foreach (p :: NamedColumns) -> Vec Char (storedLength p)
 checked p = namedLetters p
+
+replaceFlags :: foreach (p :: NamedColumns) -> Vec Bool (storedLength p) -> NamedColumns
+replaceFlags p flags = p { namedFlags = flags }
 HS
     "${ghc[@]}" "$opt" -c ProjectionType.hs
 
@@ -209,6 +226,17 @@ wrong :: NamedColumns -> NamedColumns
 wrong p = p { storedLength = Z }
 HS
     reject 'Record update.*retained' BadUpdate.hs
+
+    cat > BadPayloadUpdate.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module BadPayloadUpdate where
+import NamedSiblingColumns
+
+-- Both records can store the same length. Their projections are independent.
+wrong :: NamedColumns -> NamedColumns -> NamedColumns
+wrong p q = p { namedFlags = namedFlags q }
+HS
+    reject 'GHC-(05617|83865)' BadPayloadUpdate.hs
 
     cat > BadZip.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
