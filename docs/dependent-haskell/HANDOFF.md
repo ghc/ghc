@@ -114,9 +114,12 @@ three upgrades from normal 554, mixed interfaces and the Showcase at
 still failed at imported proof uses. Inferred proof bindings have separate checks. See the
 [ordinary proof upgrade](roadmap/R16-open-term-evaluator.md#upgrading-a-proof-whose-type-hides-the-equality).
 
-The earlier R41 comparison is `acd48e3f3f` in
-`r41-only-normal-553-20261123`. It passed 66 registrations before the
-new flag policy. The final release source and tests are archived under
+The earlier R41 comparison at `acd48e3f3f` passed 66 registrations
+before the new flag policy. Its generated compiler tree was retired
+on 23 November. To repeat the comparison, restore
+`refs/archive/dependent-haskell/2026-11-23/r41-only-normal`.
+The build recipe and results are in `r41-only-normal-553-20261123`.
+The final release source and tests are archived under
 `refs/archive/dependent-haskell/2026-11-23/r41-verified`.
 Jobs 1286 and 1319 provide the focused results on the final compiler.
 The former has one failed diagnostic expectation. The latter checks
@@ -179,8 +182,11 @@ The ordinary `MTrans` default is a separate open decision.
 Jobs 1595 and 1601 identified another R23 limit. User-defined closed
 family wrappers passed the higher-order arithmetic checks. With ordinary
 type synonyms in their place, public 561 failed Core Lint on a partial
-built-in family. A private change is being checked against older
-interface readers. The public branch still uses the previous arity rule.
+built-in family. Job 1605 tested private compiler component `3422b091ba`.
+Direct addition, comparison and string prefixes passed at `-O0` and
+`-O2`. An ordinary client read the new interface. The old reader
+rejected a partial built-in with GHC-47808 and accepted a provider
+that used only saturated built-ins. The change awaits a normal build.
 [Reproducer](roadmap/R23-unsaturated-type-families.md#passing-built-in-arithmetic-to-map).
 
 Job 1335 used installed HaskLib on `4d10fdc35f` to check the
