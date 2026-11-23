@@ -5456,6 +5456,11 @@ data RetainedQuantificationError
   | RetainedPackageDeclaration
   | RetainedPackagePromotion
   | RetainedPackagePattern
+  | RetainedRecordDeclaration
+  | RetainedRecordConstruction Name (Maybe FieldLabelString)
+  | RetainedRecordPatternOrder
+  | RetainedRecordUpdate
+  | RetainedRecordUpdateWitness Name FieldLabelString [FieldLabelString]
   | RetainedUncoveredConstructors Name [Name]
   | RetainedMissingEquation Name
   | RetainedTypeOperandContext (Maybe Type)
@@ -7394,6 +7399,7 @@ data UnrepresentableTypeDescr
   | RetainedFunctionType
   | RetainedRuntimeIndex
   | InteriorConstructorContext
+  | NamedRetainedRecordCon
 
 -- FFI error types
 data IllegalForeignTypeReason

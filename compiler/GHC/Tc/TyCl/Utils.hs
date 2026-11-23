@@ -30,6 +30,7 @@ import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Bind( tcValBinds )
+import GHC.Tc.Gen.SourceTable (publishRetainedRecordWitness, sourceTableReferenceUse)
 import GHC.Tc.Utils.TcType
 
 import GHC.Builtin.WiredIn.Types( unitTy, unmatchableDataConTy )
@@ -58,7 +59,7 @@ import GHC.Data.FastString
 
 import GHC.Unit.Module
 
-import GHC.Rename.Utils (genHsVar, genLHsApp, genLHsLit, genWildPat, wrapGenSpan)
+import GHC.Rename.Utils (genHsVar, genLHsApp, genLHsLit, genSimpleConPat, genWildPat, wrapGenSpan)
 
 import GHC.Types.Basic
 import GHC.Types.FieldLabel
@@ -848,7 +849,11 @@ addTyConsToGblEnv tyclss
     do { traceTc "tcAddTyCons" $ vcat
             [ text "tycons" <+> ppr tyclss
             , text "implicits" <+> ppr implicit_things ]
-       ; gbl_env <- tcRecSelBinds (mkRecSelBinds tyclss)
+       ; selectors <- mkRecSelBinds tyclss
+       ; let tables = mapMaybe (sourceTableId_maybe . fst) selectors
+       ; gbl_env <- tcExtendTyConEnv tables $
+                    tcExtendGlobalEnvImplicit (concatMap implicitTyConThings tables) $
+                    tcRecSelBinds selectors
        ; th_bndrs <- tcTyThBinders implicit_things
        ; return (gbl_env, th_bndrs)
        }
@@ -928,7 +933,8 @@ early in the pipeline.
 tcRecSelBinds :: [(Id, LHsBind GhcRn)] -> TcM TcGblEnv
 tcRecSelBinds sel_bind_prs
   = tcExtendGlobalValEnv [sel_id | (L _ (XSig (IdSig sel_id))) <- sigs] $
-    do { (rec_sel_binds, tcg_env) <- discardWarnings $
+    do { mapM_ sourceTableReferenceUse (mapMaybe (sourceTableId_maybe . fst) sel_bind_prs)
+       ; (rec_sel_binds, tcg_env) <- discardWarnings $
                                        -- See Note [Impredicative record selectors]
                                      setXOptM LangExt.ImpredicativeTypes $
                                      tcValBinds TopLevel binds sigs getGblEnv
@@ -939,11 +945,25 @@ tcRecSelBinds sel_bind_prs
                                              , let loc = getSrcSpan sel_id ]
     binds = [(NonRecursive, [bind]) | (_, bind) <- sel_bind_prs]
 
-mkRecSelBinds :: [TyCon] -> [(Id, LHsBind GhcRn)]
+mkRecSelBinds :: [TyCon] -> TcM [(Id, LHsBind GhcRn)]
 -- See Note [Record selectors]
-mkRecSelBinds tycons
-  = map mkRecSelBind [ (tc,fld) | tc <- tycons
-                                , fld <- tyConFieldLabels tc ]
+mkRecSelBinds tycons = concat <$> mapM make_selectors tycons
+  where
+    make_selectors tc
+      | [con] <- tyConDataCons tc
+      , first : rest <- dataConFieldLabels con
+      , Just (_, payloads) <- promotedRetainedFields con
+      = do { let cons = [RealDataCon con]
+                 parent = RecSelData tc
+                 selector = fst (mkOneRecordSelector cons parent first FieldSelectors)
+           ; table <- publishRetainedRecordWitness con selector
+           ; record <- mkSysLocalM (fsLit "record") ManyTy (mkTyConTy tc)
+           ; let first_sel = mkRecordSelector (Just table) Nothing cons parent first FieldSelectors
+                 index = mkTyConApp table [TermVarTy record]
+                 payload_sel fld result = mkRecordSelector Nothing
+                   (Just (mkDepFunTy record (result index))) cons parent fld FieldSelectors
+           ; pure (first_sel : zipWithEqual payload_sel rest payloads) }
+      | otherwise = pure (map (mkRecSelBind . (tc,)) (tyConFieldLabels tc))
 
 mkRecSelBind :: (TyCon, FieldLabel) -> (Id, LHsBind GhcRn)
 mkRecSelBind (tycon, fl)
@@ -954,7 +974,14 @@ mkRecSelBind (tycon, fl)
 
 mkOneRecordSelector :: [ConLike] -> RecSelParent -> FieldLabel -> FieldSelectors
                     -> (Id, LHsBind GhcRn)
-mkOneRecordSelector all_cons idDetails fl has_sel
+mkOneRecordSelector = mkRecordSelector Nothing Nothing
+
+-- | Make a selector, with the checked witness equation or dependent result.
+-- See Note [Selectors of retained records].
+mkRecordSelector :: Maybe TyCon -> Maybe Type
+                 -> [ConLike] -> RecSelParent -> FieldLabel -> FieldSelectors
+                 -> (Id, LHsBind GhcRn)
+mkRecordSelector source_table dependent_type all_cons idDetails fl has_sel
   = (sel_id, L (noAnnSrcSpan loc) sel_bind)
   where
     loc      = getSrcSpan sel_name
@@ -977,6 +1004,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
     rec_details = RecSelId { sel_tycon      = idDetails
                            , sel_naughty    = is_naughty
                            , sel_fieldLabel = fl
+                           , sel_sourceTable = source_table
                            , sel_cons       = rec_sel_info }
                              -- See (IRS1) in Note [Detecting incomplete record selectors]
                              -- in GHC.HsToCore.Pmc
@@ -993,7 +1021,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
                    conLikeUserTyVarBinders con1
 
     -- is_naughty: see Note [Naughty record selectors]
-    is_naughty = isExistentialRecordField field_ty con1 || no_selectors
+    is_naughty = (isNothing dependent_type && isExistentialRecordField field_ty con1) || no_selectors
 
     no_selectors   = has_sel == NoFieldSelectors
       -- For PatternSynonyms with -XNoFieldSelectors, pretend the fields
@@ -1002,6 +1030,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
       -- See Note [NoFieldSelectors and naughty record selectors]
 
     sel_ty | is_naughty = unitTy  -- See Note [Naughty record selectors]
+           | Just ty <- dependent_type = ty
            | otherwise  = mkForAllTys [(unmatchableDataConTy, b) | b <- sel_tvbs] $
                           -- Urgh! See Note [The stupid context] in GHC.Core.DataCon
                           mkPhiTy (conLikeStupidTheta con1) $
@@ -1021,19 +1050,24 @@ mkOneRecordSelector all_cons idDetails fl has_sel
         alts | is_naughty = [mkSimpleMatch match_ctxt (noLocA []) unit_rhs]
              | otherwise =  map mk_match cons_w_field ++ deflt
     mk_match con = mkSimpleMatch match_ctxt
-                                 (L (l2l loc') [L loc' (mk_sel_pat con)])
+                                 (L (l2l loc') [mk_sel_pat con])
                                  (L loc' (mkHsVar (L locn field_var)))
-    mk_sel_pat con =
-      let con_lname = L locn (noUserRdr (getName con))
-      in ConPat NoExtField con_lname (RecCon noAnn rec_fields)
+    mk_sel_pat con
+      | isJust source_table || isJust dependent_type
+      = genSimpleConPat (getName con)
+          [ if flSelector field == sel_name then field_pat else genWildPat
+          | field <- conLikeFieldLabels con ]
+      | otherwise =
+          let con_lname = L locn (noUserRdr (getName con))
+          in L loc' (ConPat NoExtField con_lname (RecCon noAnn rec_fields))
     rec_fields = HsRecFields { rec_ext = noAnn, rec_flds = [rec_field], rec_dotdot = Nothing }
     rec_field  = noLocA (HsFieldBind
                         { hfbAnn = noAnn
                         , hfbLHS
                            = L locc (FieldOcc (mkRdrUnqual $ nameOccName sel_name) (L locn sel_name))
-                        , hfbRHS
-                           = L loc' (VarPat noExtField (L locn field_var))
+                        , hfbRHS = field_pat
                         , hfbPun = False })
+    field_pat = L loc' (VarPat noExtField (L locn field_var))
     field_var = mkInternalName (mkBuiltinUnique 1) (getOccName sel_name) loc
 
     -- Add catch-all default case unless the case is exhaustive
@@ -1063,6 +1097,24 @@ mkOneRecordSelector all_cons idDetails fl has_sel
 
     unit_rhs = mkLHsTupleExpr [] noExtField
     msg_lit = HsStringPrim NoSourceText (bytesFS (mkFastStringShortText (field_label lbl)))
+
+{- Note [Selectors of retained records]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Generate both kinds of selectors from the exact constructor. The first
+selector returns the witness. Its checked source equation describes the
+same case. Keep the equation with the selector's field metadata.
+Read the fields in constructor order. The datatype's label map is sorted.
+
+For a payload selector, substitute the first selector's checked family
+applied to a fresh record binder. Its result can depend on that same
+record value. The ordinary HasField solver already refuses a selector
+whose type fails isTauTy, including a retained arrow.
+
+Generate positional matches so the retained pattern checker can relate
+the payload type to the input record. Source record patterns preserve
+their field order when expanded. See Note [Named retained record fields]
+in GHC.Rename.HsType.
+-}
 
 {-
 Note [Polymorphic selectors]

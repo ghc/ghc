@@ -89,7 +89,6 @@ An omitted explicit field uses its projection from the original record.
 If an explicit length changes, each reused vector must therefore also
 typecheck at the new length. Agda's `VList` example uses an implicit
 length field that the checker can infer from the replacement vector.
-These are distinct controls for a future Haskell record update.
 [Agda record update and the VList example](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html#record-update).
 
 R04 uses Serokell's dependent sum syntax. In
@@ -8618,3 +8617,28 @@ case. Preserving the source call inside the proof fixes the ill-typed Core
 and leaves the independent count observations accessible to the caller.
 [Theorem 8.2](https://janis-voigtlaender.eu/papers/TheImpactOfSeqOnFreeTheoremsBasedProgramTransformations.pdf#page=29)
 and [compiled observations](roadmap/R16-open-term-evaluator.md#the-optimized-client-of-the-composed-proof).
+
+### Omitted fields in a dependent record
+
+Haskell 2010 assigns an omitted lazy field a bottom value. It requires
+a strict field in a record construction. Agda's `VList` uses an
+implicit length inferred from its vector. The Haskell example declares
+its length as a visible runtime field. The field-omission experiment
+checks whether a caller who supplies that length can leave one of the
+two vectors undefined and still read the other vector.
+[Haskell 2010 Report, §3.15.2](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html),
+[Agda's VList example](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html#record-update)
+and [the R04 source cases](roadmap/R04-dependent-sums.md#named-fields-at-one-stored-length).
+
+### Updating a payload at its stored witness
+
+Haskell 2010 defines a record update by matching the old constructor
+and rebuilding it with the replacement fields. R04 checks the new
+payload at the type of the receiver's selector result, then uses the
+constructor match to check reconstruction at the retained witness.
+The update reuses each untouched field. Agda also preserves omitted
+explicit fields. Its `VList` example can infer an omitted implicit
+length and illustrates a separate, length-changing case.
+[Haskell 2010 Report, §3.15.3](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-500003.15.3),
+[Agda record update](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html#record-update),
+and [the R04 source cases](roadmap/R04-dependent-sums.md#named-fields-at-one-stored-length).

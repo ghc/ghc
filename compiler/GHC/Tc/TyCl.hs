@@ -2863,6 +2863,10 @@ kcConDeclsWith check_field tc_res_kind cons
 -- we need the first two arguments.
 kcConDecl :: (LHsType GhcRn -> ContextKind -> TcM TcType)
           -> NewOrData -> TcKind -> ConDecl GhcRn -> TcM ()
+kcConDecl _ _ _ (ConDeclH98 { con_name = name, con_ext = Just sig })
+  = addErrCtxt (DataConDefCtxt (NE.singleton name)) $
+    void (tcCheckRetainedConType False False (tcDataConMult IsNotPrefixConGADT) sig)
+
 kcConDecl check_field new_or_data tc_res_kind
           (ConDeclH98 { con_name = name, con_telescope = teles
                       , con_args = args })
@@ -5400,6 +5404,30 @@ tcConDecl :: NewOrData
           -> ConDecl GhcRn
           -> TcM (NonEmpty DataCon)
 
+tcConDecl _ dd_info rep_tycon tc_bndrs _ tag_map
+          (ConDeclH98 { con_name = lname@(L _ name), con_ext = Just sig })
+  = addErrCtxt (DataConDefCtxt (NE.singleton lname)) $
+    do { case dd_info of
+           DDataType | null tc_bndrs -> pure ()
+           _ -> failWithTc (TcRnRetainedQuantificationError RetainedPackageDeclaration)
+       ; skol_info <- mkSkolemInfo (DataConSkol name)
+       ; (tclvl, wanted, (retained, full_ty)) <-
+           pushLevelAndSolveEqualitiesX "tcConDecl:retained record" $
+             tcCheckRetainedConType True False (tcDataConMult IsNotPrefixConGADT) sig
+       ; reportUnsolvedEqualities skol_info [] tclvl wanted
+       ; zonked <- initZonkEnv NoFlexi (zonkTcTypeToTypeX full_ty)
+       ; let (arg_tys, res_ty) = splitRetainedConFields retained zonked
+             unbanged = HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict
+       ; field_lbls <- lookupConstructorFields (noUserRdr name)
+       ; rep_nm <- newTyConRepName name
+       ; fam_envs <- tcGetFamInstEnvs
+       ; dflags <- getDynFlags
+       ; con <- buildDataConWithTelescope (LegacyConOrder 0) retained fam_envs
+                   (SrcBangOpts (initBangOpts dflags)) name False rep_nm
+                   (map (const unbanged) retained) field_lbls [] [] [] [] []
+                   arg_tys res_ty rep_tycon tag_map
+       ; pure (NE.singleton con) }
+
 tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
           (ConDeclH98 { con_name = lname@(L _ name)
                       , con_telescope = explicit_teles
@@ -5793,6 +5821,11 @@ not force rejigConRes while the parent TyCon is still knot-tied.
 rejigConRes substitutes only erased type variables. It cannot rename or
 capture a retained field Id. Keep its existential and equality metadata until
 checkValidDataCon can check it after the parent knot is complete.
+
+For an Haskell98 retained record, keep the same lazy field spine.
+Splitting an arrow can inspect the kind of its result, which still refers
+to the unfinished parent. Check the record's payload shape in
+checkValidDataCon after the parent TyCon is available.
 
 Kind inference checks domain kinds without inspecting unfinished datatype
 constructor graphs. Final checking validates the fixed native index domain.
@@ -6722,7 +6755,10 @@ checkValidDataCon dflags existential_ok tc con
                        && (null theta || (null eq_spec && user_tvs == univ_tvs))
                        && valid_eq_spec && checkDataConTyVars con
                        && sizeVarSet (mkVarSet user_tvs) == length user_tvs) $
-                 failWithTc $ TcRnRetainedQuantificationError RetainedPackageDeclaration }
+                 failWithTc $ TcRnRetainedQuantificationError RetainedPackageDeclaration
+             ; unless (null (dataConFieldLabels con) ||
+                       validRetainedRecordFields (dataConRepArgBinders con) arg_tys) $
+                 failWithTc $ TcRnRetainedQuantificationError RetainedRecordDeclaration }
 
         ; traceTc "checkValidDataCon" (vcat
               [ ppr con, ppr tc, ppr tc_tvs

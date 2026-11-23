@@ -18,7 +18,7 @@ module GHC.Rename.HsType (
         rnScopedHsSigWcType, signatureWrittenKinds, withWrittenSignatureKinds,
         rnHsPatSigType, rnHsPatSigKind,
         newTyVarNameRn,
-        rnHsConDeclRecFields,
+        rnHsConDeclRecFields, rnRetainedHsRecordFields,
         lookupField, mkHsOpTyRn,
         rnLTyVar, classifyTypeCasePattern, warnPunnedTypeSyntax, warnPunnedTyConSyntax,
 
@@ -48,7 +48,8 @@ module GHC.Rename.HsType (
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Rename.Splice( rnSpliceType, checkThLocalTyName, checkThLocalNameNoLift )
+import {-# SOURCE #-} GHC.Rename.Splice( rnSpliceType, rnSpliceTypeWith,
+                                        checkThLocalTyName, checkThLocalNameNoLift )
 
 import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
 import GHC.Core.TyCon    ( isKindName )
@@ -162,12 +163,18 @@ rnLocalHsSigWcType bound_names doc ty@(HsWC { hswc_body = sig_ty })
 -- | Use the local type-lambda lifter in the current declaration group.
 rnScopedHsSigWcType :: HsDocContext -> LHsSigWcType GhcPs
                     -> RnM (LHsSigWcType GhcRn, FreeNames)
-rnScopedHsSigWcType doc ty = do
+rnScopedHsSigWcType doc ty =
+  tryLiftLocalTypeLambdas doc ty >>= maybe (rnHsSigWcType doc ty) pure
+
+-- | Try the local type-lambda lifter while renaming a declaration group.
+tryLiftLocalTypeLambdas :: HsDocContext -> LHsSigWcType GhcPs
+                        -> RnM (Maybe (LHsSigWcType GhcRn, FreeNames))
+tryLiftLocalTypeLambdas doc ty = do
   level <- getThLevel
   lift_lambdas <- tcg_rn_local_lambdas <$> getGblEnv
   case (level, lift_lambdas) of
     (Comp, Just (scope, lift_sig)) -> lift_sig scope doc ty
-    _ -> rnHsSigWcType doc ty
+    _ -> pure Nothing
 
 -- | Get the optional written kinds of explicitly scoped erased binders.
 signatureWrittenKinds :: [Name] -> LHsSigType GhcRn -> LocalSignatureKinds
@@ -197,8 +204,52 @@ rnHsTypeApp ty@(HsWC { hswc_body = hs_ty })
        ; if experimental
          then do { free_vars <- filterInScopeM (extractHsTyRdrTyVars hs_ty)
                  ; rnWithRetainedAliases emptyNameSet RetainedPartialTypeArgument free_vars hs_ty $
-                     rnHsWcType HsTypeCtx ty }
+                     rn_argument }
          else rnHsWcType HsTypeCtx ty }
+  where
+    rn_argument
+      | hasParsedRetainedPi hs_ty = rnHsWcType HsTypeCtx ty
+      | otherwise = do
+          lifted <- try_lift_argument hs_ty
+          maybe (rnHsWcTypeWithSplice rn_argument_splice HsTypeCtx ty) pure lifted
+
+    rn_argument_splice = rnSpliceTypeWith [] $ \raw -> do
+      lifted <- if hasParsedRetainedPi raw then pure Nothing else try_lift_argument raw
+      case lifted of
+        Just (HsWC { hswc_body = body }, fvs) -> pure (body, fvs)
+        Nothing -> rnLHsType (SpliceTypeCtx raw) raw
+
+    try_lift_argument :: LHsType GhcPs -> RnM (Maybe (LHsWcType GhcRn, FreeNames))
+    try_lift_argument body = do
+      -- See Note [Type lambdas in visible type arguments].
+      let wrapper = HsWC noExtField
+                      (L (l2l (getLoc body)) (mkHsExplicitSigType noAnn [] body))
+      lifted <- tryLiftLocalTypeLambdas HsTypeCtx wrapper
+      pure $ case lifted of
+        Just (HsWC { hswc_ext = wcs, hswc_body = L _ HsSig { sig_body = result } }, fvs)
+          -> Just (HsWC wcs result, fvs)
+        Nothing -> Nothing
+
+{- Note [Type lambdas in visible type arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In rowFor @(\cell -> Either e cell), e can refer to an enclosing
+ScopedTypeVariables binder. A visible type argument cannot bind a free
+type variable. Give the local signature lifter an empty explicit
+telescope so it lifts lambdas with the same lexical scope as the argument.
+Discard the temporary signature after lifting. The type checker receives
+the result as an ordinary visible type argument.
+
+The local lifter accepts only copyable types. When it emits no helper,
+rename the original argument with rnHsWcType. Ordinary wildcards and the
+checks for retained Pi arguments use their existing visible argument path.
+In an untyped quote, leave the lambda in the quoted syntax. The lifter
+runs when the argument is spliced into the ordinary declaration group.
+
+In rowFor @($([t| \err cell -> Either err cell |]) e), the renamer
+first runs the type splice. Use its normal continuation to try lifting
+the resulting type. The splice runs once and retains its finalizers.
+If lifting fails, rename the result in the ordinary SpliceTypeCtx.
+-}
 
 -- | Scope aliases for complete types that capture lexical runtime Names.
 -- The excluded Names belong to an unavailable signature binding group.
@@ -407,9 +458,9 @@ rnRetainedSigTypeWith env ty = rnLHsTyKi env ty
 -- Scope each fresh runtime Name over subsequent binders and the body only.
 -- See Note [Retained Pi type formation] below.
 rnRetainedTelescope :: RnTyKiEnv
-                    -> (RnTyKiEnv -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames))
-                    -> [LHsTyVarBndr () GhcPs] -> LHsType GhcPs
-                    -> RnM (([LHsTyVarBndr () GhcRn], LHsType GhcRn), FreeNames)
+                    -> (RnTyKiEnv -> a -> RnM (b, FreeNames))
+                    -> [LHsTyVarBndr () GhcPs] -> a
+                    -> RnM (([LHsTyVarBndr () GhcRn], b), FreeNames)
 rnRetainedTelescope env rn_body bndrs body
   = do { experimental <- xoptM LangExt.ExperimentalDependentTypes
        ; unless (experimental && not (isRnKindLevel env)) $
@@ -523,18 +574,20 @@ rnHsPatSigTyKi level scoping ctx sig_ty thing_inside
     pat_sig_ty = hsPatSigType sig_ty
 
 rnHsWcType :: HsDocContext -> LHsWcType GhcPs -> RnM (LHsWcType GhcRn, FreeNames)
-rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
+rnHsWcType = rnHsWcTypeWithSplice rnSpliceType
+
+-- | Rename wildcards and use the caller's continuation for type splices.
+rnHsWcTypeWithSplice :: RenameTypeSplice -> HsDocContext -> LHsWcType GhcPs
+                    -> RnM (LHsWcType GhcRn, FreeNames)
+rnHsWcTypeWithSplice rename_splice ctxt (HsWC { hswc_body = hs_ty })
   = do { free_vars <- filterInScopeM (extractHsTyRdrTyVars hs_ty)
        ; (nwc_rdrs', _) <- partition_nwcs free_vars
        ; let nwc_rdrs = nubL nwc_rdrs'
-       ; (wcs, hs_ty', fvs) <- rnWcBodyType ctxt nwc_rdrs hs_ty
+       ; (wcs, hs_ty', fvs) <- rnWcBodyTyKiWithSplice (const rename_splice)
+                                TypeLevel ctxt nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = hs_ty' }
        ; return (sig_ty', fvs) }
 
-
-rnWcBodyType :: HsDocContext -> [LocatedN RdrName] -> LHsType GhcPs
-  -> RnM ([Name], LHsType GhcRn, FreeNames)
-rnWcBodyType = rnWcBodyTyKi TypeLevel
 
 rnWcBodyTyKi :: TypeOrKind -> HsDocContext -> [LocatedN RdrName] -> LHsType GhcPs
          -> RnM ([Name], LHsType GhcRn, FreeNames)
@@ -779,6 +832,7 @@ data RnTyKiEnv
     }
 
 data RnTyKiWhat = RnTypeBody
+                | RnTypeCasePat     -- A classified type-case pattern in a quote
                 | RnGadtSuffix      -- The right spine of an ordered GADT signature
                 | RnTopConstraint   -- Top-level context of HsSigWcTypes
                 | RnConstraint      -- All other constraints
@@ -792,6 +846,7 @@ instance Outputable RnTyKiEnv where
 
 instance Outputable RnTyKiWhat where
   ppr RnTypeBody      = text "RnTypeBody"
+  ppr RnTypeCasePat   = text "RnTypeCasePat"
   ppr RnGadtSuffix    = text "RnGadtSuffix"
   ppr RnTopConstraint = text "RnTopConstraint"
   ppr RnConstraint    = text "RnConstraint"
@@ -1214,7 +1269,8 @@ rnHsTyKi env (XHsType (HsTypeCase (case_kw, _) _ scrutinee alts)) = do
     rn_row (pat, rhs) = do
       names <- mapM newLocalBndrRn (extractHsTyRdrTyVars pat)
       bindLocalNamesFV names $ do
-        (pat', pat_fvs) <- rnLHsTyKi env pat
+        -- See Note [Wildcards in quoted type case patterns].
+        (pat', pat_fvs) <- rnLHsTyKi (env { rtke_what = RnTypeCasePat }) pat
         (rhs', rhs_fvs) <- rnLHsTyKi env rhs
         pure ((names, pat', rhs'), pat_fvs `plusFN` rhs_fvs)
 
@@ -1267,6 +1323,18 @@ classifyTypeCasePattern pat = do
       | isRdrTc (unLoc name) || isRdrDataCon (unLoc name)
       = Just (L loc (if isPromoted promotion then pat else XHsType (HsTypeCaseHead name)), [])
     constructorPattern _ = Nothing
+
+{- Note [Wildcards in quoted type case patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An ordinary type case becomes a family equation before renaming its
+pattern. A quotation keeps the case as written. Its pattern can occur
+in a type synonym, where a wildcard in a type expression is illegal.
+
+Classify the pattern first. Rename only that pattern with RnTypeCasePat.
+An anonymous wildcard binds nothing. The branch variables enter scope
+through bindLocalNamesFV. The scrutinee and branch RHS use the original
+context, including its wildcard rules.
+-}
 
 {-
 Note [Strict level checks with ExplicitLevelImports]
@@ -1481,14 +1549,13 @@ checkAnonWildCard env
   = checkWildCard env Nothing mb_bad
   where
     mb_bad :: Maybe BadAnonWildcardContext
-    mb_bad | not (wildCardsAllowed env)
-           = Just WildcardsNotAllowedAtAll
-           | otherwise
-           = case rtke_what env of
-               RnTypeBody      -> Nothing
-               RnGadtSuffix    -> Nothing
-               RnTopConstraint -> Just WildcardNotLastInConstraint
-               RnConstraint    -> Just WildcardNotLastInConstraint
+    mb_bad = case rtke_what env of
+      RnTypeCasePat -> Nothing
+      _ | not (wildCardsAllowed env) -> Just WildcardsNotAllowedAtAll
+      RnTypeBody      -> Nothing
+      RnGadtSuffix    -> Nothing
+      RnTopConstraint -> Just WildcardNotLastInConstraint
+      RnConstraint    -> Just WildcardNotLastInConstraint
 
 checkNamedWildCard :: RnTyKiEnv -> Name -> RnM ()
 -- Report an error if a named wildcard is illegal here
@@ -1502,6 +1569,7 @@ checkNamedWildCard env name
            | otherwise
            = case rtke_what env of
                RnTypeBody      -> Nothing   -- Allowed
+               RnTypeCasePat   -> Just WildcardsNotAllowedAtAll
                RnGadtSuffix    -> Nothing
                RnTopConstraint -> Nothing   -- Allowed; e.g.
                   -- f :: (Eq _a) => _a -> Int
@@ -2097,6 +2165,70 @@ rnHsConDeclRecFields ctxt fls fields
   where
     env    = mkTyKiEnv ctxt TypeLevel RnTypeBody
     fl_env = mkFsEnv [ (mkFastStringShortText (field_label $ flLabel fl), fl) | fl <- fls ]
+
+-- | Rename the record fields under the name of their stored witness.
+-- See Note [Named retained record fields].
+rnRetainedHsRecordFields :: Name -> HsDocContext -> [FieldLabel] -> [LHsConDeclRecField GhcPs]
+                         -> RnM (Maybe (LHsType GhcRn, [LHsConDeclRecField GhcRn], FreeNames))
+rnRetainedHsRecordFields owner ctxt fls
+    (L loc (HsConDeclRecField _ fields@[L _ (FieldOcc _ name)] first_field) : rest@(_ : _))
+  | all (plain_field . cdrf_spec . unLoc) rest
+  , plain_field first_field
+  , let witness = mkRdrUnqual (setOccNameSpace tvName (rdrNameOcc (unLoc name)))
+  , all (uses_witness witness) rest
+  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; field_selectors <- xoptM LangExt.FieldSelectors
+       ; strict <- xoptM LangExt.StrictData
+       ; duplicate_fields <- xoptM LangExt.DuplicateRecordFields
+       ; locals <- getLocalRdrEnv
+       ; if enabled && field_selectors && not (strict || duplicate_fields)
+              && not (elemLocalRdrEnv witness locals)
+           then do { let binder = L loc (HsTvb noAnn () (HsBndrVar noExtField name)
+                                            (HsBndrKind noExtField (cdf_type first_field)))
+                   ; ((binders, payloads), fvs) <- rnRetainedTelescope env
+                       (\e -> mapFvRn (rnField fl_env e)) [binder] rest
+                   ; doc <- traverse rnLHsDoc (cdf_doc first_field)
+                   ; let domain = case binders of
+                           [L _ (HsTvb{tvb_kind = HsBndrKind _ ty})] -> ty
+                           _ -> panic "rnRetainedHsRecordFields: expected one witness"
+                         field = first_field
+                           { cdf_multiplicity = HsModifiedFunArr noExtField []
+                               (HsStandardArr noExtField)
+                           , cdf_type = domain
+                           , cdf_doc = doc }
+                         witness_field = L loc (HsConDeclRecField noExtField
+                                               (map (fmap (lookupField fl_env)) fields) field)
+                         result = nlHsTyVar NotPromoted owner
+                         body = foldr (nlHsFunTy . cdf_type . cdrf_spec . unLoc) result payloads
+                         sig = L loc (HsForEachTy (noEpTok, Left noEpUniTok) binders body)
+                   ; pure (Just (sig, witness_field : payloads, fvs)) }
+           else pure Nothing }
+  where
+    env = mkTyKiEnv ctxt TypeLevel RnTypeBody
+    fl_env = mkFsEnv [(mkFastStringShortText (field_label (flLabel fl)), fl) | fl <- fls]
+
+    plain_field CDF{cdf_bang = NoSrcStrict, cdf_unpack = NoSrcUnpack,
+                    cdf_multiplicity = HsModifiedFunArr _ [] (HsStandardArr _)} = True
+    plain_field _ = False
+
+    uses_witness witness (L _ (HsConDeclRecField _ [_] field)) =
+      any ((== witness) . unLoc) (extractHsTyRdrTyVars (cdf_type field))
+    uses_witness _ _ = False
+rnRetainedHsRecordFields _ _ _ _ = pure Nothing
+
+{- Note [Named retained record fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+With ExperimentalDependentTypes, the first field of a closed Haskell98
+record can bind its stored value in later field types. Use the same
+renaming scope as foreach. The first field's type is outside that scope.
+An existing type variable takes precedence. GADT records retain their
+existing implicit quantification rules.
+Check the local type scope directly. The global scope already contains
+the field selector, and implicit quantification also checks term names.
+
+Keep the renamed fields for the record syntax. Save a retained arrow
+telescope in the Haskell98 declaration extension for constructor checking.
+-}
 
 rnField :: FastStringEnv FieldLabel -> RnTyKiEnv -> LHsConDeclRecField GhcPs
         -> RnM (LHsConDeclRecField GhcRn, FreeNames)

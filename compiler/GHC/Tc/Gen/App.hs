@@ -1797,10 +1797,12 @@ The client flag must not remove the inference needed to use this contract.
 
 Compute one capability for the application. Enable it when the source flag is
 set, when the zonked head or an available expected type contains native syntax,
-or when tcRetainedInferableArg finds a declared native value anchor. This
-selection only reads existing types. It does not infer arguments, instantiate
-a signature, record occurrences or usage, or expand source syntax. Read an
-available expected type without allocating an inference cell.
+or when tcRetainedInferableArg finds a declared native value anchor. A record
+selector with a retained receiver is such an anchor. The renamer gives it a
+separate expression form. This selection only reads existing types. It does
+not infer arguments, instantiate a signature, record occurrences or usage, or
+expand source syntax. Read an available expected type without allocating an
+inference cell.
 
 Pass the capability to the existing application helpers and evidence capture.
 Keep their Quick Look modes, complete immutable choices, scope checks, typed
@@ -6134,6 +6136,12 @@ tcRetainedInferableArg (L _ expr)
               ; return (case mb_id of
                           Just var -> (True, hasNativeDependentExpr (Core.Type (varType var)))
                           Nothing -> (False, False)) }
+      XExpr (HsRecSelRn (FieldOcc _ (L _ name)))
+        -> do { mb_id <- tcLookupIdMaybe name
+              ; return $ case mb_id of
+                  Just sel | DepFunTy DepFunVisible _ _ <- coreFullView (varType sel)
+                    -> (True, True)
+                  _ -> (False, False) }
       HsApp _ fun arg -> application fun [arg]
       OpApp _ lhs op rhs ->
         do { ql <- wantQuickLook (unLoc op)

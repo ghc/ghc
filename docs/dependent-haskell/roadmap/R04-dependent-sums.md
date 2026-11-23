@@ -367,6 +367,68 @@ named-field syntax or overloading is needed.
 [Agda record types](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html)
 and [the Serokell card](https://ghc.serokell.io/dh#dependent-sums).
 
+### Named fields at one stored length
+
+```haskell
+data NamedColumns = NamedColumns
+  { storedLength :: Nat
+  , namedLetters :: Vec Char storedLength
+  , namedFlags :: Vec Bool storedLength
+  }
+```
+
+With `ExperimentalDependentTypes`, the two payload types refer to the
+stored value of the first field. The generated selector has type
+`foreach (p :: NamedColumns) -> Vec Char (storedLength p)`. An ordinary
+client can call both payload selectors on the same record and zip the
+results. To construct the record, supply the witness field. An omitted
+lazy payload uses the supplied witness in its type. GHC issues the
+ordinary missing-field warning and raises the ordinary missing-field
+exception if evaluation demands that payload.
+[Example](../examples/packed-vector/NamedSiblingColumns.hs).
+
+The declaration uses one constructor, no datatype parameters, and lazy
+fields. Each payload uses the witness as its final type argument. Named
+patterns list the selected fields in declaration order. Payload selection
+uses the generated function. The `HasField` result type depends on the
+label and record type, which do not supply a record value.
+Template Haskell rejects reification of this datatype. Its retained
+constructor representation does not carry record labels.
+[Agda record types](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html)
+and [GHC proposal #23](https://ghc-proposals.readthedocs.io/en/latest/proposals/0023-overloaded-record-fields.html).
+
+Jobs 1901 and 1907 checked generated selectors in native code and
+through typecheck-only interfaces. In an ordinary source-hidden client,
+`zipVec (namedLetters p) (namedFlags p)` retained the one length shared
+by both fields. Using `namedFlags q` from another record failed.
+A warm typecheck-only invocation reused the provider interfaces. Job
+1908 built the Showcase's ordinary client at both optimization levels.
+[Ordinary client](../examples/packed-vector/NamedSiblingColumnsClient.hs).
+
+Construction with a retained variable, field puns and record wildcards
+passed in job 1909. Job 1946 checked construction with a supplied
+witness and one or two omitted lazy payloads. A supplied field remains
+readable. Omitting the witness gives GHC-83605 at the constructor and
+names the required field.
+[Field omission and witness inference](../REFERENCES.md#omitted-fields-in-a-dependent-record).
+
+An ordinary caller can replace one payload at the original witness.
+The Showcase sets the first flag to `False` and keeps the rest of the
+vector. The update checks the replacement at `storedLength p` for
+receiver `p`. Job 1968 passed the source-hidden test at `-O0` and `-O2`.
+It checked the unchanged length, the laziness of the fields, and the
+GHC-83865 error for a vector at a separate record's witness.
+The receiver must be a supported retained operand, such as a local
+variable. An update that keeps the witness can replace one payload.
+[Record update in Haskell and Agda](../REFERENCES.md#updating-a-payload-at-its-stored-witness).
+
+To change the witness, supply a replacement for every payload. For
+example, `p { storedLength = Z, namedLetters = VNil, namedFlags = VNil }`
+changes a nonempty record to an empty one. The constructor match demands
+the old record and leaves its fields unevaluated. GHC checks each new
+vector at `Z`. If an update omits a payload, GHC reports GHC-83605 at
+the witness field and names the missing replacement.
+
 ## Sums in constructor fields
 
 [StoredVector](../examples/packed-vector/StoredVector.hs) uses one strict

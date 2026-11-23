@@ -726,7 +726,7 @@ data TcGblEnv
 
         tcg_rn_local_lambdas
           :: Maybe (LocalSignatureKinds, LocalSignatureKinds -> HsDocContext
-                    -> LHsSigWcType GhcPs -> RnM (LHsSigWcType GhcRn, FreeNames)),
+                    -> LHsSigWcType GhcPs -> RnM (Maybe (LHsSigWcType GhcRn, FreeNames))),
           -- ^ Scope and helper accumulator for local type lambdas.
           -- Set only while renaming value bindings in one declaration group.
 

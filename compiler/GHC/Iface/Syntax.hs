@@ -634,7 +634,8 @@ data IfaceIdDetails
     { ifRecSelIdParent     :: Either IfaceTyCon IfaceDecl
     , ifRecSelFirstCon     :: IfaceTopBndr
     , ifRecSelIdIsNaughty  :: Bool
-    , ifRecSelIdFieldLabel :: FieldLabel }
+    , ifRecSelIdFieldLabel :: FieldLabel
+    , ifRecSelSourceTable  :: Maybe IfExtName }
   | IfDFunId
   | IfSourceDFunId [(IfExtName, IfExtName)] (Maybe (IfExtName, IfExtName, IfExtName))
   -- Rule heads can name private bindings. Their defining module and
@@ -2116,10 +2117,9 @@ instance Outputable IfaceIdDetails where
             FinalCoreSourceTable -> "FinalCoreSourceTable"
   ppr (IfSourceProofId deps) = text "SourceProof" <+> ppr deps
   ppr (IfWorkerLikeId dmd) = text "StrWork" <> parens (ppr dmd)
-  ppr (IfRecSelId tc _c b _fl) = text "RecSel" <+> ppr tc
-                            <+> if b
-                                  then text "<naughty>"
-                                  else Outputable.empty
+  ppr (IfRecSelId tc _c b _fl table) = text "RecSel" <+> ppr tc
+                            <+> ppWhen b (text "<naughty>")
+                            <+> maybe Outputable.empty (\n -> text "SourceTable" <+> ppr n) table
   ppr IfDFunId          = text "DFunId"
   ppr (IfSourceDFunId methods literal) =
     text "DFunId" <+> ppWhen (not (null methods)) (text "SourceMethods" <+> ppr methods)
@@ -2238,10 +2238,11 @@ freeNamesIfAxBranch (IfaceAxBranch { ifaxbTyVars   = tyvars
     freeNamesIfType rhs
 
 freeNamesIfIdDetails :: IfaceIdDetails -> NameSet
-freeNamesIfIdDetails (IfRecSelId tc first_con _ fl) =
+freeNamesIfIdDetails (IfRecSelId tc first_con _ fl table) =
   either freeNamesIfTc freeNamesIfDecl tc &&&
   unitFN first_con &&&
-  unitFN (flSelector fl)
+  unitFN (flSelector fl) &&&
+  maybe emptyNameSet unitFN table
 freeNamesIfIdDetails IfVanillaId         = emptyNameSet
 freeNamesIfIdDetails (IfSourceTableId table _) = unitFN table
 freeNamesIfIdDetails (IfSourceProofId _) = emptyNameSet
@@ -3118,6 +3119,8 @@ instance Binary IfaceConDecl where
     put_ bh (IfCon a1 a2 a3 a12 a4 a5 a6 ctxt a8 arg_binders a9 a10 a11 _) = do
         unless (null arg_binders || null ctxt) $
           requireIfaceEvidenceVersion bh RetainedConstructorContextEvidence
+        unless (null arg_binders || null a9) $
+          requireIfaceEvidenceVersion bh RetainedNamedRecordEvidence
         putIfaceTopBndr bh a1
         put_ bh a2
         put_ bh a3
@@ -3299,11 +3302,16 @@ instance Binary IfaceAnnotation where
 
 instance Binary IfaceIdDetails where
     put_ bh IfVanillaId           = putByte bh 0
-    put_ bh (IfRecSelId a b c d)  = do { putByte bh 1
+    put_ bh (IfRecSelId a b c d table)
+                                = do { case table of
+                                         Nothing -> putByte bh 1
+                                         Just _ -> do { requireIfaceEvidenceVersion bh RetainedNamedRecordEvidence
+                                                      ; putByte bh 10 }
                                        ; put_ bh a
                                        ; put_ bh b
                                        ; put_ bh c
-                                       ; put_ bh d }
+                                       ; put_ bh d
+                                       ; mapM_ (put_ bh) table }
     put_ bh (IfWorkerLikeId dmds) = putByte bh 2 >> put_ bh dmds
     put_ bh IfDFunId              = putByte bh 3
     put_ bh (IfSourceTableId table NominalSourceTable) = putByte bh 4 >> put_ bh table
@@ -3322,7 +3330,7 @@ instance Binary IfaceIdDetails where
                     ; b <- get bh
                     ; c <- get bh
                     ; d <- get bh
-                    ; return (IfRecSelId a b c d) }
+                    ; return (IfRecSelId a b c d Nothing) }
             2 -> do { dmds <- get bh
                     ; return (IfWorkerLikeId dmds) }
             3 -> return IfDFunId
@@ -3332,6 +3340,7 @@ instance Binary IfaceIdDetails where
             7 -> flip IfSourceTableId ExecutableSourceTable <$> get bh
             8 -> flip IfSourceTableId FinalCoreSourceTable <$> get bh
             9 -> IfSourceProofId <$> get bh
+            10 -> IfRecSelId <$> get bh <*> get bh <*> get bh <*> get bh <*> (Just <$> get bh)
             _ -> panic "Binary IfaceIdDetails: unknown tag"
 
 instance Binary IfaceInfoItem where
@@ -3856,8 +3865,8 @@ instance NFData IfaceIdDetails where
     IfSourceTableId table origin -> rnf table `seq` origin `seq` ()
     IfWorkerLikeId dmds -> rnf dmds `seq` ()
     IfSourceProofId deps -> rnf deps
-    IfRecSelId (Left tycon) b c d -> rnf tycon `seq` rnf b `seq` rnf c `seq` rnf d
-    IfRecSelId (Right decl) b c d -> rnf decl `seq` rnf b `seq` rnf c `seq` rnf d
+    IfRecSelId parent b c d table ->
+      either rnf rnf parent `seq` rnf b `seq` rnf c `seq` rnf d `seq` rnf table
     IfDFunId -> ()
     IfSourceDFunId methods literal -> rnf methods `seq` rnf literal
 

@@ -154,6 +154,8 @@ data IdDetails
                                 -- See Note [Naughty record selectors] in GHC.Tc.TyCl
     , sel_cons       :: RecSelInfo
                         -- Partiality info, cached here based on the RecSelParent.
+    , sel_sourceTable :: Maybe TyCon
+                        -- The checked equation of a generated retained witness selector.
     }
 
   | DataConWorkId DataCon       -- ^ The 'Id' is for a data constructor /worker/

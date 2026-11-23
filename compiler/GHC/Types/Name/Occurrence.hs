@@ -135,6 +135,7 @@ import GHC.Data.FastString.Env
 import Control.DeepSeq
 import Data.Char
 import Data.Data
+import Data.List (stripPrefix)
 import qualified Data.Semigroup as S
 import GHC.Exts( Int(I#), dataToTag# )
 
@@ -1070,7 +1071,10 @@ mkDataConWorkerOcc datacon_occ = setOccNameSpace varName datacon_occ
 
 -- | Name of the closed family for a finite source function.
 mkSourceTableOcc :: OccName -> OccName
-mkSourceTableOcc = mk_simple_deriv tcName "T:"
+mkSourceTableOcc occ
+  | Just parent <- fieldOcc_maybe occ
+  = mkTcOcc ("T:field:" ++ show (unpackFS parent) ++ ":" ++ occNameString occ)
+  | otherwise = mk_simple_deriv tcName "T:" occ
 
 -- | Private families for the unevaluated fields of an ordinary pair builder.
 -- See Note [A partial pair in a nominal operand] in GHC.Tc.Gen.SourceTable.
@@ -1081,6 +1085,9 @@ mkSourceSndOcc = mk_simple_deriv tcName "P2:"
 -- | Recover the source function's spelling from its family occurrence.
 sourceTableTermOcc :: OccName -> Maybe OccName
 sourceTableTermOcc occ
+  | isTcOcc occ, Just rest <- stripPrefix "T:field:" (occNameString occ)
+  , [(parent, ':' : selector)] <- reads rest
+  = Just (mkOccName (fieldName (mkFastString parent)) selector)
   | isTcOcc occ, 'T':':':term <- occNameString occ = Just (mkVarOcc term)
   | otherwise = Nothing
 

@@ -1345,7 +1345,9 @@ lookupSourceTables legacy_identity (gbl, lcl) term_rdr
     candidate gre = (gre,) <$> table (greName gre)
 
     table term
-      | isVarOcc (nameOccName term), Just mod <- nameModule_maybe term = do
+      | let occ = nameOccName term
+      , isVarOcc occ || isFieldOcc occ
+      , Just mod <- nameModule_maybe term = do
           env <- getGblEnv
           let occ = mkSourceTableOcc (nameOccName term)
           if mod == tcg_semantic_mod env

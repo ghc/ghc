@@ -1181,7 +1181,7 @@ instance Diagnostic TcRnMessage where
            text "A type case needs a supported position in a top-level type synonym, a closed type family equation RHS, a top-level value signature, or a constructor field."
     TcRnTypeLambdaContext
       -> mkSimpleDecorated $
-           text "A type lambda needs a supported position in a top-level type synonym, the right-hand side of a type family equation, a value signature, an expression type annotation, or an ordinary constructor field."
+           text "A type lambda needs a supported position in a top-level type synonym, the right-hand side of a type family equation, a value signature, an expression type annotation, a complete visible type argument, or an ordinary constructor field."
            $$ text "A local signature can use a type lambda during ordinary compilation when GHC can copy the kinds of its captures, or infer their kinds and check the body in that scope."
 
     TcRnInvalidVisibleKindArgument arg ty
@@ -3956,6 +3956,23 @@ pprRetainedQuantificationError reason = case reason of
          , text "Retained fields require variables, wildcards, or constructor patterns for their index domain."
          , text "A retained variable or wildcard can be parenthesized or have a bang. Fields of an index constructor must be bare variables or wildcards."
          , text "Lazy patterns and pattern bindings are not supported yet." ]
+  RetainedRecordConstruction con (Just witness) ->
+    fsep [text "Constructor" <+> quotes (ppr con),
+          text "requires witness field" <+> quotes (ppr witness) <> dot]
+  RetainedRecordConstruction con Nothing ->
+    text "Supply positional arguments to constructor" <+> quotes (ppr con) <> dot
+  RetainedRecordDeclaration ->
+    text "Each payload field of a retained record must use the first field as its final type argument."
+  RetainedRecordPatternOrder ->
+    text "Match the fields of a retained record in declaration order."
+  RetainedRecordUpdate ->
+    vcat [ text "Record update of a retained record can replace one payload field."
+         , text "To replace its witness, also replace every payload field." ]
+  RetainedRecordUpdateWitness con witness missing ->
+    hang (fsep [ text "Updating witness field", quotes (ppr witness)
+               , text "of constructor", quotes (ppr con) ]) 2 $
+      fsep [ text "requires replacement", text "for field" <> plural missing
+           , pprQuotedList missing <> dot ]
 
 pprTcRnBadlyLevelled :: LevelCheckReason -> Set.Set ThLevelIndex -> ThLevelIndex -> Maybe ErrorItem -> DecoratedSDoc
 pprTcRnBadlyLevelled reason bind_lvls use_lvl lift_attempt = mkDecorated $
@@ -8235,6 +8252,7 @@ pprTHReifyError = \case
            FirstClassExistential   -> (False, text "first-class existential type")
            MachineIntTypeLiteral   -> (False, text "machine integer type literal")
            InteriorConstructorContext -> (False, text "constructor with an interior context")
+           NamedRetainedRecordCon  -> (False, text "a named retained record constructor")
 
 pprTypedTHError :: TypedTHError -> DecoratedSDoc
 pprTypedTHError = \case
