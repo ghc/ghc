@@ -33,7 +33,7 @@ NativeTypeNumeralWrong.hs:27:27: error: [GHC-83865]
           wrongGrouping rows cols = replicateNative (1 + rows * cols) True
 
 NativeTypeNumeralWrong.hs:33:8: error: [GHC-05617]
-    • Could not deduce ‘plus cells (S Z) ~ S (times height width)’
+    • Could not deduce ‘plus cells (S Z) ~ S cells’
       from the context: cells ~ times height width
         bound by a type expected by the context:
                    (cells ~ times height width) =>
