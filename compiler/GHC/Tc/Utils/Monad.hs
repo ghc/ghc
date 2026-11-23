@@ -22,7 +22,7 @@ module GHC.Tc.Utils.Monad(
   tcWithPartialSigContext, getPartialSigPredicates,
   updTopFlags,
   getEnvs, setEnvs, updEnvs, restoreEnvs,
-  xoptM, doptM, goptM, woptM,
+  xoptM, unsaturatedTypeFamiliesEnabled, doptM, goptM, woptM,
   setXOptM, setWOptM,
   unsetXOptM, unsetGOptM, unsetWOptM,
   whenDOptM, whenGOptM, whenWOptM,
@@ -739,6 +739,12 @@ the /parent/ context these mutable collection IORefs:
 
 xoptM :: LangExt.Extension -> TcRnIf gbl lcl Bool
 xoptM flag = xopt flag <$> getDynFlags
+
+-- | Keep the umbrella's existing admission without applying the standalone
+-- extension's TypeFamilies and printing implications to umbrella modules.
+unsaturatedTypeFamiliesEnabled :: TcM Bool
+unsaturatedTypeFamiliesEnabled =
+  xoptM LangExt.UnsaturatedTypeFamilies <||> xoptM LangExt.ExperimentalDependentTypes
 
 doptM :: DumpFlag -> TcRnIf gbl lcl Bool
 doptM flag = do

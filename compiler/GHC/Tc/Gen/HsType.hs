@@ -1611,10 +1611,10 @@ No new inference follows from the result of applying the callback.
 -- [Inferred closed family callback arrows].
 tcCheckInferredFamilyRhs :: LHsType GhcRn -> TcKind -> TcM TcType
 tcCheckInferredFamilyRhs rhs kind = do
-  experimental <- xoptM LangExt.ExperimentalDependentTypes
+  enabled <- unsaturatedTypeFamiliesEnabled
   poly_kinds <- xoptM LangExt.PolyKinds
   let arrows
-        | experimental && poly_kinds = InferUnsignedFamilyArrows
+        | enabled && poly_kinds = InferUnsignedFamilyArrows
         | otherwise = DefaultUnsignedFamilyArrows
   addTypeCtxt (familyRhsForContext rhs) $
     tc_check_lhs_type (typeLevelMode {mode_callback_arrow = arrows}) rhs kind
@@ -1623,8 +1623,8 @@ tcCheckInferredFamilyRhs rhs kind = do
 -- See Note [Callback kinds in checked family equations].
 tcCheckFamilyRhs :: LHsType GhcRn -> TcKind -> TcM TcType
 tcCheckFamilyRhs rhs kind = do
-  experimental <- xoptM LangExt.ExperimentalDependentTypes
-  if experimental
+  enabled <- unsaturatedTypeFamiliesEnabled
+  if enabled
      then addTypeCtxt (familyRhsForContext rhs) $
           tc_check_lhs_type (typeLevelMode {mode_callback_arrow = CheckFamilyRhsArrows}) rhs kind
      else tcCheckLHsTypeInContext rhs (TheKind kind)
@@ -3329,7 +3329,7 @@ tc_app_ty_with_head mode rn_ty exp_kind fun_ty
              expected_kind = checkingExpType_maybe exp_kind
        ; (prefix, prefix_kind) <- tcInferTyApps_nosat index_level expected_kind mode hs_fun_ty fun_ty hs_args
        -- See Note [saturateFamApp] for a checked partial family.
-       ; allow_partial <- xoptM LangExt.ExperimentalDependentTypes
+       ; allow_partial <- unsaturatedTypeFamiliesEnabled
        ; (ty, inferred_kind) <- case (exp_kind, tcSplitTyConApp_maybe prefix) of
            (Check expected, Just (tc, args))
              | allow_partial, isPartialTypeFunction tc args
@@ -4700,7 +4700,7 @@ tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
              , isUnsaturatedUserFamily tc []
              , all is_par orig_hs_args
              , invisibleBndrCount expected == invisibleBndrCount (typeKind fun)
-             -> xoptM LangExt.ExperimentalDependentTypes
+             -> unsaturatedTypeFamiliesEnabled
            _ -> pure False
        ; fun <- case (mode_synonym_metadata mode, fun) of
            _ | keep_inferred_prefix -> pure fun
@@ -4952,7 +4952,7 @@ tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
           , Nothing <- mode_holes mode
           , HsValArg{} : _ <- dropWhile is_par all_args
           , substTy subst (tyVarKind tv) `tcEqType` matchabilityTy
-          = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+          = do { enabled <- unsaturatedTypeFamiliesEnabled
                ; if not enabled
                  then default_binder tv
                  else do

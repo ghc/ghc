@@ -2822,6 +2822,8 @@ extensionEffect = \case
     -> setIncoherentInsts
   LangExt.DerivingVia
     -> setDeriveVia
+  LangExt.UnsaturatedTypeFamilies
+    -> \enabled -> when enabled (setGeneralFlag Opt_PrintExplicitMatchabilities)
   _ -> nop
 
 -- | Things you get with `-dlint`.

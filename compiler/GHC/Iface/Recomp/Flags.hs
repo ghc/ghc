@@ -48,7 +48,9 @@ fingerprintDynFlags hsc_env this_mod nameio =
 
         -- all the extension flags and the language
         lang = fmap IfaceLanguage language
-        exts = map IfaceExtension $ EnumSet.toList extensionFlags
+        -- See Note [Fingerprinting UnsaturatedTypeFamilies].
+        exts = map IfaceExtension $
+               filter (/= LangExt.UnsaturatedTypeFamilies) (EnumSet.toList extensionFlags)
 
         -- avoid fingerprinting the absolute path to the directory of the source file
         -- see Note [Implicit include paths]
@@ -119,11 +121,25 @@ fingerprintDynFlags hsc_env this_mod nameio =
 
         -- See Note [Recompiling ordinary pair producers]
         -- and Note [Opting in to checked source equations].
-        fp | xopt LangExt.ExperimentalDependentTypes dflags = computeFingerprint nameio f
-           | gopt Opt_WriteSourceEquations dflags =
-               computeFingerprint nameio (f, "write-source-equations-v1" :: String)
-           | otherwise = computeFingerprint nameio (f, "ordinary-pair-equations-v1" :: String)
+        base_fp | xopt LangExt.ExperimentalDependentTypes dflags = computeFingerprint nameio f
+                | gopt Opt_WriteSourceEquations dflags =
+                    computeFingerprint nameio (f, "write-source-equations-v1" :: String)
+                | otherwise = computeFingerprint nameio (f, "ordinary-pair-equations-v1" :: String)
+
+        -- See Note [Fingerprinting UnsaturatedTypeFamilies].
+        fp | xopt LangExt.UnsaturatedTypeFamilies dflags =
+               computeFingerprint nameio (base_fp, "unsaturated-type-families-v1" :: String)
+           | otherwise = base_fp
     in (fp, f)
+
+{- Note [Fingerprinting UnsaturatedTypeFamilies]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The standalone flag can change inferred kinds and which applications the
+compiler accepts. Include it in the self-recompilation hash. The resulting
+kinds and partial applications use the existing interface format. Keep
+the new extension's enum tag out of IfaceDynFlags so a reader that
+supports those types can still read the interface.
+-}
 
 {- Note [Opting in to checked source equations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

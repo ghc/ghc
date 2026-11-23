@@ -1538,7 +1538,7 @@ check_syn_tc_app (ve@ValidityEnv{ ve_ctxt = ctxt, ve_expand = expand })
   = failWithTc (TcRnConstrainedFamilyUnsupported tc reason)
 
   | isPartialTypeFunction tc tys
-  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+  = do { enabled <- unsaturatedTypeFamiliesEnabled
        ; if enabled || ve_imported_synonym ve || is_inferred ctxt
            then check_args_only expand
            else case expand of
@@ -1589,8 +1589,10 @@ reportWrittenPartialFamily tc args = do
   case writtenSpans contexts of
     [Just loc] -> do
       unit_state <- hsc_units <$> getTopEnv
-      let hint = useExtensionInOrderTo (text "to write a partial type family application.")
-                                      LangExt.ExperimentalDependentTypes
+      let entity | isTypeSynonymTyCon tc = "type synonym"
+                 | otherwise = "type family"
+          hint = useExtensionInOrderTo (text "to write a partial" <+> text entity <+> text "application.")
+                                       LangExt.UnsaturatedTypeFamilies
       setSrcSpan loc $ failWithTc $
         TcRnMessageWithInfo unit_state (mkDetailedMessage (ErrInfo [] Nothing [hint]) message)
     _ -> failWithTc message

@@ -179,6 +179,7 @@ extensionName = \case
   LangExt.UnliftedDatatypes -> "UnliftedDatatypes"
   LangExt.BangPatterns -> "BangPatterns"
   LangExt.TypeFamilies -> "TypeFamilies"
+  LangExt.UnsaturatedTypeFamilies -> "UnsaturatedTypeFamilies"
   LangExt.TypeFamilyDependencies -> "TypeFamilyDependencies"
   LangExt.TypeInType -> "TypeInType"               -- Deprecated
   LangExt.OverloadedStrings -> "OverloadedStrings"
@@ -311,6 +312,7 @@ impliedXFlags
     , (LangExt.FunctionalDependencies,    On LangExt.MultiParamTypeClasses)
     , (LangExt.MultiParamTypeClasses,     On LangExt.ConstrainedClassMethods)  -- c.f. #7854
     , (LangExt.TypeFamilyDependencies,    On LangExt.TypeFamilies)
+    , (LangExt.UnsaturatedTypeFamilies,   On LangExt.TypeFamilies)
 
     , (LangExt.RebindableSyntax, Off LangExt.ImplicitPrelude)      -- NB: turn off!
 

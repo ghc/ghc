@@ -2706,10 +2706,8 @@ signatures and TypeLevel defaults keep their own rules.
 
 -- | Enable inference of a synonym's higher-order argument matchability.
 generaliseSynonymCallbackArrows :: TcM Bool
-generaliseSynonymCallbackArrows = do
-  experimental <- xoptM LangExt.ExperimentalDependentTypes
-  liberal <- xoptM LangExt.LiberalTypeSynonyms
-  pure (experimental || liberal)
+generaliseSynonymCallbackArrows =
+  unsaturatedTypeFamiliesEnabled <||> xoptM LangExt.LiberalTypeSynonyms
 
 ------------------------------------------------------------------------
 kcLTyClDecl :: Bool -> LTyClDecl GhcRn -> TcM (Maybe (Name, SynonymMetadata))
@@ -2774,10 +2772,10 @@ kcTyClDecl (DataDecl { tcdLName    = (L _ _name)
        -- (conceivably) shadowed.
     do { traceTc "kcTyClDecl" (ppr tycon $$ ppr (tyConTyVars tycon) $$ ppr (tyConResKind tycon))
        ; _ <- tcHsContext ctxt
-       ; experimental <- xoptM LangExt.ExperimentalDependentTypes
+       ; enabled <- unsaturatedTypeFamiliesEnabled
        ; poly_kinds <- xoptM LangExt.PolyKinds
        ; let check_field
-               | experimental && poly_kinds =
+               | enabled && poly_kinds =
                    tcCheckDatatypeField (mkNameSet (map fst (tcTyConScopedTyVars tycon)))
                | otherwise = tcCheckLHsTypeInContext
        ; kcConDeclsWith check_field (tyConResKind tycon) cons
