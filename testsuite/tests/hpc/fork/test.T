@@ -9,5 +9,7 @@ test('hpc_fork',
       # and #8862.
       req_process,
       omit_ways(prof_ways),
-      cmd_prefix(hpc_prefix)],
+      cmd_prefix(hpc_prefix),
+      # The threaded nonmoving-gc doesn't support forkProcess. See #27547
+      omit_ways(['nonmoving_thr', 'nonmoving_thr_ghc', 'nonmoving_thr_sanity'])],
      compile_and_run, ['-fhpc'])
