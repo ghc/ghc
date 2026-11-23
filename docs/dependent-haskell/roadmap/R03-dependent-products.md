@@ -34,7 +34,13 @@ package, or the lexical `mapper` in the first signature, failed to match.
 Both forms use one new interface feature for the defining name. A reader
 can then build an application with the usual interface syntax. Job 1243
 verified that the previous compiler rejects the new feature and reads
-unaffected interfaces. These component results still need a normal build.
+unaffected interfaces. The combined normal compiler at `fc2186e9cb`
+passed the named-callback registrations and the strict callback
+client. The independent release candidate checks
+`spaceDecision :: foreach (c :: Char) -> Decision Char.isSpace (Char.isSpace c)`.
+An ordinary source-hidden client classified a space, an `x` and a tab.
+It printed `[True,False,True]` at `-O0` and default `-O2`. The interface
+records the same defining name in both index positions.
 [Design sources](../REFERENCES.md#imported-functions-in-retained-indices).
 
 ## Supported subset and evidence

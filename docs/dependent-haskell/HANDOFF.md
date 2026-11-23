@@ -109,10 +109,30 @@ and in GHCi on this component. The keyed-tree regression also passed
 at `-O2`. The combined checkout at `fc2186e9cb` in
 `r03-r21-r41-integration-20261123/source` includes the tree series,
 the R03 CorePrep correction and the R41 scoping fixtures. Job 1320
-builds both stages. Job 1321 checks 99 registrations, the 556-line
-Showcase, proof clients and interface readers. Jobs 1304 and 1305
-ended before starting when their prerequisite failed. The source ref
-is `r03-r21-r41-scoping-556` under the 23 November archive.
+built both stages. Job 1321 passed the 556-line Showcase at native
+`-O0` and in GHCi, the 17 callback observations, the installed tree
+client, rule and proof upgrades, constructor matrices and interface readers.
+Of 99 registrations, 98 passed. The merge had restored an obsolete
+stderr file for `GadtEmptyRequiredOff`. Job 1343 passed the unchanged
+test on the same compiler after removing that file. The fix is archived
+as `r03-r21-r41-verified-tests-556`. Default `-O2` still rejects the
+filter proof in the Showcase and the `map` and append proofs in the
+HaskLib package test. Keep this combined compiler private.
+
+The independent R03 release candidate is `b2cda4061d` in
+`r03-named-callbacks-normal-554-20261123/source`, archived as
+`r03-named-callbacks-normal-554`. It starts from the published R41
+compiler. Its new example records `Data.Char.isSpace` and its result
+in a decision type. It also contains the tested diagnostic correction
+for an implicit wildcard binder. Job 1345 builds both stages. Job 1346
+checks 95 registrations, 554 Showcase outputs and old and new readers.
+
+Job 1335 used installed HaskLib on `4d10fdc35f` to check the
+[append counterexample](roadmap/R16-open-term-evaluator.md#append-fusion-and-an-undefined-right-list).
+The private guard rejected the proof at default `-O2`. The public R41
+compiler still accepts it. Job 1338 separately verified that GHCi
+shows constructor argument order from the published R41 interfaces.
+This supersedes stashed job 1273.
 
 The local archive refs `r19-r41-normal-552`, `r16-hasklib-tree-553`
 and `r27-legacy-transition-normal` are under
@@ -387,4 +407,9 @@ a built executable and a passing Showcase answer different questions.
 After qualification, update this handoff and [the checkpoint record](CHECKPOINTS.md).
 Keep the Git revisions, the commands and any outstanding failure. Release
 superseded build products after their final consumer finishes. The main
-`_build` cleanup threshold is 200 GB. [Retention rules](CHECKPOINTS.md#clean-up-after-each-experiment).
+`_build` cleanup threshold is 200 GB. After R41, retirement removed
+700,309,504 bytes of superseded relinks and guide caches and
+4,672,086,016 bytes of archived comparison-build intermediates. Job 1341
+checked native linking and GHCi on both preserved installations.
+See `retirement-r41-release-20261123` for paths and receipts.
+[Retention rules](CHECKPOINTS.md#clean-up-after-each-experiment).

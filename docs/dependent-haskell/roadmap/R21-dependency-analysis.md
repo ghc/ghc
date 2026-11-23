@@ -499,3 +499,9 @@ out of scope for an earlier proof. The checker rejected a mapper that
 changed the key type and a proof with one extra branch. Ordinary workers
 over a dependent kind still compiled. The tests also cover a recursive
 call on a reconstructed tree instead of a direct subtree.
+
+Job 1321 passed `NativeLocalTree` on normal compiler `fc2186e9cb`.
+Its 556-line Showcase ran at native `-O0` and in GHCi. The keyed-tree
+observation returned `(1,Refl,Just (9,'y','n'))`. It kept the branch
+key while mapping both leaf values. The combined compiler is awaiting
+the separate optimized list-proof work.

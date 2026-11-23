@@ -142,11 +142,12 @@ source examples. General promotion remains open.
 | --- | --- | --- |
 | [R16 Open evaluation](roadmap/R16-open-term-evaluator.md#optimized-clients-of-the-filter-proof) | Use HaskLib's `lengthMap` proof with default optimization. | Check the specific observation `size (map f xs)` against the installed rules. A client must still reject a rule that drops a cell or changes the observer. Verify that a separately compiled forwarder preserves the check. |
 | [R03 Dependent products](roadmap/R03-dependent-products.md#private-check-for-an-imported-function-in-an-index) | Export a retained index that names an ordinary imported function, either alone or applied to an argument. | Run the normal compiler with a source-hidden client. A re-export must preserve identity. A lexical binder and a same-spelled function in a different unit must remain distinct. Check old readers on changed and unaffected interfaces. |
-| [R21 Declaration dependencies](roadmap/R21-dependency-analysis.md#a-tree-with-two-type-parameters) | Qualify the two-parameter tree proof on a normal compiler. Both declaration orders and separately compiled workers pass on a private compiler component. | Repeat the keyed-tree client, wrong proof and splice boundaries on the integrated compiler. Compare the native and GHCi Showcase output. |
+| [R21 Declaration dependencies](roadmap/R21-dependency-analysis.md#a-tree-with-two-type-parameters) | The keyed-tree proof passes on normal compiler `fc2186e9cb` in both declaration orders and through compiled interfaces. | Publish it with the cross-module proof guard once the optimized HaskLib examples qualify. |
 
-R41 is complete on the fork. R21 and the R03 CorePrep correction share
-the next normal build. R16's installed
-`lengthMap` experiment is on hold. Use the [handoff](HANDOFF.md#current-checkpoint)
+R41 is complete on the fork. R03 has an independent release build.
+R16 has a stock-compiler counterexample to unconditional append fusion.
+The append-singleton case has a defined seed and still needs a check
+of the client's rewrite rules. Use the [handoff](HANDOFF.md#current-checkpoint)
 for the pinned compilers and test jobs.
 
 ### Earlier integration checks
