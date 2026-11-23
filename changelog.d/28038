@@ -1,12 +1,8 @@
 section: compiler
 synopsis:
-  Fix a panic when trying to bind a type variable in patterns.
+  When encountering a required type argument in a pattern binding, don't panic, report an error instead.
 description:
-  GHC currently does not allow to bind type variables in patterns. When
-  a user would try that, in some situations, we didn't abort eagerly
-  enough after discovering the error and thus ran into a panic looking up
-  the type in the env while trying to update the local context. Instead,
-  when discovering the error,
-  we now abort eagerly.
+  GHC does not currently support pattern bindings that bind a required type argument. Now GHC reports an 
+  error in that situation, instead of panicking.
 mrs: !16868
 issues: #28038

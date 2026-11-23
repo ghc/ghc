@@ -1557,8 +1557,8 @@ lookupMBI :: Name -> TcM MonoBindInfo
 lookupMBI name
   = do { mono_id_e <- tcLookupTermBndr name
        ; case mono_id_e of
-         Left _ -> failIllegalTyVar (noUserRdr name)
-         Right mono_id ->
+         TyVarBndr _ -> failIllegalTyVar (noUserRdr name)
+         TermBndr mono_id ->
            return (MBI { mbi_poly_name = name
                        , mbi_sig       = Nothing
                        , mbi_mono_id   = mono_id

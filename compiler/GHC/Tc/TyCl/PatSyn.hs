@@ -652,8 +652,8 @@ collectPatSynArgInfo details =
 tcLookupPatSynArg :: Name -> TcM Id
 tcLookupPatSynArg arg_name
   = do { tcLookupTermBndr arg_name >>= \ case
-         Left (ButATyVar _var) -> failIllegalTyVar (noUserRdr arg_name)
-         Right id -> return id }
+         TyVarBndr{} -> failIllegalTyVar (noUserRdr arg_name)
+         TermBndr id -> return id }
 
 wrongNumberOfParmsErr :: Name -> Arity -> Arity -> TcM a
 wrongNumberOfParmsErr name decl_arity missing
