@@ -86,8 +86,11 @@ findings. The compiler owners write the implementation, tests and benchmarks.
 
 The previous 577 compiler was `893d2ebc06`. Its qualified records are
 in `r04-r16-r17-normal-after-574-20261123/published-qualification.tsv`.
-Recent build retirement manifests are in `retirement-completed-r19-r23-20261123`
-and `retirement-r17-before-578-20261123`.
+The 581 compiler, the omitted-field component and the first display
+component now require rebuilding for a binary replay. Their Git sources,
+logs and results remain available. The exact three generated trees are in
+`retirement-four-finished-warm-trees-20261123/sizes.tsv`.
+The 585 qualification reuses the previous 584 build tree.
 
 ## Previous checkpoints
 
