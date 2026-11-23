@@ -223,3 +223,41 @@ backticked type variable can supply the operator, so the helper
 captures the operator as well as variables from its two operands. A function
 RHS can also mention a multiplicity parameter in its arrow.
 [GHC's infix type syntax](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/infix_tycons.html).
+
+## Using a previous case result as a default
+
+A later case can refer to a type computed by an earlier binding.
+Here the first `width` on the right refers to the Boolean parameter.
+The `Nothing` branch uses the computed width. The `Just` pattern binds
+its own `width` and returns it even if the Boolean parameter is unknown.
+
+```haskell
+type DimensionWithOverride (width :: Bool) (override :: Maybe TypeNats.Nat) =
+  let width = case width of { True -> 3; False -> 2 }
+      result = case override of { Nothing -> width; Just width -> width }
+  in result
+```
+
+The value signature uses the wildcard fallback
+`Just provided -> provided; _ -> width`. Component job 1606 checked
+the result through an ordinary client with only the provider interface.
+The client can prove that an explicit override wins. An attempt to
+prove a particular default with the Boolean still unknown fails.
+[Example](../examples/open-evaluation/TypeLet.hs) and
+[interface and scope checks](../../../testsuite/tests/dependent/should_run/NativeTypeLet.sh).
+
+The renamer passes the earlier result as an argument to the lifted
+family for the later case. A pattern binder shadows that argument
+inside its own branch. This preserves the source scope when GHC moves
+the case to a top-level family. See Note [Lifting type cases]
+in `GHC.Rename.Module`. Agda uses ordered scope for its local
+definitions. Section 4.5 of Eisenberg and Stolarek describes lifting a
+case and passing the in-scope bindings to its generated family.
+[Agda local definitions](https://agda.readthedocs.io/en/v2.8.0/language/let-and-where.html#let-expressions)
+and [Eisenberg and Stolarek](https://richarde.dev/papers/2014/promotion/promotion.pdf).
+
+Job 1598 also checked `let b = G a in Either b b` with `a` still
+abstract on the published 561 compiler. It compiled in a value
+signature, a datatype field, a GADT result index, a type synonym,
+a closed family equation and an open family instance.
+[Six-context regression](../../../testsuite/tests/dependent/should_run/NativeTypeLetContexts.hs).
