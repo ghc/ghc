@@ -2765,8 +2765,18 @@ expandRecordUpd record_expr@(L lspan _) possible_parents rbnds res_ty
                               vcat [ text "record_expr:" <+> ppr record_expr ]
              retained_record (RealDataCon con) = not (null (dataConRepArgBinders con))
              retained_record _ = False
+             supplied = mkNameEnv (zip (map idName sel_ids) rbinds)
 
        ; case (relevant_cons, zip sel_ids rbinds) of
+           (RealDataCon con NE.:| [], _)
+             | let tc = dataConTyCon con
+             , tyConArity tc == 0
+             , [_] <- tyConDataCons tc
+             , Just (witness, payload_types) <- promotedRetainedFields con
+             , witness_field : payload_fields <- dataConFieldLabels con
+             , Just witness_bind <- lookupNameEnv supplied (flSelector witness_field)
+             -> expandRetainedWitnessUpd con witness payload_types witness_field payload_fields
+                  witness_bind supplied record_expr (map idName sel_ids)
            (RealDataCon con NE.:| [], [(sel, L _ field)])
              | retained_record relevant_con
              , DepFunTy DepFunVisible receiver payload_ty <- coreFullView (idType sel)
@@ -2929,25 +2939,58 @@ expandRetainedRecordUpd :: DataCon -> Id -> TcType -> Id
                         -> LHsExpr GhcRn -> LHsExpr GhcRn
                         -> TcM (HsExpr GhcRn, TcType, HsCtxt)
 expandRetainedRecordUpd con receiver payload_ty sel record_expr value = do
-    update <- newSysName (mkVarOcc "update_payload")
     replacement <- newSysName (mkVarOcc "replacement")
     let fresh fld = newSysName (nameOccName (flSelector fld))
     names <- mapM fresh (dataConFieldLabels con)
     let con_name = dataConName con
         result_ty = idType receiver
         signature = mkDepFunTy receiver (mkVisFunTyManyU payload_ty result_ty)
-        update_id = mkLocalId update ManyTy signature
         field_arg fld name
           | flSelector fld == idName sel = (genWildPat, genLHsVar replacement)
           | otherwise = (genVarPat name, genLHsVar name)
         (pats, args) = zipWithAndUnzip field_arg (dataConFieldLabels con) names
-        binding = genSimpleFunBind update [genSimpleConPat con_name pats, genVarPat replacement]
-                    (wrapGenSpan (genHsApps con_name args))
+    expanded <- genRetainedRecordUpd signature
+                  [genSimpleConPat con_name pats, genVarPat replacement]
+                  (genHsApps con_name args) [record_expr, value]
+    pure (expanded, result_ty, RecordUpdCtxt (RealDataCon con NE.:| []) [idName sel] [])
+
+-- | Check every replacement payload at the new witness.
+-- See Note [Replacing a retained record witness].
+expandRetainedWitnessUpd :: DataCon -> Id -> [Type -> Type] -> FieldLabel -> [FieldLabel]
+                         -> LHsRecUpdField GhcTc GhcRn -> NameEnv (LHsRecUpdField GhcTc GhcRn)
+                         -> LHsExpr GhcRn -> [Name]
+                         -> TcM (HsExpr GhcRn, TcType, HsCtxt)
+expandRetainedWitnessUpd con witness payload_types witness_field payload_fields witness_bind supplied record_expr updated = do
+    let (missing, payloads) = partitionWith lookup_payload payload_fields
+        lookup_payload field = case lookupNameEnv supplied (flSelector field) of
+          Just binding -> Right (hfbRHS (unLoc binding))
+          Nothing -> Left (flLabel field)
+        con_name = dataConName con
+        witness_label = flLabel witness_field
+        result_ty = mkTyConTy (dataConTyCon con)
+    unless (null missing) $
+      setSrcSpanA (getLoc (hfbLHS (unLoc witness_bind))) $
+        failWithTc (TcRnRetainedQuantificationError
+          (RetainedRecordUpdateWitness con_name witness_label missing))
+    names <- mapM (newSysName . nameOccName . flSelector) (witness_field : payload_fields)
+    let old_pat = genSimpleConPat con_name (map (const genWildPat) names)
+        signature = mkVisFunTyManyU result_ty $
+          mkDepFunTy witness (mkVisFunTysManyU [ty (TermVarTy witness) | ty <- payload_types] result_ty)
+        arguments = record_expr : hfbRHS (unLoc witness_bind) : payloads
+    expanded <- genRetainedRecordUpd signature (old_pat : map genVarPat names)
+                  (genHsApps con_name (map genLHsVar names)) arguments
+    pure (expanded, result_ty, RecordUpdCtxt (RealDataCon con NE.:| []) updated [])
+
+-- | Apply a generated updater with its checked retained signature.
+genRetainedRecordUpd :: TcType -> [LPat GhcRn] -> HsExpr GhcRn -> [LHsExpr GhcRn]
+                     -> TcM (HsExpr GhcRn)
+genRetainedRecordUpd signature pats rhs args = do
+    update <- newSysName (mkVarOcc "update_payload")
+    let update_id = mkLocalId update ManyTy signature
+        binding = genSimpleFunBind update pats (wrapGenSpan rhs)
         binds = HsValBinds noAnn $ XValBindsLR $
                   HsVBG [(NonRecursive, [binding])] [wrapGenSpan (XSig (IdSig update_id))]
-        body = wrapGenSpan (genHsApps update [record_expr, value])
-        ctxt = RecordUpdCtxt (RealDataCon con NE.:| []) [idName sel] []
-    pure (genHsLet (wrapGenSpan binds) body, result_ty, ctxt)
+    pure (genHsLet (wrapGenSpan binds) (wrapGenSpan (genHsApps update args)))
 
 {- Note [Updating a retained record payload]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2963,8 +3006,27 @@ The retained match then refines the replacement type to the constructor's
 witness. The update reuses the other fields without forcing their values.
 Use the selector's checked type after field disambiguation, so the receiver
 in the replacement type has the same witness projection as source code.
-This rule handles one payload field. The witness itself has an ordinary
-selector, and cannot select this rule.
+This rule handles one payload field at the old witness. See
+Note [Replacing a retained record witness] for updates of the witness.
+-}
+
+{- Note [Replacing a retained record witness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When the update writes the witness, require a replacement for every
+payload. The old payload types use the old witness. No evidence relates
+the old witness to the new one. For a record with two payloads, generate
+the following function and apply it to the receiver and replacements:
+
+  update :: NamedColumns -> foreach (n :: Nat)
+         -> Vec Char n -> Vec Bool n -> NamedColumns
+  update (NamedColumns _ _ _) n xs ys = NamedColumns n xs ys
+
+Order the arguments by the constructor fields, even if the source lists
+them in a different order. The retained application checks each payload
+at the new witness. The old constructor pattern demands the receiver
+but keeps its fields lazy. The replacement patterns follow ordinary
+argument demand, including Strict. Keep the arguments unrestricted, as
+in the ordinary record update path.
 -}
 
 

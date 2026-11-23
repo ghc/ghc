@@ -5460,6 +5460,7 @@ data RetainedQuantificationError
   | RetainedRecordConstruction Name (Maybe FieldLabelString)
   | RetainedRecordPatternOrder
   | RetainedRecordUpdate
+  | RetainedRecordUpdateWitness Name FieldLabelString [FieldLabelString]
   | RetainedUncoveredConstructors Name [Name]
   | RetainedMissingEquation Name
   | RetainedTypeOperandContext (Maybe Type)

@@ -18,6 +18,7 @@ for opt in -O0 -O2; do
     test ! -e NamedSiblingColumns.hs
     cat > Main.hs <<'HS'
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes, OverloadedRecordDot #-}
+import Control.Exception (ErrorCall, evaluate, try)
 import NamedSiblingColumns
 import PackedVecLibrary (Nat(..), Vec(..), natToInt, toList, zipVec)
 
@@ -37,6 +38,9 @@ negateFlags p = p { namedFlags = negateVec (namedFlags p) }
 omitFlags :: NamedColumns -> NamedColumns
 omitFlags p = p { namedFlags = undefined }
 
+emptyRecord :: NamedColumns -> NamedColumns
+emptyRecord p = p { namedFlags = VNil, storedLength = Z, namedLetters = VNil }
+
 main :: IO ()
 main = do
     let p = NamedColumns { namedFlags = VCons True VNil
@@ -52,23 +56,33 @@ main = do
     print (readOnlyFlags (negateFlags (NamedColumns (S Z) undefined (VCons True VNil))))
     let r = omitFlags p
     print (toList (namedLetters r))
+    let empty = emptyRecord p
+    print (natToInt (storedLength empty), readPairs empty)
+    let noOldPayloads = emptyRecord (NamedColumns (S Z) undefined undefined)
+    print (readPairs noOldPayloads)
+    oldBottom <- try (evaluate (emptyRecord undefined)) :: IO (Either ErrorCall NamedColumns)
+    print (either (const True) (const False) oldBottom)
 HS
     "${ghc[@]}" "$opt" -c Main.hs
     "${ghc[@]}" Main.o ../provider/{PackedVecLibrary,NamedSiblingColumns}.o -o observe
     timeout 15 ./observe > actual
-    printf '%s\n' "[('r',True)]" "0" '[True]' "(1,[('r',False)])" '[False]' '"r"' | cmp - actual
+    printf '%s\n' "[('r',True)]" "0" '[True]' "(1,[('r',False)])" '[False]' '"r"' \
+        '(0,[])' '[]' 'True' | cmp - actual
 
     cat > ProjectionType.hs <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes #-}
 module ProjectionType where
 import NamedSiblingColumns
-import PackedVecLibrary (Vec)
+import PackedVecLibrary (Nat, Vec)
 
 checked :: foreach (p :: NamedColumns) -> Vec Char (storedLength p)
 checked p = namedLetters p
 
 replaceFlags :: foreach (p :: NamedColumns) -> Vec Bool (storedLength p) -> NamedColumns
 replaceFlags p flags = p { namedFlags = flags }
+
+replaceAll :: NamedColumns -> foreach (n :: Nat) -> Vec Char n -> Vec Bool n -> NamedColumns
+replaceAll p n letters flags = p { storedLength = n, namedLetters = letters, namedFlags = flags }
 HS
     "${ghc[@]}" "$opt" -c ProjectionType.hs
 
@@ -226,7 +240,68 @@ import PackedVecLibrary (Nat(..))
 wrong :: NamedColumns -> NamedColumns
 wrong p = p { storedLength = Z }
 HS
-    reject 'Record update.*retained' BadUpdate.hs
+    reject 'GHC-83605' BadUpdate.hs
+    grep -Fq 'BadUpdate.hs:6:15:' rejected.log
+    grep -Eq 'requires replacement for fields .*namedLetters.*namedFlags' rejected.log
+
+    cat > MissingChangedPayload.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module MissingChangedPayload where
+import NamedSiblingColumns
+import PackedVecLibrary (Nat(..), Vec(..))
+
+wrong :: NamedColumns
+wrong =
+  let old = NamedColumns (S Z) (VCons 'x' VNil) (VCons True VNil)
+  in old { storedLength = Z, namedFlags = VNil }
+HS
+    reject 'GHC-83605' MissingChangedPayload.hs
+    grep -Fq 'MissingChangedPayload.hs:9:12:' rejected.log
+    grep -Eq 'Updating witness field .*storedLength.*of constructor .*NamedColumns' rejected.log
+    grep -Eq 'requires replacement for field .*namedLetters' rejected.log
+
+    cat > WrongNewPayload.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module WrongNewPayload where
+import NamedSiblingColumns
+import PackedVecLibrary (Nat(..), Vec(..))
+
+wrong :: NamedColumns -> NamedColumns
+wrong p = p { storedLength = Z
+            , namedLetters = VCons 'x' VNil
+            , namedFlags = VNil }
+HS
+    reject 'GHC-(05617|83865)' WrongNewPayload.hs
+    grep -Fq 'WrongNewPayload.hs:8:30:' rejected.log
+
+    cat > StrictUpdate.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes, Strict #-}
+module Main where
+import Control.Exception (ErrorCall, evaluate, try)
+import NamedSiblingColumns
+import PackedVecLibrary (Nat(..), Vec(..))
+
+clear :: NamedColumns -> NamedColumns
+clear p = p { storedLength = Z, namedLetters = undefined, namedFlags = VNil }
+
+data Ordinary = Ordinary { field :: ~Bool }
+update :: Ordinary -> Ordinary
+update p = p { field = undefined }
+
+checkDemand :: a -> IO ()
+checkDemand ~value = do
+    forced <- try (evaluate value >> pure ()) :: IO (Either ErrorCall ())
+    print (either (const True) (const False) forced)
+
+main :: IO ()
+main = do
+    checkDemand (clear (NamedColumns Z VNil VNil))
+    checkDemand (update (Ordinary False))
+HS
+    "${ghc[@]}" "$opt" -c StrictUpdate.hs
+    "${ghc[@]}" StrictUpdate.o ../provider/{PackedVecLibrary,NamedSiblingColumns}.o -o strict-update
+    timeout 15 ./strict-update > actual
+    printf '%s\n' 'True' 'True' | cmp - actual
 
     cat > BadPayloadUpdate.hs <<'HS'
 {-# LANGUAGE NoExperimentalDependentTypes #-}
