@@ -51,28 +51,36 @@ module Main where
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
-import NativeTypeLambdaEta (reverseMap, visible)
+import NativeTypeLambdaEta (overRoute, partialStage, reverseMap, routed, visible)
 
 fromImportedProof :: forall (xs :: [Type]). Proxy xs -> Int
 fromImportedProof witness =
   case reverseMap @Int @xs witness of
     Refl -> visible
 
+fromRoute :: forall (flag :: Bool). Proxy flag -> (Int, Int)
+fromRoute _ =
+  case partialStage @Int Proxy of
+    Refl -> case overRoute @Int @flag Proxy of
+      Refl -> (fromImportedProof (Proxy @'[Bool]), routed)
+
 main :: IO ()
-main = print (fromImportedProof (Proxy @'[Bool]))
+main = print (fromRoute (Proxy @'True))
 HS
                 test ! -e NativeTypeLambdaEta.hs
                 "${run[@]}" "-$opt" -ddump-inlinings -dsuppress-uniques -c Main.hs >reader.log 2>&1
                 if [[ "$opt" == O2 ]]; then
-                    grep -Eq 'Inlining done: (NativeTypeLambdaEta\.)?reverseMap' reader.log
+                    for proof in reverseMap partialStage overRoute; do
+                        grep -Eq "Inlining done: (NativeTypeLambdaEta\.)?$proof" reader.log
+                    done
                 fi
                 "${run[@]}" "-$opt" Main.o NativeTypeLambdaEta.o NativeTypeLambdaEtaLib.o -o eta
-                printf '42\n' | cmp - <(./eta)
+                printf '(42,42)\n' | cmp - <(./eta)
             )
         fi
 
         cp "$root/NativeTypeLambdaEtaReject.hs" .
-        for reject in WRONG_CAPTURE REORDERED CONSTANT INVERSE MATCHABLE FALLBACK; do
+        for reject in WRONG_CAPTURE WRONG_SPINE_CAPTURE REORDERED CONSTANT INVERSE MATCHABLE FALLBACK; do
             status=0
             "${run[@]}" "-$opt" "-D$reject" -c NativeTypeLambdaEtaReject.hs >"$reject.log" 2>&1 || status=$?
             printf '%s\t%s\t%s\n' "$opt" "$reject" "$status" >>"$result"

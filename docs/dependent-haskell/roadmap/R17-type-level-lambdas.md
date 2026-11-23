@@ -224,6 +224,20 @@ The example enables `UndecidableInstances` because the generated family
 calls `Stamp` with arguments the same size as its own.
 [Forwarding regression](../../../testsuite/tests/dependent/should_run/NativeTypeLambdaEta.hs).
 
+The same conversion applies to a captured callback in a partially
+applied family. Here `Stage` still needs its cell argument.
+
+```haskell
+throughStage :: forall tag. Ticket (Stage (Stamp tag)) -> Int
+throughStage ticket = choose @(Stage (\cell -> Stamp tag cell)) ticket
+```
+
+A family can also return a callback. The check can compare
+`Route (Stamp tag) flag Bool` with the forwarding form when `flag`
+is unknown. Both types have the same family head and the same
+arguments after the callback. The compiler can prove their equality
+without selecting a family equation.
+
 At `-O0` and `-O2`, the source-hidden reader prints `42`. The optimized
 reader also inlines the imported equality proof. Interfaces that contain
 that proof require `scoped-lambda-eta-v1`. An older reader still accepts
