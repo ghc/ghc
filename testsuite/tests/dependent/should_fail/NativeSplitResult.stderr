@@ -13,7 +13,7 @@ NativeSplitResult.hs:12:41: error: [GHC-83865]
                      with: plus n1 other
       Expected: Vec Bool (Add n1 other)
         Actual: Vec Bool (Add n1 m1)
-      Note: ‘plus’ is a non-injective type family.
+      Note: GHC cannot determine the arguments of the function ‘plus’ from its result.
     • In the second argument of ‘splitAtVec’, namely ‘xs’
       In the expression: splitAtVec n xs
       In an equation for ‘wrongSuffix’:

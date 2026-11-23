@@ -6074,6 +6074,9 @@ pprAmbiguityInfo (NonInjectiveTyFam tc)
   = note $ text "GHC cannot infer the captured indices of this retained sum from its payload type"
   | Just source <- liftedTypeContext (tyConName tc)
   = note $ text "GHC cannot determine the arguments of the" <+> source <+> text "from its result"
+  | Just _ <- sourceTableTermOcc (getOccName tc)
+  = note $ text "GHC cannot determine the arguments of the function"
+           <+> quotes (ppr tc) <+> text "from its result"
   | otherwise
   = note $ quotes (ppr tc) <+> text "is a non-injective type family"
 
