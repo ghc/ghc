@@ -1,11 +1,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ExperimentalDependentTypes #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators #-}
 
-module TypeLambdaQuote (checkedColumns) where
+module TypeLambdaQuote (checkedColumns, labelledColumn) where
 
+import Data.Kind (Type)
 import Data.Type.Equality ((:~:)(Refl))
 import TypeLambda (Fields(..), Map)
 
@@ -22,3 +24,12 @@ checkedColumns :: Fields '[Either String Int, Either String Bool]
 checkedColumns = case columnTypes of
   Refl -> $([| Field (Right 42) (Field (Left "missing flag") End)
                 :: Fields (Map (\cell -> Either String cell) '[Int, Bool]) |])
+
+$([d|
+  -- | Attach a caller-supplied label to the Boolean column.
+  labelledColumn :: forall (label :: Type). label -> Fields '[(label, Bool)]
+  labelledColumn label = attach label
+    where
+      attach :: label -> Fields (Map (\cell -> (label, cell)) '[Bool])
+      attach key = Field (key, True) End
+  |])

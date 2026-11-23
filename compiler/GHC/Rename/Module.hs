@@ -2181,17 +2181,20 @@ rnSrcDeclsWithLambdas sigma named_wildcards lift_cases early_hidden early_scopes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The local signature renamer runs with the enclosing lexical Names in scope.
 Carry their written kinds while renaming the corresponding definitions.
-Select a binder only if its Name is still visible. A shadowing pattern or
-signature can therefore exclude an outer binder with the same occurrence.
-Exclude every enclosing lexical name from implicit quantification in the
-local signature. Only names used in a lambda or its captures' kinds
-become parameters of the helper.
+Resolve unqualified names by their occurrence. A shadowing pattern or
+signature can exclude an outer binder from this lookup. A spliced lambda
+can refer to the outer binder by its exact Name while it remains in scope.
+Look up each spelling in the local environment. Exclude names that belong
+to the local signature's own forall. Only names used in a lambda or its
+captures' kinds become parameters of the helper.
 
 For a capture with a written kind, copy names and applications in
 telescope order. Keep external Names and references to earlier visible
-captures. Leave the signature unchanged when a needed written kind
-cannot be copied. For a capture with no annotation, leave the helper's
-parameter unannotated as in an ordinary type synonym. Also retain the lambda
+captures in the same name form as the copied binder. This keeps two
+distinct exact Names with the same occurrence separate. Leave the
+signature unchanged when a needed written kind cannot be copied. For a
+capture with no annotation, leave the helper's parameter unannotated
+as in an ordinary type synonym. Also retain the lambda
 body so that the signature checker can check the actual capture kinds.
 See Note [Checking local lambda captures] in GHC.Tc.Gen.HsType.
 
@@ -2222,7 +2225,12 @@ rnLocalSignatureLambdas sigma named_wildcards fix_env generated local_lambdas ki
       let formals = case outer of
               HsOuterImplicit{} -> []
               HsOuterExplicit{hso_bndrs = binders} -> mapMaybe hsLTyVarName binders
-          ambient = localSignatureCaptures local formals kinds
+          source_formals = map (mkRdrUnqual . rdrNameOcc) formals
+          source_captures = localSignatureCaptures (mkRdrUnqual . nameOccName) local source_formals kinds
+          exact_captures
+            | any (isExact . unLoc) occurrences = localSignatureCaptures nameRdrName local formals kinds
+            | otherwise = []
+          ambient = source_captures ++ exact_captures
           actuals = [(unLoc name, nameRdrName actual) | ((_, name), actual) <- ambient]
           unavailable =
             [rdr
@@ -2258,10 +2266,10 @@ rnLocalSignatureLambdas sigma named_wildcards fix_env generated local_lambdas ki
       | Just (L _ (XHsType HsTypeLambda{})) <- cast node :: Maybe (LHsType GhcPs) = True
       | otherwise = or (gmapQ hasLambda node)
 
--- | Bind the visible captures in their original dependency order.
-localSignatureCaptures :: LocalRdrEnv -> [RdrName] -> LocalSignatureKinds
+-- | Bind the visible captures in their original dependency order and name form.
+localSignatureCaptures :: (Name -> RdrName) -> LocalRdrEnv -> [RdrName] -> LocalSignatureKinds
                        -> [(LiftedTypeCapture, Name)]
-localSignatureCaptures local formals = catMaybes . snd . mapAccumL copy emptyNameSet
+localSignatureCaptures captureName local formals = catMaybes . snd . mapAccumL copy emptyNameSet
   where
     copy earlier (located, written_kind)
       | rdr `notElem` formals
@@ -2275,7 +2283,7 @@ localSignatureCaptures local formals = catMaybes . snd . mapAccumL copy emptyNam
       | otherwise = (earlier, Nothing)
       where
         name = unLoc located
-        rdr = mkRdrUnqual (nameOccName name)
+        rdr = captureName name
         source = rdr <$ located
 
     copyKind earlier ty = case ignoreParens ty of
@@ -2286,7 +2294,7 @@ localSignatureCaptures local formals = catMaybes . snd . mapAccumL copy emptyNam
       L loc (HsTyVar _ promoted var)
         | let name = getName (unLoc var)
         , name `elemNameSet` earlier
-        -> pure (L loc (HsTyVar noAnn promoted (mkRdrUnqual (nameOccName name) <$ var)))
+        -> pure (L loc (HsTyVar noAnn promoted (captureName name <$ var)))
       kind -> namedSpliceType kind
 
 -- | Lift cases and lambdas from the parsed result of a top-level signature splice.

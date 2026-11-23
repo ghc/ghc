@@ -355,6 +355,9 @@ top-level value signature and an expression quote spliced into a value
 binding can also contain inline lambdas. In the example, the type quote
 proves that the generated schema agrees with a directly mapped row.
 The expression quote produces the row with that type.
+The declaration quote for `labelledColumn` uses a lambda in a local
+signature. It captures the enclosing function's label type by its
+exact name.
 [Source and executable example](../examples/open-evaluation/TypeLambdaQuote.hs).
 
 This follows the Template Haskell translation of a quoted binder
