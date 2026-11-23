@@ -77,6 +77,32 @@ constructor pattern that returns a vector at a caller-chosen index
 still fails.
 [Interface and escape controls](../../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh).
 
+## Package a runtime choice and read its payload
+
+`Message` is `some (flag :: Bool) | Payload flag`. One flag selects an
+integer payload, and the other selects text. The provider's `make`
+returns `Payload flag` at the supplied runtime value. An ordinary client
+packages the two fields without a singleton or a visible type argument.
+
+```haskell
+pack :: Bool -> Message
+pack flag = Pair flag (make flag)
+
+readMessage :: Message -> (Bool, String)
+readMessage (Pair False (Number n)) = (False, show n)
+readMessage (Pair True (Text text))  = (True, text)
+```
+
+The match on the flag determines which payload constructor can occur.
+The client reads the flag from an `IORef`. Reading only the first field
+of a different pair leaves its undefined payload unevaluated. The
+provider and client can be compiled separately. Agda's `Σ` gives
+`snd` a type indexed by `fst`. The Haskell example uses the same
+relationship between the two stored fields in a constructor match.
+[Provider](../examples/packed-vector/RuntimeMessage.hs),
+[ordinary client](../examples/packed-vector/RuntimeMessageClient.hs),
+and [Agda's built-in Σ](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type).
+
 ## Project a payload at the length of its input package
 
 Agda's `Σ` record gives the second projection a result type indexed by
@@ -631,8 +657,16 @@ known result type, including an imported open family that reduces to a
 sum. For example, `consume (Pair True payload)` uses the argument type
 of `consume` to select the erased parameters of `Pair`. GHC checks
 `payload` against the written witness and keeps an ignored field lazy.
-This Quick Look path follows unconstrained family heads. A stuck
-family leaves the constructor application unresolved.
+This Quick Look path can also follow an associated family when its domain
+is already available in the caller's scope. An instance can supply the
+domain, as can a dictionary from a prior GADT match. The compiler checks
+each domain before using that family equation to select the erased
+constructor arguments. Ordinary subsumption still checks the original
+expected result. A stuck family or a missing domain leaves the
+constructor application unresolved. The runtime message example uses both
+domain sources. Its Showcase row selects the text and integer payloads
+and reads another stored flag without evaluating its payload.
+[Ordinary Showcase client](../examples/packed-vector/RuntimeMessageClient.hs).
 
 ## Partition at the original length
 

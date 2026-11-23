@@ -103,6 +103,7 @@ import qualified IndexedMark
 import qualified IndexedVec
 import qualified CertifiedSplitClient
 import qualified CursorClient
+import qualified RuntimeMessageClient
 import qualified RuntimeTypeColumn as Column
 import qualified FinitePositionClient
 import qualified OrdinaryOpenVectorAppend
@@ -421,6 +422,9 @@ vectors = do
         package = PackVec n xs
     observe "IORef length and dependent vector" (renderPacked (repack package))
     observe "nested package/vector patterns" (headPacked package)
+    modeCell <- newIORef True
+    mode <- readIORef modeCell
+    observe "package a runtime mode with its associated payload" (RuntimeMessageClient.observeMessage mode)
     case unconsPacked package of
         Nothing -> fail "expected a nonempty package"
         Just (x, rest) -> observe "uncons retains the runtime predecessor" (x, renderPacked rest)
