@@ -2042,7 +2042,7 @@ sourceCaseTables binds = do
         | generates_code
         , isNothing (sourceTableOccurrence env owner >>= sourceTableId_maybe)
         , Just signature <- constructorCaseType (varType owner)
-        = isTwoStructuralCase signature
+        = isTwoStructuralCase signature || isSizeListCase signature
         | otherwise = False
       final_candidate owner = isJust (list_case_position owner) || indexed_candidate owner ||
                               structural_candidate owner
@@ -2104,7 +2104,7 @@ sourceCaseTables binds = do
                         (directListAppend owner body <|> directListReverseWorker owner (prepare body) <|>
                          checkedTwoListCase public owner (prepare body))) <|>
                       (guard (structural_candidate owner) *>
-                        checkedTwoStructuralCase public owner (prepare body)) <|>
+                        checkedStructuralCase public owner (prepare body)) <|>
                       (guard (fold_candidate owner) *> directListFold owner (prepare body)) <|>
                       (guard (zip_candidate owner) *> checkedListZip public owner (prepare body)) -> do
             table <- publishConstructorCase owner signature rows
@@ -2193,7 +2193,7 @@ sourceCaseTables binds = do
       = publish (publishConstructorRows owner telescope domains result [row])
       | Just (signature, rows) <- checkedConstructorCase public helper owner rhs
       , not (isBinaryListCase signature)
-      , not (isTwoStructuralCase signature)
+      , not (isTwoStructuralCase signature || isSizeListCase signature)
       = publish (publishConstructorCase owner signature rows)
       where
         helper = lookupHelper env imported done
@@ -2218,7 +2218,7 @@ sourceCaseTables binds = do
       = enum_enabled && all enumVisible kinds
       | Just signature@(ConstructorCaseType _ tc _ domains position _) <- constructorCaseType (varType owner)
       , not (isBinaryListCase signature)
-      , not (isTwoStructuralCase signature)
+      , not (isTwoStructuralCase signature || isSizeListCase signature)
       = (position == 1 && (tc == listTyCon || publicCaseType env exported imported tc)) ||
         (nameModule_maybe (tyConName tc) == Just (tcg_semantic_mod env) &&
          publicCaseType env exported (const False) tc) ||
@@ -2711,12 +2711,30 @@ isTwoListCaseTable table =
 -- | Two operands and a result at the same ordinary recursive datatype.
 -- See Note [Checked cases on two structural sizes].
 isTwoStructuralCase :: ConstructorCaseType -> Bool
-isTwoStructuralCase (ConstructorCaseType [] root [] [left, right] 0 result)
-  | left `eqType` result, right `eqType` result
-  , Just fields <- traverse (`openDataConFieldTypes` []) (tyConDataCons root)
-  , lengthIs fields 2, [child] <- concat fields
-  = child `eqType` result
+isTwoStructuralCase (ConstructorCaseType [] root [] [left, right] 0 result) =
+    left `eqType` result && right `eqType` result && isStructuralSize root left
 isTwoStructuralCase _ = False
+
+-- | A structural size bound followed by an ordinary list of the result type.
+-- See Note [Checked cases on a size and a list].
+isSizeListCase :: ConstructorCaseType -> Bool
+isSizeListCase (ConstructorCaseType _ root [] [bound, input] 0 result)
+  | Just (tc, _) <- caseDatatype input
+  = tc == listTyCon && input `eqType` result && isStructuralSize root bound
+isSizeListCase _ = False
+
+isStructuralSize :: TyCon -> Type -> Bool
+isStructuralSize root ty
+  | Just fields <- traverse (`openDataConFieldTypes` []) (tyConDataCons root)
+  , lengthIs fields 2, [child] <- concat fields
+  = child `eqType` ty
+  | otherwise = False
+
+isSizeListCaseTable :: TyCon -> Bool
+isSizeListCaseTable table =
+    isJust (sourceTableTermOcc (nameOccName (tyConName table))) &&
+    isJust (closedFamilyTyConCoAxiom_maybe table) &&
+    maybe False isSizeListCase (constructorCaseType (tyConKind table))
 
 isTwoStructuralCaseTable :: TyCon -> Bool
 isTwoStructuralCaseTable table =
@@ -2777,7 +2795,7 @@ constructorCaseType tau = do
     guard (all isLiftedTypeKind binder_kinds ||
            (isRetainedCaseRoot domain tc && noFreeVarsOfType (mkForAllTys telescope liftedTypeKind)))
     let two_lists = twoListDomains domains
-    if null binders && (two_lists || isTwoStructuralCase signature)
+    if isSizeListCase signature || (null binders && (two_lists || isTwoStructuralCase signature))
       then guard (all (caseKind kinds) args)
       else do
         parameters <- catMaybes <$> traverse (domainParameter (fixedMapTypes signature)) args
@@ -2995,6 +3013,18 @@ empty set of active rewrite rules for this owner.
 
 Ignore debugger breakpoints in both checks. Keep coverage ticks because
 they record evaluation.
+
+Note [Checked cases on a size and a list]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A structural size can bound a recursion over the spine of a list. The
+size and list operands have different types. Keep the ordered case tree:
+the zero branch can skip the list, and the empty-list branch can skip
+the predecessor. Use each operand's own Core binder and constructor
+fields when checking recursive descent. The sum of the sizes of the two
+finite constructor trees must decrease. Publish the equations only for
+a checked ordinary provider, and verify the same equations in final
+Core. The source family uses the same row representation as the size
+and list families.
 -}
 
 {- Note [Nullary indexed source projections]
@@ -4170,7 +4200,7 @@ isFinalCoreListCaseTable :: TyCon -> Bool
 isFinalCoreListCaseTable table =
     isListFoldTable table || isListZipWithTable table ||
     isReverseWorkerTable table || isJust (reverseWrapperWorker table) ||
-    isTwoListCaseTable table
+    isTwoListCaseTable table || isSizeListCaseTable table
 
 -- | Check list tables even if earlier Core simplification dropped Id details.
 -- Structural size tables use the original owner's FinalCoreSourceTable
@@ -4207,8 +4237,8 @@ checkedFinalCaseTable bindings table = isJust $ do
                   check Nothing <|> do
                     worker <- checkedSpecConstrWorker bindings table owner
                     check (Just worker)
-              | isTwoStructuralCaseTable table -> do
-                  (signature, rows) <- checkedTwoStructuralCase (const True) owner rhs
+              | isTwoStructuralCaseTable table || isSizeListCaseTable table -> do
+                  (signature, rows) <- checkedStructuralCase (const True) owner rhs
                   guard (matchesConstructorCase table signature rows)
                   pure (signature, rows)
               | otherwise -> directListReverseWorker owner rhs
@@ -4234,13 +4264,13 @@ checkedTwoListCaseWith specialized public owner rhs = do
     guard (isTwoListCase signature)
     pure (signature, rows)
 
--- | Check the case tree on two values at the same structural size type.
-checkedTwoStructuralCase :: (TyCon -> Bool) -> Id -> Core.CoreExpr
+-- | Check a structural size case that also examines its second operand.
+checkedStructuralCase :: (TyCon -> Bool) -> Id -> Core.CoreExpr
                          -> Maybe (ConstructorCaseType, [ConstructorCaseRow])
-checkedTwoStructuralCase public owner rhs = do
+checkedStructuralCase public owner rhs = do
     checked@(signature, rows) <-
       checkedConstructorCase public (const Nothing) owner (stripTicksE isSourceBreakpoint rhs)
-    guard (isTwoStructuralCase signature && any checks_right rows)
+    guard ((isTwoStructuralCase signature || isSizeListCase signature) && any checks_right rows)
     pure checked
   where
     checks_right (ConstructorCaseRow [_, CaseConstructor{}] _) = True
@@ -4427,7 +4457,7 @@ checkedConstructorCaseWith specialized visible helper owner rhs = do
               [_, other] <- pure terms
               checkedSpecializedCall worker other (mkTyVarTys (binderVars telescope))
                                      patterns aliases expr)
-    rows <- checkedConstructorRows (isTwoListCase signature || isTwoStructuralCase signature) public helper recursive
+    rows <- checkedConstructorRows (multipleCaseOperands signature) public helper recursive
                                   kinds result (map CaseField terms) scrutinee body
     -- The patterns use types from the Core binders. Use the same telescope
     -- for substitution. Keep the owner's declared visibility in the interface.
@@ -4438,7 +4468,8 @@ checkedConstructorCaseWith specialized visible helper owner rhs = do
     checked_signature = constructorCaseType (exprType rhs)
 
     public tc = visible tc || case checked_signature of
-      Just (ConstructorCaseType _ root _ _ _ _) -> root == listTyCon && tc == root
+      Just signature@(ConstructorCaseType _ root _ _ _ _) ->
+        tc == listTyCon && (root == tc || isSizeListCase signature)
       _ -> False
 
     checkedSelfCall signature@(ConstructorCaseType telescope tc args _ position _) terms patterns aliases expr = do
@@ -4450,7 +4481,7 @@ checkedConstructorCaseWith specialized visible helper owner rhs = do
       guard (eqTypes types expected)
       fields <- traverse (\case Core.Var v -> Just (resolveCaseAlias aliases v); _ -> Nothing) operands
       guard (equalLength terms fields)
-      next <- if isTwoListCase signature || isTwoStructuralCase signature
+      next <- if multipleCaseOperands signature
         then do
           checked <- zipWithM recursiveCaseOperand (zip terms patterns) fields
           guard (any fst checked)
@@ -4473,6 +4504,11 @@ checkedConstructorCaseWith specialized visible helper owner rhs = do
       guard (input `eqType` varType field && output `eqType` exprType expr)
       pure (CaseApply carried [CaseField field])
     checkedCallback _ _ _ _ = Nothing
+
+-- | Check more than one structural operand and allow each to decrease.
+multipleCaseOperands :: ConstructorCaseType -> Bool
+multipleCaseOperands signature =
+    isTwoListCase signature || isTwoStructuralCase signature || isSizeListCase signature
 
 -- | Check the remaining cases from the supplied operand patterns.
 checkedConstructorRows :: Bool -> (TyCon -> Bool) -> (Id -> Maybe TyCon)

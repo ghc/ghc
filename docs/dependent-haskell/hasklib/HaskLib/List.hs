@@ -3,12 +3,13 @@
 
 -- | Length laws for the installed Prelude functions on ordinary lists.
 module HaskLib.List
-    ( Size(..), size, plus, minSize
-    , lengthMap, lengthAppend, lengthZip, lengthZipWith, lengthZipMap, lengthReverse
+    ( Size(..), size, plus, minSize, takeSize
+    , lengthMap, lengthAppend, lengthZip, lengthZipWith, lengthZipMap, lengthReverse, lengthTakeSize
     ) where
 
 import Data.Type.Equality ((:~:)(Refl), trans)
 import qualified GHC.Internal.List as List
+import HaskLib.List.Prefix (takeSize)
 import HaskLib.Size (congSucc, plusSucc, plusZero)
 import Prelude ((++), map, reverse)
 import PreludeAppendLengthSource (plus)
@@ -50,6 +51,13 @@ If that operand is bottom, size can lose its first Succ. The proof
 still returns Refl for the one-cell left list. See AppendFusionDemand.hs
 in docs/dependent-haskell/examples/open-evaluation.
 -}
+
+-- | The prefix length is the smaller of the bound and input length.
+lengthTakeSize :: forall a. foreach (n :: Size) -> foreach (xs :: [a])
+               -> size (takeSize n xs) :~: minSize n (size xs)
+lengthTakeSize Zero _ = Refl
+lengthTakeSize (Succ _) [] = Refl
+lengthTakeSize (Succ n) (_ : xs) = congSucc (lengthTakeSize n xs)
 
 -- | Count the result of the reverse worker with any accumulator.
 lengthReverseOnto :: forall a. foreach (xs :: [a]) -> foreach (acc :: [a])

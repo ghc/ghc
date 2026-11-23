@@ -169,6 +169,11 @@ test('NativeOpenMinimum',
                    ['PreludeMapLengthSize.hs', 'PreludeZipMapRuntime.hs', 'PreludeZipRuntime.hs',
                     'ZipMinimum.hs']])],
      run_command, ['bash NativeOpenMinimum.sh "{compiler}" "{libdir}" ' + config.ghc_th_way_flags])
+test('NativeSizeListNoDescent',
+     [only_ways(['normal']),
+      extra_files(['NativeSizeListNoDescent.hs', 'NativeSizeListNoDescentSource.hs',
+                   open_eval_dir + 'PreludeMapLengthSize.hs'])],
+     run_command, ['bash NativeSizeListNoDescent.sh "{compiler}" "{libdir}"'])
 test('NativeRetainedFamilyGiven',
      [only_ways(['normal']),
       extra_files(['NativeRetainedFamilyGiven.hs', 'NativeRetainedTailGiven.hs',

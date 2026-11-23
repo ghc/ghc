@@ -15,6 +15,7 @@ library
     HaskLib.Size
 
   other-modules:
+    HaskLib.List.Prefix
     PreludeAppendLengthSource
     PreludeMapLengthSize
     PreludeZipMapRuntime

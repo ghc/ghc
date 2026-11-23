@@ -1,5 +1,6 @@
 module Main where
 
+import Control.Exception (ErrorCall(..), evaluate, try)
 import Client (checkAppendSingleton, checkReverse, checkZipMap, zipLaw)
 import HaskLib
 
@@ -10,10 +11,21 @@ check pre f xs ys = case lengthMap pre xs of
         Refl -> case zipLaw xs ys of
             Refl -> case lengthZipWith f xs ys of Refl -> True
 
+-- | Consume a prefix-length witness without inspecting the elements.
+checkPrefix :: Size -> [Bool] -> Bool
+checkPrefix n xs = case lengthTakeSize n xs of Refl -> True
+
 main :: IO ()
 main = do
-    let bad = error "forced zipWith callback"
+    let undefinedBound = error "forced the prefix bound"
+    strictBound <- try (evaluate (takeSize undefinedBound [] :: [Bool]))
+    let boundWasForced = case strictBound of
+            Left (ErrorCall "forced the prefix bound") -> True
+            _ -> False
+        bad = error "forced zipWith callback"
         element = error "forced an append element"
+        tailList = error "forced the list beyond the bound"
+        tailBound = error "forced the bound beyond the list"
     if check not bad [True, False] [False]
         && check not bad [] (error "forced right list")
         && checkAppendSingleton [] element
@@ -21,5 +33,13 @@ main = do
         && checkReverse []
         && checkReverse [element, element]
         && checkZipMap (error "forced map callback") (error "forced zip callback") [element] [0]
+        && boundWasForced
+        && checkPrefix Zero tailList
+        && checkPrefix (Succ tailBound) []
+        && null (takeSize (Succ tailBound) ([] :: [Bool]))
+        && checkPrefix (Succ Zero) (element : tailList)
+        && checkPrefix (Succ (Succ Zero)) (repeat element)
+        && checkPrefix (Succ (Succ Zero)) [element]
+        && takeSize (Succ Zero) (True : tailList) == [True]
         then pure ()
         else fail "list proof failed"
