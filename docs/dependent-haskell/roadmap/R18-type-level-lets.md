@@ -66,9 +66,10 @@ properties before marking R18 complete.
   renaming a local binder that shadows an enclosing kind. Jobs 1615
   and 1619 checked these on compiler components.
   [Intervening abbreviation](#an-intervening-abbreviation).
-- [ ] Run all of these checks on the combined two-stage compiler,
-  together with quotation, exact printing and the Showcase. Record the
-  tested revision here before changing the roadmap count.
+- [x] Normal compiler `b6ddbb4ce8` passed the source, quotation and
+  exact-print registrations. Jobs 1627 and 1649 checked the combined
+  compiler and both spellings of the dependent-kind binder. The 566-line
+  Showcase matched in three modes. [Verification record](../CHECKPOINTS.md#lexical-type-lets-and-cases-in-closed-family-equations).
 
 The fork also supports projection patterns for pairs and regular named
 products. The latter have a separate quotation restriction. The
@@ -338,9 +339,9 @@ type Width (flag :: Bool) (override :: Maybe Nat) =
 ```
 
 Both spellings give `7` for a `'Just 7` override with `flag` still
-abstract on private component `453eab5058`. Job 1615 also checked two
+abstract on normal compiler `b6ddbb4ce8`. Job 1615 also checked two
 successive aliases and a branch binder that shadows an earlier name.
-The 564 release rejects the intervening alias with GHC-97233. The
+The preceding R18 component rejected the intervening alias with GHC-97233. The
 renamer now follows references through each right-hand side in scope
 order when it determines which values to pass to the lifted case.
 

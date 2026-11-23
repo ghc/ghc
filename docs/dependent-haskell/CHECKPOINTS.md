@@ -6,6 +6,41 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Lexical type lets and cases in closed family equations
+
+Normal compiler `b6ddbb4ce8` preserves the result of inserting an
+intermediate type-level name, including when a local binding shadows
+the kind of another parameter. A source-hidden client can reuse that
+parameter at its original kind. A closed family can also use an earlier
+case result in a later branch. The client selected widths `2`, `3` and
+`7`. The two unknown-input proofs failed at `Refl`. A 564 reader could
+use the width family through the new provider interface.
+[R18 release check](roadmap/R18-type-level-lets.md#release-check) and
+[R19 case example](roadmap/R19-type-level-cases.md#a-case-in-a-closed-type-family-equation).
+
+Job 1627 built both stages and matched all 566 Showcase observations
+at native `-O0`, default `-O2` and in GHCi. All 17 initial registrations
+passed. These included `NativeTypeLet`, `NativeTypeLetQuote` and
+`TypeLetPrint`. The package, three source-hidden clients and arithmetic
+interfaces passed. All 234 compatibility registrations passed. Of 137
+focused tests, 136 passed. The unchanged `MTrans` diagnostic accounted
+for the raw focused driver exit of 1.
+
+The original aggregate job also exited 1. Three Haskell2010 negative
+fixtures needed `KindSignatures` to reach the intended equality check.
+The first targeted replay counted additional helper diagnostics as
+source errors. Job 1649 checked the four original source locations
+and passed all 42 source-case checks at `-O0` and `-O2`. Both replays
+used the sealed 566 compiler. Job 1644 separately compiled the exact
+User's Guide example and checked both results from an ordinary client.
+
+`Down` is a decreasing recursive case that compiles without
+`UndecidableInstances`. Some deeper cases still fail the size check
+on a generated helper even when the written equations pass. R19
+remains partial. R18 meets the upstream scope for local definitions
+with ordered, nonrecursive bindings on this fork.
+[Compiler implementation and tests](roadmap/R19-type-level-cases.md#a-case-in-a-closed-type-family-equation).
+
 ## Built-in arithmetic callbacks and type-let case results
 
 The normal compiler at `049ac2c031` accepts

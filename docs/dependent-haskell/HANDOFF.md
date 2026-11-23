@@ -11,7 +11,25 @@ and its [expected output](Showcase.stdout) are the executable examples.
 Updated 23 November 2026. The development branch is
 `dependent-haskell`. Use the fork command below to find its latest commit.
 
-The current compiler is `049ac2c031`. It accepts
+The current compiler is `b6ddbb4ce8`. It qualifies R18 local
+type-level definitions, including scope through intervening aliases and
+shadowed kind binders. R19 now supports a case in a closed family
+equation, including a decreasing recursive call. The two-stage build
+passed all 566 Showcase observations in three modes, all 234
+compatibility cases and 136 of 137 focused cases. The remaining
+failure is the existing `MTrans` diagnostic. The initial source-case
+driver exited 1. Corrected job 1649 verified all 42 O0/O2 source-case
+statuses on the same binary. [Release evidence](CHECKPOINTS.md#lexical-type-lets-and-cases-in-closed-family-equations).
+
+The next normal build is job 1650 at `687b465aad` in
+`r13-hasklib-prefix-normal-567-20261123`. Recover its source from
+`refs/archive/dependent-haskell/2026-11-23/r13-prefix-normal-567`.
+The ordinary function `takeSize` computes a bounded list prefix and
+the HaskLib witness proves its length is `minSize n (size xs)`. The
+component passed the Cabal package build and source-hidden client
+checks. The other active card is R17 type-level lambdas.
+
+The preceding compiler is `049ac2c031`. It accepts
 `Map ((+) 1) '[2, 3, 4]` and can use a previous type-level case result
 as a wildcard branch's default. Job 1608 built both stages. All 564
 Showcase outputs matched at native `-O0`, default `-O2` and in GHCi.
@@ -20,15 +38,6 @@ migrated `first-class-families` package passed. All 234 compatibility
 registrations passed. The focused run passed 136 of 137, with the
 existing `MTrans` failure unchanged.
 [Release checks](CHECKPOINTS.md#built-in-arithmetic-callbacks-and-type-let-case-results).
-
-For the next R18/R19 integration, start from local archive
-`refs/archive/dependent-haskell/2026-11-23/r18-r19-refined-565`
-at `61031f9f05`. R18 component job 1619 preserved scope across
-intervening aliases and a shadowed kind binder. R19 component job 1623
-checked decreasing calls in a closed family equation. Verify their
-combination on the 564 donor before publishing. A nonrecursive family
-with two dependent cases still needs a termination check that accounts
-for both generated case functions.
 
 The preceding R18/R23 compiler is `f030369687`. It supports the standalone
 `UnsaturatedTypeFamilies` extension and reports constructor-pattern
@@ -471,7 +480,7 @@ and `r36-r41-r19-r13-549-normal`.
 The compiler sources remain available there after generated builds expire.
 
 The [release-readiness assessment](ROADMAP.md#release-readiness) records
-R35, R36 and R41 as complete on the fork. R27 keeps the legacy CUSK
+R18, R35, R36 and R41 as complete on the fork. R27 keeps the legacy CUSK
 defaults and an opt-in migration warning.
 
 ## Resume after a restart
@@ -496,8 +505,8 @@ defaults and an opt-in migration warning.
 
 ## Build and verify
 
-The 564-line Showcase uses the normal two-stage compiler at
-`049ac2c031` in `r18-r23-combined-normal-564-20261123`.
+The 566-line Showcase uses the normal two-stage compiler at
+`b6ddbb4ce8` in `r18-r19-combined-normal-20261123`.
 On this host the bootstrap tools are GHC 9.14.1, Cabal 3.18.1.0, Happy 2.1.7
 and Alex 3.5.4.0. A fresh checkout needs the Git submodules at their recorded
 revisions. This build copied the preceding build tree, ran `./boot`
@@ -510,7 +519,7 @@ self-hosted stage 2 compiler in `_build/stage1/bin/ghc`. Both use the
 target libraries in `_build/stage1/lib`. For example, from the main checkout:
 
 ```sh
-stable="$PWD/_build/on-demand/r18-r23-combined-normal-564-20261123/source/_build/stage1"
+stable="$PWD/_build/on-demand/r18-r19-combined-normal-20261123/source/_build/stage1"
 queue="$PWD/docs/dependent-haskell/tools/ghc-build-job"
 check="$PWD/docs/dependent-haskell/check-showcase.sh"
 "$queue" showcase-stage2-ghci bash "$check" "$stable/bin/ghc" "$stable/lib" --ghci
