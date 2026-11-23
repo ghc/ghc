@@ -371,7 +371,7 @@ still require substantial research.
 - [x] **R31 [Invisible binders in constructors](https://ghc.serokell.io/dh#invisible-binders-in-constructors)** — Completed. Needs/includes: no outgoing graph edge.
 - [x] **R32 [Visible type applications](https://ghc.serokell.io/dh#visible-type-applications)** — Completed. Needs/includes: no outgoing graph edge.
 - [x] **R33 [Visible kind applications](https://ghc.serokell.io/dh#visible-kind-applications)** — Completed. Needs/includes: no outgoing graph edge.
-- [ ] **R34 [Syntactic unification](https://ghc.serokell.io/dh#syntactic-unification)** — Accepted. Needs/includes: R44, R45, R46, R47.
+- [ ] **R34 [Syntactic unification](https://ghc.serokell.io/dh#syntactic-unification)** — Accepted. Needs/includes: R44, R45, R46, R47. [Function arrows in required type patterns](#r34-function-arrows-in-required-type-patterns).
 - [ ] **R35 [Namespace management](https://ghc.serokell.io/dh#namespace-management)** — Accepted. Needs/includes: R36, R37, R38, R42. [Complete on the fork](roadmap/R35-namespace-management.md).
 - [ ] **R36 [Pun warnings](https://ghc.serokell.io/dh#pun-warnings)** — Accepted. Needs/includes: no outgoing graph edge. [Proposal #765](https://ghc-proposals.readthedocs.io/en/latest/proposals/0765-pun-warnings.html) specifies the two opt-in diagnostics. [Complete on the fork](roadmap/R36-pun-warnings.md).
 - [x] **R37 [Namespace-specified imports](https://ghc.serokell.io/dh#namespace-specified-imports)** — Completed. Needs/includes: no outgoing graph edge.
@@ -393,6 +393,32 @@ still require substantial research.
 arguments already exist while syntax unification and nested GADT quantifiers
 remain incomplete. Do not infer completion by propagating checkmarks through
 the graph.
+
+### R34 function arrows in required type patterns
+
+Given `Pack :: forall a -> a -> Box a`, the stage-2 compiler for release
+556 (`54c4c62287`) and stock GHC 9.14.1 accept `Pack (Int -> Int) (+ 1)` and
+`Pack (type (Int -> Int)) (+ 1)` as expressions. For an indexed scrutinee
+of type `Box (Int -> Int)`, writing `Pack (type (a -> b)) f` or
+`Pack ((->) a b) f` in a pattern binds `a` and `b` in the body.
+Both spellings work with either setting of `ViewPatterns`. The examples
+use `ExplicitForAll`, `ExplicitNamespaces`, `GADTs` and
+`RequiredTypeArguments` with Haskell2010.
+
+- With `NoViewPatterns`, the parser rejects the bare `Pack (a -> b) f`
+  with `GHC-32181` (illegal function arrow in pattern).
+- With `ViewPatterns`, the parser produces a view pattern for `a -> b`.
+  Pattern-to-type conversion rejects it with `GHC-88754` (ill-formed type
+  pattern). An ordinary value view pattern such as `not -> x` compiles.
+- For a scrutinee of type `Box t` with a rigid `t`, the explicit
+  `Pack (type (Int -> Int)) f` parses and reaches type checking. GHC
+  reports `GHC-25897` because `t` cannot unify with `Int -> Int`.
+
+The bare-arrow production in #281 §1.7.1 predates the final decision.
+The accepted prose reserves the bare arrow in type patterns until an
+alternative to view-pattern syntax exists.
+[Specification](https://ghc-proposals.readthedocs.io/en/latest/proposals/0281-visible-forall.html#syntax)
+and [review change](https://github.com/ghc-proposals/ghc-proposals/pull/626#discussion_r1442817608).
 
 ## Research and provenance
 

@@ -1367,6 +1367,17 @@ They do not define new Boolean constructors.
 | [#54: Standalone kind signatures](https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0054-kind-signatures.rst) | Implemented. | Gives explicit declaration kinds. The old `0036-kind-signatures.rst` path redirects to this file. Use standalone kind signatures rather than relying on CUSK inference when the plan requires an explicit kind. |
 | [R27: CUSK deprecation](https://ghc.serokell.io/dh#deprecate-cusks) | Proposal #54 also specifies a transition away from syntactic complete user-supplied kinds. [The first implementation](https://github.com/ghc/ghc/commit/a5fdd18518) introduced the extension switch. [GHC MR !1602](https://gitlab.haskell.org/ghc/ghc/-/merge_requests/1602) remains open at [`c8c660f678`](https://github.com/ghc/ghc/commit/c8c660f678bd77fb9d0a855753a165c5a5d1f8e1). | Compare the proposed legacy-language defaults and the inferred kinds visible to importing clients. The [proposal review](https://github.com/ghc-proposals/ghc-proposals/pull/54#issuecomment-329789568) gives a polymorphically recursive GADT that needs a visible quantifier in its replacement kind signature. The [package comparison](roadmap/R27-deprecate-cusks.md#a-published-library-that-relies-on-implicit-cusks) checks three published Haskell2010 libraries, the kinds in the migrated interfaces, and a source-hidden client for each library. |
 
+The grammar in #281 §1.7.1 still lists a bare function arrow in a pattern
+with `RequiredTypeArguments` and `NoViewPatterns`. The accepted #626
+amendment requires an error in this case and defers reconsideration until
+there is an alternative to view-pattern syntax. With `ViewPatterns` enabled,
+the arrow keeps its view-pattern meaning. Use `type (a -> b)` or
+`((->) a b)` in a required constructor argument pattern.
+[Specification](https://ghc-proposals.readthedocs.io/en/latest/proposals/0281-visible-forall.html#syntax),
+[review change](https://github.com/ghc-proposals/ghc-proposals/pull/626#discussion_r1442817608),
+[committee acceptance](https://github.com/ghc-proposals/ghc-proposals/pull/626#issuecomment-1891612697)
+and [R34 diagnostic comparison](ROADMAP.md#r34-function-arrows-in-required-type-patterns).
+
 The current documentation records the implemented boundaries:
 
 - [RequiredTypeArguments](../users_guide/exts/required_type_arguments.rst) explicitly
