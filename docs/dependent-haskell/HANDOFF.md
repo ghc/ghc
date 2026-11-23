@@ -36,21 +36,18 @@ records that failure on both 577 and 578.
 
 | Area | Verified result and next step |
 | --- | --- |
-| R04, R17 and R19 | The 581 source `156cd84633` combines named dependent record fields, wildcard patterns in quoted type cases and inline lambdas in visible type arguments. Job 1937 builds it in `r04-r19-following-quoted-578-20261123`. Check `qualification/gates.tsv`, `cohorts/gates.tsv` and `run-all.exit`. |
+| R04, R17 and R19 | The 581 source `156cd84633` combines named dependent record fields, wildcard patterns in quoted type cases and inline lambdas in visible type arguments. Job 1937 stopped on the Haddock conversion of H98 constructors. Commit `573a021142` corrected the optional renamed field. Job 1959 stopped before qualification to replace the proof and upgrade-test sources. Reuse the warm tree in `r04-r19-following-quoted-578-20261123`. Check `qualification/gates.tsv`, `cohorts/gates.tsv` and `run-all.exit`. |
 | R04 omitted record fields | Job 1946 qualified `f2ab5c36a1` at both optimization levels. A supplied witness permits an omitted lazy sibling. Omitting the witness reports GHC-83605 at the constructor and names the required field. An omitted ordinary strict field still reports GHC-95909. Job 1954 exercised the exact additional Showcase row from `322b680d53` with the component compiler. The combined source still needs its normal build. |
 | R05 Specialise | On both 577 and 578, default `-O2` replaced an indexed `zip` operand with `build`. Job 1948 preserved the checked operand, passed Core and STG Lint, and returned `Refl`. Job 1956 reproduced the repair with only `base`, a retained `Proxy` result and a vacuous binder. See `r05-specialise-retained-zip-20261123`. |
 | R16 proof validity | Independent count expressions can produce `Zero` and bottom under stock fusion. Both shared counts produced `Zero`. The private Specialise repair leaves that distinction observable. In job 1957, rebuilding HaskLib with private `4c4cc16244` recorded the `map` dependency on the composed proof. The optimized client then reported GHC-83605 at the call to `lengthMapZip`. The same diagnostic occurred with a producer that simply constructs one cell. The old installed interface still reached Core Lint. The consumer-side policy remains open. |
 | R23 matchability | The private prototype `99bfde4ec4` passed the original transformer test and 32 Template Haskell reification cases. An old installed provider still needs rebuilding. The published compiler retains the existing matchability policy. |
 
 The GHC queue has two slots. Other benchmark jobs take priority and freeze
-the GHC slice. In job 1947, `zipRows` allocated 48 more bytes per process
-than the ordinary two-field zip at each of 10,000, 100,000 and 500,000
-inputs. Both returned the same checksums and passed the prefix-demand
-controls. Job 1949 measured the whole compiler. At 256 shared arithmetic
-bindings it allocated 6.45 GB for the ordinary module and 28.18 GB for
-the module with a retained result index. Attribution to a particular pass
-requires profiling. The inputs and results are in the two pilot
-directories under `_build/on-demand/opencode-go-20261123`.
+the GHC slice. Jobs 1947 and 1949 were exploratory allocation measurements.
+Both pilot harnesses are retired. Their prompts, draft code and measurements
+are archived for reference under `_build/reference-only`. Active performance
+work needs independently written benchmarks. External reviews supply prose
+findings. The compiler owners write the implementation, tests and benchmarks.
 
 The previous 577 compiler was `893d2ebc06`. Its qualified records are
 in `r04-r16-r17-normal-after-574-20261123/published-qualification.tsv`.

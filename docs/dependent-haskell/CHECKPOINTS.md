@@ -17,8 +17,8 @@ example captures a type variable bound by its enclosing function.
 An installed HaskLib client can use this proof with unknown lists.
 
 ```haskell
-lengthMapZip f xs ys =
-    trans (lengthMap f (zip xs ys)) (lengthZip xs ys)
+lengthMapZip f xs ys = case lengthMap f (zip xs ys) of
+    Refl -> lengthZip xs ys
 ```
 
 The declarations of the two lists determine the two erased type

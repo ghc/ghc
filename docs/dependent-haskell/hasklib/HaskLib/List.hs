@@ -63,7 +63,8 @@ lengthTakeSize (Succ n) (_ : xs) = congSucc (lengthTakeSize n xs)
 lengthMapZip :: forall a b c. foreach (f :: (a, b) -> c)
              -> foreach (xs :: [a]) -> foreach (ys :: [b])
              -> size (map f (zip xs ys)) :~: minSize (size xs) (size ys)
-lengthMapZip f xs ys = trans (lengthMap f (zip xs ys)) (lengthZip xs ys)
+lengthMapZip f xs ys = case lengthMap f (zip xs ys) of
+    Refl -> lengthZip xs ys
 
 -- | Count the result of the reverse worker with any accumulator.
 lengthReverseOnto :: forall a. foreach (xs :: [a]) -> foreach (acc :: [a])

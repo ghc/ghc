@@ -130,7 +130,8 @@ still needs a representation and evidence before it could enter Core.
 lengthAfterZip :: forall a b c. foreach (f :: (a, b) -> c)
                -> foreach (xs :: [a]) -> foreach (ys :: [b])
                -> size (map f (zip xs ys)) :~: minSize (size xs) (size ys)
-lengthAfterZip f xs ys = trans (lengthMap f (zip xs ys)) (lengthZip xs ys)
+lengthAfterZip f xs ys = case lengthMap f (zip xs ys) of
+    Refl -> lengthZip xs ys
 ```
 
 The retained operand `zip xs ys` gets its erased arguments from the
@@ -2666,11 +2667,12 @@ when the right list was empty. The proof did not force the callback.
 
 HaskLib now proves the same law from two existing equalities.
 `lengthMap` removes the map from the length expression. Its result
-is the left side of `lengthZip`, so `trans` can join the two proofs.
+is the left side of `lengthZip`, so matching `Refl` lets the branch
+return the existing zip proof.
 
 ```haskell
-lengthMapZip f xs ys =
-    trans (lengthMap f (zip xs ys)) (lengthZip xs ys)
+lengthMapZip f xs ys = case lengthMap f (zip xs ys) of
+    Refl -> lengthZip xs ys
 ```
 
 Job 1876 checked the explicitly instantiated proof from a fresh package installation
