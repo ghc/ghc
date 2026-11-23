@@ -1,8 +1,9 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitForAll #-}
 {-# LANGUAGE TypeFamilies #-}
-module FamilyCasePayload (ChoosePayload, KeepPayload, Dispatch, Count(..), Down) where
+module FamilyCasePayload (ChoosePayload, KeepPayload, Dispatch, Count(..), Down, Width) where
 
 import Data.Kind (Type)
+import GHC.TypeNats (Nat)
 
 type family ChoosePayload (fallback :: Type) (input :: Maybe Type) :: Type where
   forall fallback (input :: Maybe Type).
@@ -30,3 +31,11 @@ type family Down (count :: Count) :: Bool where
   Down ('S count) = case count of
     Z -> 'True
     S prior -> Down ('S prior)
+
+type family Width (flag :: Bool) (override :: Maybe Nat) :: Nat where
+  Width flag override =
+    let base = flag
+        base = case base of { True -> 3; False -> 2 }
+        saved = base
+        result = case override of { Nothing -> saved; Just n -> n }
+    in result
