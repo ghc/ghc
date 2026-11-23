@@ -1388,7 +1388,7 @@ loadBytecodeLibrary :: HscEnv -> Interp -> LoaderState -> FilePath -> IO LoaderS
 loadBytecodeLibrary hsc_env interp pls path = do
   path' <- canonicalizePath path -- Note [loadObj and relative paths]
   -- 1. Read the bytecode library
-  (BytecodeLib uid cbcs stubs_so) <- decodeOnDiskBytecodeLib hsc_env =<< readBytecodeLib hsc_env path'
+  (BytecodeLib uid _hash cbcs stubs_so) <- decodeOnDiskBytecodeLib hsc_env =<< readBytecodeLib hsc_env path'
   debugTraceMsg (hsc_logger hsc_env) 3 $ text "loadBytecodeLibrary: " $$ vcat [ text "uid: " <+> ppr uid
                                                                              , text "cbcs: " <+> ppr (length cbcs)
                                                                              , text "stubs_so: " <+> ppr stubs_so ]
