@@ -81,7 +81,7 @@ import GHC.Core (CoreExpr)
 import qualified GHC.Core as Core
 import GHC.Core.Utils (exprType)
 import GHC.Data.OrdList (fromOL)
-import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCaseTables, sourceCharacterTables, sourceRetainedWitnessTables, sourceLocalBooleanCases, checkLocalRetainedWitnessExports, isMonomorphicRetainedWitness,
+import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCaseTables, sourceMapperType, sourceMapperTable, sourceCharacterTables, sourceRetainedWitnessTables, sourceLocalBooleanCases, checkLocalRetainedWitnessExports, isMonomorphicRetainedWitness,
                                isStructuralSourceTable, isNominalStructuralSource, sourceRuleOwners, sourceRuleOwnersAt, visibleSourceMethodRules,
                                hasSourceMethodRule, hasSourceMethodRuleAt, sourceLiteralWorkers, checkSourceMethodUses,
                                checkOptionalSourceUses, checkAndInstallSourceProofs,
@@ -718,12 +718,12 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
                 | otherwise = filter (\(owner, _) -> not (idName owner `elemNameSet` case_owners)) tables
           with_fields <- if null fields then getGblEnv else fst <$> addTyConsToGblEnv fields
           let installed = typeEnvIds (tcg_type_env with_fields)
-              early_structural = [(fun, table) | fun <- installed
-                                               , isNominalStructuralSource fun
-                                               , Just table <- [sourceTableId_maybe fun]]
+              early_nominal = [(fun, table) | fun <- installed
+                                            , SourceTableId _ table NominalSourceTable <- [idDetails fun]
+                                            , isNominalStructuralSource fun || sourceMapperType (idType fun)]
           checkLocalRetainedWitnessExports with_fields installed
           failIfErrsM
-          env <- setGblEnv with_fields (installSourceTables (early_structural ++ new_tables ++ cases))
+          env <- setGblEnv with_fields (installSourceTables (early_nominal ++ new_tables ++ cases))
           installSourceMethods (\sel -> tables_enabled || sourceMapSelector sel) env }
 
 -- | Publish only checked method aliases that user rules cannot replace.
@@ -831,6 +831,47 @@ sourceTablesFor structural names env = sourceTableTyCons structural (filter requ
   where
     requested bind = any ((`elemNameSet` names) . idName)
                          (collectHsBindBinders CollNoDictBinders (unLoc bind))
+
+{- Note [Early constructor mapper equations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A dependent type can need the equations of a local mapper. Schedule
+the signed worker in the ordinary value dependency order. After the
+group's constraints are solved, check its desugared body with the
+existing constructor-case checker. Keep the actual callback binder and
+the checked identities of constructor fields and recursive calls.
+
+An empty declaration splice also makes a solved worker available to
+later declarations. The local observer checks for pending typed
+splices before zonking. The mapper pass checks only the current group's
+mapping signature. It adds no table when the checked body fails.
+
+The table has ordinary nominal source authority. Its uses record the
+same rule dependencies as a table published at module finish. A later
+rule can invalidate an unused early table as well. Pass early mapper
+owners back to installSourceTables before writing the interface, so
+the final rule environment can withdraw that authority.
+-}
+
+-- | Check the requested constructor mappers after solving their value group.
+-- See Note [Early constructor mapper equations].
+sourceTablesWithMappers :: Bool -> NameSet -> Bag EvBind -> TcGblEnv -> TcM [(Id, TyCon)]
+sourceTablesWithMappers structural names evidence env = do
+    ordinary <- sourceTablesFor structural names env
+    let in_group = [owner | bind <- tcg_binds env
+                          , owner <- collectHsBindBinders CollNoDictBinders (unLoc bind)
+                          , idName owner `elemNameSet` names]
+    candidates <- fmap catMaybes $ forM in_group $ \owner -> do
+      ty <- liftZonkM (zonkTcType (idType owner))
+      pure (owner <$ guard (sourceMapperType ty))
+    mappers <- forM candidates $ \owner ->
+      tryTcDiscardingErrs (pure Nothing) $ do
+        let name = idName owner
+        (definitions, _) <- localOpenDefinitions [(name, nameSrcSpan name)]
+                              (tcg_ev_binds env `unionBags` evidence) (tcg_binds env)
+        case lookupNameEnv definitions name of
+          Just (actual, rhs) | actual == owner -> sourceMapperTable actual rhs
+          _ -> pure Nothing
+    pure (ordinary ++ catMaybes mappers)
 
 -- | Merge the finalised types and retain a source table already attached to
 -- its exact owner. A local signature can already use the table's equations.
@@ -960,7 +1001,7 @@ tc_rn_src_decls ds
                ; enabled <- xoptM LangExt.ExperimentalDependentTypes
                ; let names = mkNameSet (collectHsValBinders CollNoDictBinders (hs_valds rn_decls))
                ; tcg_env <- if enabled
-                            then sourceTablesFor False names tcg_env >>= installSourceTables
+                            then sourceTablesWithMappers False names ev_binds1 tcg_env >>= installSourceTables
                             else return tcg_env
 
                  -- Rename the splice expression, and get its supporting decls
@@ -2409,7 +2450,7 @@ tcTopSrcTables :: HsGroup GhcRn -> TcM (TcGblEnv, TcLclEnv)
 tcTopSrcTables group = do
     enabled <- xoptM LangExt.ExperimentalDependentTypes
     env <- getGblEnv
-    let use = TableInType (sourceTableTypeDependencies (tcg_type_env env) group)
+    let use = TableInType (sourceTableTypeDependencies env group)
     case if enabled then splitLocalSourceTables use (tcg_dus env) group else Nothing of
       Nothing -> tcTopSrcDeclGroup group
       Just (needed, early, rest) -> do
@@ -2419,8 +2460,8 @@ tcTopSrcTables group = do
         restoreEnvs envs $ do
           evs <- simplifyTop wanteds
           let names = mkNameSet (collectHsValBinders CollNoDictBinders (hs_valds early))
-          structural <- sourceTablesFor True names early_env
-          let known = mkNameSet (map (tyConName . snd) structural)
+          ordinary <- sourceTablesWithMappers True names evs early_env
+          let known = mkNameSet (map (tyConName . snd) ordinary)
               witness_owners = mkNameSet
                 [idName owner | bind <- tcg_binds early_env
                               , owner <- collectHsBindBinders CollNoDictBinders (unLoc bind)
@@ -2437,7 +2478,7 @@ tcTopSrcTables group = do
             let wanted_names = mkNameSet (map fst witnesses)
                 selected (owner, _) = idName owner `elemNameSet` wanted_names
             sourceRetainedWitnessTables (filterNameEnv selected cores)
-          let tables = structural ++ cases
+          let tables = ordinary ++ cases
               found = mkNameSet (map (tyConName . snd) tables)
           for_ needed $ \(term, family) ->
             unless (family `elemNameSet` found) $
@@ -2482,9 +2523,9 @@ checked matches and constructor equations without dictionary evidence.
 
 -- | Follow the same-group types needed by a source-table signature.
 -- See Note [Ordering local source tables] in GHC.Rename.Module.
-sourceTableTypeDependencies :: TypeEnv -> HsGroup GhcRn -> (Name -> Bool)
-                            -> [(Name, Int)] -> Maybe NameSet
-sourceTableTypeDependencies type_env HsGroup{hs_tyclds = groups} ready uses = do
+sourceTableTypeDependencies :: TcGblEnv -> HsGroup GhcRn -> (Name -> Maybe Int)
+                            -> [(Name, Maybe Int)] -> Maybe NameSet
+sourceTableTypeDependencies env HsGroup{hs_tyclds = groups} ready uses = do
     guard (all saturated uses)
     closeLocalNames dependencies emptyNameSet (map fst uses)
   where
@@ -2502,16 +2543,24 @@ sourceTableTypeDependencies type_env HsGroup{hs_tyclds = groups} ready uses = do
     ordinary_parameter (L _ HsTvb{tvb_flag = HsBndrRequired{}, tvb_kind = HsBndrNoKind{}}) = True
     ordinary_parameter _ = False
 
-    saturated (name, supplied)
+    saturated (name, Nothing)
+      | name `elemNameSet` local_types = isJust (ready name)
+      | Just (ATyCon tc) <- lookupTypeEnv (tcg_type_env env) name
+      = isVanillaAlgTyCon tc || (isTypeSynonymTyCon tc && isFamFreeTyCon tc)
+      | Just gre <- lookupGRE_Name (tcg_rdr_env env) name
+      = any ((== NotBoot) . is_isboot . is_decl) (gre_imp gre)
+      | otherwise = False
+    saturated (name, Just supplied)
       | Just (arity, _) <- lookupNameEnv aliases name = supplied == arity
+      | Just arity <- ready name = supplied == arity
       | supplied == 0 = True
-      | Just (ATyCon tc) <- lookupTypeEnv type_env name
+      | Just (ATyCon tc) <- lookupTypeEnv (tcg_type_env env) name
       , isTypeSynonymTyCon tc, isFamFreeTyCon tc
       = supplied == length (tyConVisibleTyVars tc)
       | otherwise = False
 
     dependencies name
-      | ready name || not (name `elemNameSet` local_types) = Just emptyNameSet
+      | isJust (ready name) || not (name `elemNameSet` local_types) = Just emptyNameSet
       | otherwise = snd <$> lookupNameEnv aliases name
 
 {- Note [Scheduling local open definitions]

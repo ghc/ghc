@@ -1,5 +1,5 @@
 -- | Closed type families for checked functions that match one constructor.
-module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableTyCons, sourceCaseTables, sourceCharacterTables, sourceRetainedWitnessTables, publishRetainedRecordWitness, checkLocalRetainedWitnessExports, isMonomorphicRetainedWitness, finalCoreMappers, verifyFinalCoreMapper, failedFinalListTables, finalCoreSourceFamilies, isFinalCoreIdentity, indexedProjectionSource, isFinalCoreReverseWrapper, sourcePairBuilderField, lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
+module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableTyCons, sourceCaseTables, sourceMapperType, sourceMapperTable, sourceCharacterTables, sourceRetainedWitnessTables, publishRetainedRecordWitness, checkLocalRetainedWitnessExports, isMonomorphicRetainedWitness, finalCoreMappers, verifyFinalCoreMapper, failedFinalListTables, finalCoreSourceFamilies, isFinalCoreIdentity, indexedProjectionSource, isFinalCoreReverseWrapper, sourcePairBuilderField, lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
                               sourceTableCallees, sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
                               sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, monomorphicEnumCaseArity, groundFirstHead, sourceLocalBooleanCases,
                               isFinalStructuralSource, isStructuralSourceTable, isNominalStructuralSource,
@@ -2900,6 +2900,32 @@ pairCaseType tau = do
     liftedBinder (_, binder@(Bndr v (Invisible _)))
       | isTyVar v, varType v `eqType` liftedTypeKind = Just binder
     liftedBinder _ = Nothing
+
+-- | Recognize a mapper which keeps the other ordinary lifted parameters.
+sourceMapperType :: Type -> Bool
+sourceMapperType tau = isJust $ do
+    ConstructorCaseType binders root params [callback, _] 1 result <- constructorCaseType tau
+    guard (all (tcIsLiftedTypeKind . tyVarKind) (binderVars binders))
+    (input, output) <- caseArrow callback
+    a <- getTyVar_maybe input
+    b <- getTyVar_maybe output
+    vars <- traverse getTyVar_maybe params
+    guard (a `elem` vars && (a == b || b `notElem` vars))
+    guard (mkUniqSet (binderVars binders) == mkUniqSet (b : vars))
+    let mapped = [if v == a then output else mkTyVarTy v | v <- vars]
+    guard (result `eqType` mkTyConApp root mapped)
+
+-- | Publish the same constructor equations for a solved local mapper.
+sourceMapperTable :: Id -> Core.CoreExpr -> TcM (Maybe (Id, TyCon))
+sourceMapperTable owner rhs = do
+    env <- getGblEnv
+    let available name
+          | nameModule_maybe name == Just (tcg_semantic_mod env) = True
+          | otherwise = ordinaryImport (tcg_rdr_env env) name
+        public tc = all available (tyConName tc : map dataConName (tyConDataCons tc))
+    case checkedConstructorCase public (const Nothing) owner rhs of
+      Just (signature, rows) -> Just . (owner,) <$> publishConstructorCase owner signature rows
+      Nothing -> pure Nothing
 
 -- | The number of leading invisible arguments to a checked helper family.
 helperInvisibleArity :: TyCon -> Int

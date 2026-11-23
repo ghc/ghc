@@ -2579,7 +2579,10 @@ its ordinary term uses still work. Only a retained use needs the certificate.
 
 The early group cannot depend on the rest of the group. An H98 datatype
 with no parameters may refer to itself in a field, as in data Nat = Z | S Nat.
-Require each field type to be a single type constructor. A dependency on
+Require each field type to be a single type constructor. A parameterized
+datatype may use an ordinary lifted parameter or the datatype applied to
+all its parameters in declaration order. For Tree k a, a recursive field
+has type Tree k a. These fields have no outside dependencies. A dependency on
 another type in this group appears in group_ext. A private source-table
 name does not, so exclude it explicitly. Keep explicit instances in the
 regular pass. Save each early datatype's attached deriving clauses as
@@ -2611,6 +2614,19 @@ sourceLength :: forall a. [a] -> Nat, the signature binds a, so only Nat
 can add a dependency. Compare the renamed element Name with the binder.
 Only schedule a lifted type binder with no further kind dependencies.
 
+For nodes :: forall a k. Tree k a -> Size, record Tree separately from
+the worker's bound parameters. The order of the forall does not control
+the order of the datatype's arguments. Tree can come from an ordinary
+import, an earlier declaration group, or the isolated H98 datatype group
+described above. Check the written arity against the local declaration
+before moving its whole type group, including role annotations. The typed
+checker verifies the saturated datatype, constructor fields and kinds.
+
+For a mapper, match the same datatype on both sides. Replacing the
+callback's input with its output leaves every other datatype argument in
+place. Use the renamed variables in this comparison. The typed check
+verifies the same shape before reading the function body.
+
 For a binary function such as plus (S n) m = S (plus n m), the second
 domain is also a declaration dependency. The general source row passes
 the second pattern's variable unchanged. Only fields of the first pattern
@@ -2637,7 +2653,8 @@ localSourceTableBinders binds sigs =
     [ n | L _ FunBind{fun_id = L _ n, fun_matches = MG{mg_alts = L _ rows}} <- binds
         , isExternalName n, nameOccName n `elemOccSet` signed
         , all (constructor_row n False) rows ||
-          (any matches_second rows && all (constructor_row n True) rows) ]
+          (any matches_second rows && all (constructor_row n True) rows) ||
+          all (mapping_row n) rows ]
   where
     signed = mkOccSet [ rdrNameOcc n | L _ (TypeSig _ [] [L _ n] _) <- sigs ]
     constructor_row :: Name -> Bool -> LMatch GhcPs (LHsExpr GhcPs) -> Bool
@@ -2648,6 +2665,44 @@ localSourceTableBinders binds sigs =
       , GRHSs _ (L _ (GRHS _ [] rhs) :| []) (L _ EmptyLocalBinds{}) <- rhss
       = row_result self (collectPatsBinders CollNoDictBinders fields) carried rhs
     constructor_row _ _ _ = False
+
+    mapping_row :: Name -> LMatch GhcPs (LHsExpr GhcPs) -> Bool
+    mapping_row self (L _ Match{m_pats = L _ [callback, pat], m_grhss = rhss})
+      | Just fields <- constructor_fields (unparen pat)
+      , all plain_field fields
+      , Just bound <- callback_binder (unparen callback)
+      , GRHSs _ (L _ (GRHS _ [] rhs) :| []) (L _ EmptyLocalBinds{}) <- rhss
+      = mapping_result self (collectPatsBinders CollNoDictBinders fields) bound rhs
+    mapping_row _ _ = False
+
+    callback_binder (VarPat _ (L _ v)) = Just (Just v)
+    callback_binder WildPat{} = Just Nothing
+    callback_binder _ = Nothing
+
+    mapping_result self fields callback = check []
+      where
+        check args expr = case unLoc (stripParensLHsExpr expr) of
+          HsApp _ fun arg -> check (arg : args) fun
+          OpApp _ left op right -> check (left : right : args) op
+          HsAppType _ fun _ -> check args fun
+          HsVar _ (L _ name)
+            | isRdrDataCon name -> all (check []) args
+            | name `elem` fields -> null args
+            | Just name == callback, [arg] <- args -> in_field arg
+            | same_source_owner self name, [fun, arg] <- args
+            -> isJust callback && variable fun == callback && in_field arg
+          _ -> False
+        in_field arg = maybe False (`elem` fields) (variable arg)
+
+    variable :: LHsExpr GhcPs -> Maybe RdrName
+    variable e = case unLoc (stripParensLHsExpr e) of
+      HsVar _ (L _ v) -> Just v
+      _ -> Nothing
+
+    same_source_owner self r = let occ = nameOccName self in
+      r == mkRdrUnqual occ ||
+      r == mkRdrQual (moduleName (nameModule self)) occ ||
+      rdrNameExactName_maybe r == Just self
 
     -- The typed checker checks the whole matrix, including the constructor
     -- identities and the order of both columns. See Note [Local structural
@@ -2685,7 +2740,10 @@ localSourceTableBinders binds sigs =
           HsApp _ fun arg -> check (arg : args) fun
           OpApp _ left op right -> check (left : right : args) op
           HsAppType _ fun _
-            | null carried, Just r <- variable fun, is_self r -> check args fun
+            | null carried -> case unLoc (stripParensLHsExpr fun) of
+                HsAppType{} -> check args fun
+                HsVar _ (L _ r) | is_self r -> check args fun
+                _ -> False
           HsVar _ (L _ r)
             | isRdrDataCon r -> all (check []) args
             | r `elem` fields || r `elem` carried -> null args
@@ -2705,14 +2763,7 @@ localSourceTableBinders binds sigs =
           where
             cons op left right = variable op == Just consDataCon_RDR &&
                                  variable left == Just x && variable right == Just acc
-        variable :: LHsExpr GhcPs -> Maybe RdrName
-        variable e = case unLoc (stripParensLHsExpr e) of
-          HsVar _ (L _ r) -> Just r
-          _ -> Nothing
-        is_self r = let occ = nameOccName self in
-          r == mkRdrUnqual occ ||
-          r == mkRdrQual (moduleName (nameModule self)) occ ||
-          rdrNameExactName_maybe r == Just self
+        is_self = same_source_owner self
 
     unparen :: LPat GhcPs -> Pat GhcPs
     unparen (L _ (ParPat _ p)) = unparen p
@@ -2725,8 +2776,13 @@ localSourceTableBinders binds sigs =
       _ -> False
 
 -- | A type use requires equations before type declarations; a value use can wait.
-data SourceTableUse = TableInType ((Name -> Bool) -> [(Name, Int)] -> Maybe NameSet)
-                    | TableInTerm
+-- A missing arity marks a domain applied to the worker's bound parameters.
+-- The renamer has checked the arity of such an independent local datatype.
+-- The callback receives the arities of independent local datatypes.
+-- See Note [Ordering local source tables].
+data SourceTableUse
+  = TableInType ((Name -> Maybe Int) -> [(Name, Maybe Int)] -> Maybe NameSet)
+  | TableInTerm
 
 -- | Schedule independent local source functions. See Note [Ordering local source tables].
 splitLocalSourceTables :: SourceTableUse -> DefUses -> HsGroup GhcRn
@@ -2744,10 +2800,10 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
   = let wanted_set = mkNameSet (map fst wanted)
         specialised = mkNameSet [ n | L _ s <- sigs, n <- spec_name s ]
         signatures = mkNameEnv
-          [ (b, domain ++ rest) | L _ (TypeSig _ [] [L _ b] sig) <- sigs
+          [ (b, deps) | L _ (TypeSig _ [] [L _ b] sig) <- sigs
             , L _ HsSig{sig_bndrs = outer, sig_body = body} <- [dropWildCards sig]
-            , HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) arg res <- [unLoc (ignoreParens body)]
-            , Just domain <- [domain_dependencies outer arg], Just rest <- [result_dependencies outer res] ]
+            , Just (arg, res) <- [source_arrow body]
+            , Just deps <- [worker_dependencies outer arg res] ]
         declared = mkOccSet [ nameOccName f | f <- nameSetElemsStable (duDefs dus)
                                             , nameModule_maybe f == nameModule_maybe n ]
         candidates = [ (b, deps, values) | (_, [L _ FunBind{fun_id = L _ b, fun_ext = fvs}]) <- binds
@@ -2799,11 +2855,11 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
     local_binders = mkNameSet (hsGroupBinders group)
     independent_types kinds fvs = case use of
       TableInTerm
-        | all ((== 0) . snd) kinds -> Just (mkNameSet (map fst kinds))
+        | all ((== Just 0) . snd) kinds -> Just (mkNameSet (map fst kinds))
         | otherwise -> Nothing
       TableInType typeDeps -> do
-        needed <- typeDeps (`elemNameEnv` early_datatypes) kinds
-        let cons = mkNameSet (concatMap (fromMaybe [] . lookupNameEnv early_datatypes)
+        needed <- typeDeps (fmap fst . lookupNameEnv early_datatypes) kinds
+        let cons = mkNameSet (concatMap (maybe [] snd . lookupNameEnv early_datatypes)
                                         (nameSetElemsStable needed))
         guard (nameSetAll (`elemNameSet` cons) (fvs `intersectNameSet` local_binders))
         pure needed
@@ -2813,27 +2869,74 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
         | isTyConName name, isNothing (sourceTableTermOcc (nameOccName name)) -> Just name
       _ -> Nothing
 
-    -- Count only the written visible arguments. The typechecker verifies the
-    -- arity of the synonym and each dependency before moving the declarations.
-    type_dependencies :: LHsType GhcRn -> Maybe [(Name, Int)]
-    type_dependencies = go []
+    type_application :: LHsType GhcRn -> Maybe (Name, [LHsType GhcRn])
+    type_application = go []
       where
         go args ty
           | L _ (HsAppTy _ fun arg) <- ignoreParens ty = go (arg : args) fun
-          | otherwise = do
-              name <- type_name ty
-              nested <- traverse type_dependencies args
-              pure ((name, length args) : concat nested)
+          | otherwise = (, args) <$> type_name ty
 
-    domain_dependencies :: HsOuterSigTyVarBndrs GhcRn -> LHsType GhcRn -> Maybe [(Name, Int)]
-    domain_dependencies outer ty = case (outer_vars outer, list_element ty) of
-      (Just [], element) -> type_dependencies (fromMaybe ty element)
-      (Just [a], Just element)
-        | L _ (HsTyVar _ _ (L _ (WithUserRdr _ name))) <- ignoreParens element
-        , name == a -> Just []
+    -- Count only the written visible arguments. The typechecker verifies the
+    -- arity of the synonym and each dependency before moving the declarations.
+    type_dependencies :: LHsType GhcRn -> Maybe [(Name, Maybe Int)]
+    type_dependencies ty = do
+        (name, args) <- type_application ty
+        nested <- traverse type_dependencies args
+        pure ((name, Just (length args)) : concat nested)
+
+    domain_dependencies :: HsOuterSigTyVarBndrs GhcRn -> LHsType GhcRn -> Maybe [(Name, Maybe Int)]
+    domain_dependencies outer ty = case outer_vars outer of
+      Just [] -> type_dependencies (fromMaybe ty (list_element ty))
+      Just vars -> do
+        (root, params) <- parameter_domain ty
+        guard (mkNameSet params == mkNameSet vars)
+        pure (maybe [] (\name -> [(name, Nothing)]) root)
       _ -> Nothing
 
-    result_dependencies :: HsOuterSigTyVarBndrs GhcRn -> LHsType GhcRn -> Maybe [(Name, Int)]
+    parameter_name :: LHsType GhcRn -> Maybe Name
+    parameter_name ty
+      | L _ (HsTyVar _ _ (L _ (WithUserRdr _ name))) <- ignoreParens ty
+      = Just name
+      | otherwise = Nothing
+
+    -- | Read distinct named arguments and check the known local arity.
+    parameter_domain :: LHsType GhcRn -> Maybe (Maybe Name, [Name])
+    parameter_domain ty = do
+      (root, args) <- case list_element ty of
+        Just element -> Just (Nothing, [element])
+        Nothing -> do
+          (name, args) <- type_application ty
+          guard (not (null args))
+          case lookupNameEnv early_datatypes name of
+            Just (arity, _) -> guard (arity == length args)
+            Nothing -> pure ()
+          pure (Just name, args)
+      params <- traverse parameter_name args
+      guard (length (nub params) == length params)
+      pure (root, params)
+
+    worker_dependencies outer arg result
+      | TableInType{} <- use
+      , Just (from, to) <- source_arrow arg
+      , Just (domain, codomain) <- source_arrow result
+      , Just vars <- outer_vars outer
+      , Just a <- parameter_name from
+      , Just b <- parameter_name to
+      , Just (root, params) <- parameter_domain domain
+      , Just (root', params') <- parameter_domain codomain
+      , root == root', a `elem` params
+      , map (\v -> if v == a then b else v) params == params'
+      , mkNameSet vars == mkNameSet (b : params)
+      = Just (maybe [] (\name -> [(name, Nothing)]) root)
+      | otherwise = (++) <$> domain_dependencies outer arg <*> result_dependencies outer result
+
+    source_arrow :: LHsType GhcRn -> Maybe (LHsType GhcRn, LHsType GhcRn)
+    source_arrow (L _ (HsParTy _ ty)) = source_arrow ty
+    source_arrow (L _ (HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) arg result))
+      = Just (arg, result)
+    source_arrow _ = Nothing
+
+    result_dependencies :: HsOuterSigTyVarBndrs GhcRn -> LHsType GhcRn -> Maybe [(Name, Maybe Int)]
     result_dependencies outer ty = case unLoc (ignoreParens ty) of
       HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) carried result
         | TableInType{} <- use, Just [_] <- outer_vars outer -> do
@@ -2858,10 +2961,12 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
 
     outer_vars :: HsOuterSigTyVarBndrs GhcRn -> Maybe [Name]
     outer_vars (HsOuterImplicit names) = Just names
-    outer_vars (HsOuterExplicit _ Nothing []) = Just []
-    outer_vars (HsOuterExplicit _ Nothing [L _ (HsTvb _ SpecifiedSpec (HsBndrVar _ (L _ a)) kind)])
-      | plain_kind kind = Just [a]
+    outer_vars (HsOuterExplicit _ Nothing binders) = traverse plain_binder binders
     outer_vars _ = Nothing
+
+    plain_binder (L _ (HsTvb _ SpecifiedSpec (HsBndrVar _ (L _ a)) kind))
+      | plain_kind kind = Just a
+    plain_binder _ = Nothing
 
     plain_kind :: HsBndrKind GhcRn -> Bool
     plain_kind HsBndrNoKind{} = True
@@ -2871,16 +2976,41 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
     plain_kind _ = False
 
     early_datatypes = mkNameEnv
-      [ (t, cons) | TyClGroup{group_ext = deps, group_kisigs = [], group_tyclds =
+      [ (t, (length params, cons)) | TyClGroup{group_ext = deps, group_kisigs = [], group_tyclds =
                      [L _ DataDecl{tcdLName = L _ t, tcdModifiers = [],
-                                   tcdTyVars = HsQTvs{hsq_explicit = []},
+                                   tcdTyVars = HsQTvs{hsq_explicit = params},
                                    tcdDataDefn = HsDataDefn{dd_ctxt = Nothing, dd_kindSig = Nothing,
                                      dd_cons = DataTypeCons False cs, dd_derivs = derivs}}]} <- tycls
                   , isEmptyNameSet deps
-                  , Just cons <- [early_constructors t cs derivs] ]
+                  , Just cons <- [early_constructors t params cs derivs] ]
 
-    early_constructors t [con] [] | Just c <- retained_constructor t con = Just [c]
-    early_constructors t cs _ = concat <$> traverse (prefix_con t) cs
+    early_constructors t [] [con] [] | Just c <- retained_constructor t con = Just [c]
+    early_constructors t [] cs _ = concat <$> traverse (prefix_con t) cs
+    early_constructors t params cs [] = do
+      field_type <- independent_field_type t params
+      traverse (parameterized_con field_type) cs
+    early_constructors _ _ _ _ = Nothing
+
+    independent_field_type t params = do
+      vars <- traverse regular_parameter params
+      pure (field vars)
+      where
+        field vars ty
+          | Just parameter <- parameter_name ty, parameter `elem` vars = True
+          | Just (root, args) <- type_application ty
+          = root == t && traverse parameter_name args == Just vars
+          | otherwise = False
+
+        regular_parameter
+          (L _ (HsTvb _ HsBndrRequired{} (HsBndrVar _ (L _ name)) kind))
+          | plain_kind kind = Just name
+        regular_parameter _ = Nothing
+
+    parameterized_con field_type
+      (L _ ConDeclH98{con_name = L _ c, con_modifiers = [], con_telescope = [],
+                      con_args = PrefixCon _ fields})
+      | all (plain_constructor_field field_type) fields = Just c
+    parameterized_con _ _ = Nothing
 
     retained_constructor t (L _ ConDeclGADT
       { con_names = L _ c :| [], con_modifiers = [], con_telescope = []
@@ -2919,10 +3049,13 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
       , all independent_field fields = Just (map unLoc (toList cs))
     prefix_con _ _ = Nothing
 
-    independent_field :: HsConDeclField GhcRn -> Bool
-    independent_field CDF{cdf_type = ty, cdf_multiplicity = HsModifiedFunArr _ [] HsStandardArr{}}
-      = isJust (type_name ty)
-    independent_field _ = False
+    independent_field = plain_constructor_field (isJust . type_name)
+
+    plain_constructor_field :: (LHsType GhcRn -> Bool) -> HsConDeclField GhcRn -> Bool
+    plain_constructor_field check
+      CDF{cdf_type = ty, cdf_multiplicity = HsModifiedFunArr _ [] HsStandardArr{}}
+      = check ty
+    plain_constructor_field _ _ = False
 
     sig_names :: Sig GhcRn -> [Name]
     sig_names (TypeSig _ _ [L _ b] _) = [b]
