@@ -3283,15 +3283,24 @@ checkFamInstRhs selectors lhs_tc lhs_tys famInsts
    -- See Note [Termination of lifted case selectors] in GHC.Tc.TyCl.
    case_calls tc tys = do
       rows <- lookupNameEnv selectors (tyConName tc)
-      guard (tyConArity tc == length tys)
-      kind@TyConApp{} <- pure (coreFullView (typeKind (mkTyConApp tc tys)))
-      guard (all isConstructorCaseType (kind : tys))
+      guard (selector_result tc tys)
       if all constructor_row rows
-        then pure []
+        then [] <$ guard (all (isCaseSelectorType constructor_selector) tys)
         else do
-          guard (all isConstructorCaseType lhs_tys)
+          guard (all isConstructorCaseType tys && all isConstructorCaseType lhs_tys)
           refined <- traverse (refineCaseCall lhs_tc lhs_tys tys) rows
           pure (concatMap check_branch refined)
+
+   constructor_selector tc tys
+      | Just rows <- lookupNameEnv selectors (tyConName tc)
+      = selector_result tc tys && all constructor_row rows
+      | otherwise = False
+
+   selector_result tc tys
+      | tyConArity tc == length tys
+      , kind@TyConApp{} <- coreFullView (typeKind (mkTyConApp tc tys))
+      = isConstructorCaseType kind
+      | otherwise = False
 
    constructor_row VI{vi_rhs = rhs} = isConstructorCaseType rhs
    constructor_row _ = False
@@ -3363,13 +3372,19 @@ refineCaseCall _ _ _ _ = Nothing
 -- | A case selector permits only constructor types, variables and literals.
 -- In particular, an application of a captured variable can call a family.
 isConstructorCaseType :: Type -> Bool
-isConstructorCaseType ty
-  | Just rhs <- coreView ty = isConstructorCaseType rhs
-isConstructorCaseType (TyVarTy _) = True
-isConstructorCaseType (LitTy _) = True
-isConstructorCaseType (TyConApp tc args) =
-  not (isFamilyTyCon tc || isTypeSynonymTyCon tc) && all isConstructorCaseType args
-isConstructorCaseType _ = False
+isConstructorCaseType = isCaseSelectorType (\_ _ -> False)
+
+-- | A constructor type can also contain checked selector applications.
+isCaseSelectorType :: (TyCon -> [Type] -> Bool) -> Type -> Bool
+isCaseSelectorType check_selector = go
+  where
+    go ty | Just rhs <- coreView ty = go rhs
+    go (TyVarTy _) = True
+    go (LitTy _) = True
+    go (TyConApp tc args) =
+      not (isTypeSynonymTyCon tc) &&
+      (not (isFamilyTyCon tc) || check_selector tc args) && all go args
+    go _ = False
 
 {- Note [Termination of lifted sum payloads]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
