@@ -290,6 +290,7 @@ read a supplied field when its sibling is omitted: [True]
 replace a named field at the original stored length: (1,[('x',False)])
 reset both columns at their stored length: (1,[('-',False)])
 replace the stored length and both named payloads: (0,[])
+copy flags after comparing two stored lengths: (Just [('x',False)],Nothing)
 put two columns in a row indexed by the record length: ("rs",[True,False])
 project the length of a known dependent package in a type: Refl
 project from two payload families with the same dependent function: ("xx",7)

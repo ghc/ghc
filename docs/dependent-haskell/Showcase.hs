@@ -2511,12 +2511,9 @@ listBoundaries = do
             }
     observe "replace a named field at the original stored length"
         (natToInt (Named.storedLength updated), NamedSiblingColumnsClient.readPairs updated)
-    let fillVector :: a -> Vec a len -> Vec a len
-        fillVector _ VNil = VNil
-        fillVector x (VCons _ xs) = VCons x (fillVector x xs)
-        defaults = named
-            { Named.namedLetters = fillVector '-' (Named.namedLetters named)
-            , Named.namedFlags = fillVector False (Named.namedFlags named)
+    let defaults = named
+            { Named.namedLetters = replicateNative (Named.storedLength named) '-'
+            , Named.namedFlags = replicateNative (Named.storedLength named) False
             }
     observe "reset both columns at their stored length"
         (natToInt (Named.storedLength defaults), NamedSiblingColumnsClient.readPairs defaults)
@@ -2527,6 +2524,9 @@ listBoundaries = do
             }
     observe "replace the stored length and both named payloads"
         (natToInt (Named.storedLength emptied), NamedSiblingColumnsClient.readPairs emptied)
+    let copyFlags q = NamedSiblingColumnsClient.readPairs
+                       <$> NamedSiblingColumnsClient.copyFlagsAtSameLength named q
+    observe "copy flags after comparing two stored lengths" (copyFlags defaults, copyFlags emptied)
     let unpack :: forall len. TypeLambda.Fields '[Vec Char len, Vec Bool len] -> (String, [Bool])
         unpack (TypeLambda.Field xs (TypeLambda.Field ys TypeLambda.End)) = (toList xs, toList ys)
     observe "put two columns in a row indexed by the record length"
