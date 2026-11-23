@@ -454,3 +454,15 @@ counted two forks and returned `Refl` with a bottom leaf payload and a
 bottom callback.
 [Declaration group boundaries](https://serokell.io/blog/dependency-analysis-haskell#template-haskell-splices)
 and [proposal #378 on lexical scoping](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#lexical-scoping-term-syntax-and-type-syntax-and-renaming).
+
+### A tree with two type parameters
+
+Job 1271 repeated the comparison on normal 555 with a tree of kind
+`Type -> Type -> Type`. Its mapper preserves a branch key and changes
+the leaf payload. At both `-O0` and `-O2`, the ordinary workers compiled.
+The proof failed with GHC-68947 in both source orders, after a splice
+following the datatypes, and with imported datatypes. Compiling all
+workers separately exposed an equation for `mapValues`, but none for
+`nodes`. The client then rejected `nodes (mapValues f t)` with GHC-70565.
+Changing declaration order alone cannot make this proof work. The 12
+results are in `r21-two-parameter-tree-20261123/results.tsv`.

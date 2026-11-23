@@ -8285,6 +8285,20 @@ names. The additional equality for matching trees is a fork decision.
 [Agda case trees](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#case-trees)
 and [pattern-lambda translation](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#internal-representation-of-pattern-lambdas).
 
+### Required type arguments in GADT signatures
+
+Proposal #402 requires `RequiredTypeArguments` for visible `forall`
+in a GADT constructor signature. Stock GHC 9.14.1 still accepts
+`K :: forall -> T` with the extension disabled. On 23 November the fork
+chose to apply the requirement to that empty leading group as well.
+`ExperimentalDependentTypes` will imply `RequiredTypeArguments` through
+GHC's ordinary flag mechanism. This also enables #281's scoping rules
+for terms in types. A module can override the implication with a later
+`NoRequiredTypeArguments`.
+[Proposal #402, grammar clarification 5](https://ghc-proposals.readthedocs.io/en/latest/proposals/0402-gadt-syntax.html#grammar-specification),
+[#281 on scoping](https://ghc-proposals.readthedocs.io/en/latest/proposals/0281-visible-forall.html)
+and [GHC's extension flag ordering](../../compiler/GHC/Driver/Session.hs).
+
 ### Newtype casts and ordered fields
 
 Proposal #98 permits a newtype to abstract over its field's

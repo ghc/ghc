@@ -69,18 +69,27 @@ still failed at imported proof uses. Inferred proof bindings have separate check
 R41 has a separate release candidate at `acd48e3f3f` in
 `r41-only-normal-553-20261123`. Job 1242 built both normal stages from the
 published branch plus the ordered GADT changes and their Showcase
-example. It includes the extension guard on the new empty visible
-suffix. Check its own tests and guide render before updating R41.
-Job 1246 checks 66 registered cases, the default optimized Showcase,
-constructor permutations and older interface readers. The two edited
-guide pages rendered with all six new internal links resolved. The next R41 change starts from
-the guide-only descendant `a3d61239a2`. It corrects the
-grammar for an inferred binder with a kind annotation and an unparenthesized
-function type in a record field. Job 1266 checks both examples and the
-guide render on that compiler. Before publishing R41, extend the
-`RequiredTypeArguments` check to the leading empty visible GADT forall,
-and make `ExperimentalDependentTypes` imply `RequiredTypeArguments`.
-A later explicit `NoRequiredTypeArguments` overrides the implication.
+example. Job 1246 passed all 66 registered tests, the 553-line Showcase
+at native `-O0`, native `-O2` and in GHCi, the constructor permutations
+and the older interface readers. Job 1266 checked the inferred binder
+and record-field examples from guide revision `a3d61239a2`. Both pages
+rendered with all six new links resolved.
+
+The release still needs the [required type argument policy](REFERENCES.md#required-type-arguments-in-gadt-signatures).
+An empty visible `forall` in a GADT signature requires
+`RequiredTypeArguments`, including in the first position.
+`ExperimentalDependentTypes` implies it. A later explicit
+`NoRequiredTypeArguments` overrides the implication. Job 1276 found that
+a hand-built splice could lose the empty binder during conversion.
+The correction preserves the group on the constructor's result spine.
+Job 1284 passed all 16 selected registrations on the component,
+including the matrix of source, quotation, splice and flag-order cases.
+Records still reject a quantified result under either setting.
+The evidence is in `r41-required-flag-20261123/POLICY-EVIDENCE.md`.
+Job 1285 builds both normal stages at `71e5215115`. Its dependent job
+1286 checks 84 registered tests, 553 Showcase outputs in three modes,
+interface readers and the guide. Resume these jobs from
+`r41-required-normal-553-20261123` and the local `r41-required-normal` ref.
 The `r41-only-normal` and `r16-r41-review-normal` source refs are
 under `refs/archive/dependent-haskell/2026-11-23/`.
 
@@ -88,10 +97,15 @@ The next combined source is `4d10fdc35f` in
 `r03-r16-proof-attribution-intake-20261123/source`. It includes the
 single interface feature for a named callback as a value or in an
 application. It also includes inferred proof bindings at `4a119b07e1`.
-The 32 component cases passed at `-O0` and `-O2`. Job 1267 builds
-these changes after 1227. Job 1269 checks 59 registrations, proof
+The 32 component cases passed at `-O0` and `-O2`. Job 1267 built
+both normal stages. Job 1269 checks 59 registrations, proof
 upgrades and the Showcase. It reports the package archive, list-law
 test and installed tree client independently.
+
+The separate R16 prototype in `r16-length-observation-20261123` records
+the `size (map f xs)` observation on the installed `lengthMap` proof.
+Job 1279 installed HaskLib. Its client compiler crashed, so this
+prototype stays private.
 
 The local archive refs `r19-r41-normal-552`, `r16-hasklib-tree-553`
 and `r27-legacy-transition-normal` are under
@@ -322,8 +336,11 @@ and an open decision on legacy language defaults.
    The earlier WSL restart erased `/tmp` while Git and Pueue retained
    records for its old paths. Keep active builds under `_build/on-demand/`.
 3. Restore the [shared WSL build queue](CHECKPOINTS.md#restore-the-shared-wsl-build-queue)
-   before submitting work. Use two subagents, one on R41 and one on R16,
-   with the coordinator handling review and integration. R21 is on hold.
+   before submitting work. Use at most two subagents. The coordinator
+   reviews and integrates their results. R41 is checking constructor
+   signatures. R21 is checking whether the compiler can export the
+   branch-count equation for a tree with two type parameters. See the
+   [two-parameter comparison](roadmap/R21-dependency-analysis.md#a-tree-with-two-type-parameters).
    The group has two slots. All GHC jobs share
    16 logical CPUs, 64,000,000,000 bytes of memory and zero swap.
    Higher-priority jobs pause the queue and freeze the GHC slice.
