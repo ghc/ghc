@@ -39,7 +39,7 @@ known = Refl
 HS
     "${ghc[@]}" "$opt" -c KnownLength.hs
     cat > Main.hs <<'HS'
-{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
+{-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes #-}
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.List (isPrefixOf)
 import PackedVecLibrary (Nat(..), Vec(..), natToInt, toList)
@@ -53,6 +53,13 @@ readLetters p = toList (letters p)
 
 readFlags :: Columns -> [Bool]
 readFlags p = toList (flags p)
+
+readRow :: Columns -> (String, [Bool])
+readRow p = unpack (packRow p)
+  where
+    -- Fix the two field types before matching on the GADT.
+    unpack :: Fields '[Vec Char n, Vec Bool n] -> (String, [Bool])
+    unpack (Field xs (Field ys End)) = (toList xs, toList ys)
 
 throws :: String -> a -> IO Bool
 throws label value = do
@@ -71,8 +78,7 @@ main = do
             (VCons 'r' (VCons 's' VNil))
             (VCons True (VCons False VNil))
     print (readPairs columns)
-    case packRow columns of
-        Field xs (Field ys End) -> print (toList xs, toList ys)
+    print (readRow columns)
 HS
     "${ghc[@]}" "$opt" -c Main.hs
     "${ghc[@]}" Main.o SiblingColumnsClient.o SiblingColumnRow.o \
