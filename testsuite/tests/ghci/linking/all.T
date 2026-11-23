@@ -97,13 +97,11 @@ test('T25155', [req_c, req_th, req_interp, req_rts_linker, extra_files(['T25155_
 #
 # The expected output is the *fixed* behaviour: UnloadWkrB fails to link and
 # nothing else does, so UnloadWkrA keeps working and :reload succeeds.
-#
-# FIXME: replace the expect_broken ticket numbers once the bug is filed.
 
 def normalise_unload_wkr(s):
     import re
     # The failing object is named with the full path of the test directory.
-    s = re.sub(r'\S*UnloadWkrB\.o', 'UnloadWkrB.o', s)
+    s = re.sub(r'(Could not load Object Code ).*(UnloadWkrB\.o)', r'\1\2', s)
     # With -fexternal-interpreter the messages are prefixed with the name of
     # the iserv binary, which GHC generates into a temporary directory.
     # normalise_errmsg only knows how to normalise the compiler's own name.
@@ -117,8 +115,7 @@ test('unload_wkr-throw',
       unless(doing_ghci, skip),
       req_rts_linker,
       when(ghc_dynamic(), skip),
-      normalise_errmsg_fun(normalise_unload_wkr),
-      expect_broken(28104)],
+      normalise_errmsg_fun(normalise_unload_wkr)],
      ghci_script, ['unload_wkr-throw.script'])
 
 test('unload_wkr-throw-ext',
@@ -128,6 +125,5 @@ test('unload_wkr-throw-ext',
       only_ways(['ghci']),
       unless(doing_ghci, skip),
       req_rts_linker,
-      normalise_errmsg_fun(normalise_unload_wkr),
-      expect_broken(28104)],
+      normalise_errmsg_fun(normalise_unload_wkr)],
      ghci_script, ['unload_wkr-throw.script'])

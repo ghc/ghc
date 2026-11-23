@@ -111,6 +111,7 @@ import GHC.Linker.Types
 import Control.Monad
 
 import Data.Array
+import Data.Containers.ListUtils (nubOrd)
 import Data.ByteString (ByteString)
 import qualified Data.Set as Set
 import Data.Char (isSpace)
@@ -234,27 +235,26 @@ lookupFromLoadedEnv interp name = do
 loadName :: SafeInterp -> HscEnv -> Name -> IO (ForeignHValue, [LinkableUsage], PkgsLoaded)
 loadName interp0 hsc_env name = do
   initLoaderState interp0 hsc_env
-  modifyLoaderState interp0 $ \interp pls0 -> do
-    (pls, links, pkgs) <- if not (isExternalName name)
-       then return (pls0, [], emptyUDFM)
-       else do
-         (pls', ok, links, pkgs) <- loadDependencies interp hsc_env pls0 noSrcSpan
-                                      [nameModule name]
-         if failed ok
-           then throwGhcExceptionIO (ProgramError "")
-           else return (pls', links, pkgs)
+  (ok, m, links, pkgs) <- modifyLoaderState interp0 $ \interp pls0 -> do
+    (pls, ok, links, pkgs) <- if not (isExternalName name)
+       then return (pls0, Succeeded, [], emptyUDFM)
+       else loadDependencies interp hsc_env pls0 noSrcSpan [nameModule name]
 
-    case lookupNameBytecodeState (bco_loader_state pls) name of
-      Just (_,aa) -> return (pls,(aa, links, pkgs))
+    m <- case lookupNameBytecodeState (bco_loader_state pls) name of
+      _ | failed ok -> return Nothing
+      Just (_,aa) -> return (Just aa)
       Nothing     -> assertPpr (isExternalName name) (ppr name) $
-                     do let sym_to_find = IClosureSymbol name
-                        -- TODO: does not take loader state lock
-                        m <- lookupClosure interp sym_to_find
-                        r <- case m of
-                          Just fhv -> return fhv
-                          Nothing -> linkFail "GHC.Linker.Loader.loadName"
-                                       (ppr sym_to_find)
-                        return (pls,(r, links, pkgs))
+                     -- TODO: does not take loader state lock
+                     lookupClosure interp sym_to_find
+    return (pls, (ok, m, links, pkgs))
+
+  when (failed ok) $ throwGhcExceptionIO (ProgramError "")
+  case m of
+    Just fhv -> return (fhv, links, pkgs)
+    Nothing -> linkFail "GHC.Linker.Loader.loadName"
+                 (ppr sym_to_find)
+  where
+    sym_to_find = IClosureSymbol name
 
 -- | Restrict a 'PkgsLoaded' map to the packages directly needed and their
 -- full transitive closure (via 'loaded_pkg_trans_deps').
@@ -737,16 +737,19 @@ loadDecls interp0 hsc_env span linkable = do
     initLoaderState interp0 hsc_env
 
     -- Take lock for the actual work.
-    modifyLoaderState interp0 $ \interp pls0 -> do
+    (ok, ok2, links_needed, units_needed) <- modifyLoaderState interp0 $ \interp pls0 -> do
       -- Link the packages and modules required
       (pls, ok, links_needed, units_needed) <- loadDependencies interp hsc_env pls0 span needed_mods
-      if failed ok
-        then throwGhcExceptionIO (ProgramError "could not load dependencies for decls")
-        else do
-          (pls2, ok2) <- loadInternalModuleLinkables interp hsc_env pls [linkable]
-          when (failed ok2) $
-            throwGhcExceptionIO (ProgramError "could not load linkable for decls")
-          return (pls2, (links_needed, units_needed))
+      (pls2, ok2) <- if failed ok
+        then return (pls, Failed)
+        else loadInternalModuleLinkables interp hsc_env pls [linkable]
+      return (pls2, (ok, ok2, links_needed, units_needed))
+
+    when (failed ok) $
+      throwGhcExceptionIO (ProgramError "could not load dependencies for decls")
+    when (failed ok2) $
+      throwGhcExceptionIO (ProgramError "could not load linkable for decls")
+    return (links_needed, units_needed)
   where
     cbcs = linkableBCOs linkable
 
@@ -774,11 +777,11 @@ loadDecls interp0 hsc_env span linkable = do
 loadModule :: SafeInterp -> HscEnv -> Module -> IO ()
 loadModule interp0 hsc_env mod = do
   initLoaderState interp0 hsc_env
-  modifyLoaderState_ interp0 $ \interp pls -> do
+  ok <- modifyLoaderState interp0 $ \interp pls -> do
     (pls', ok, _, _) <- loadDependencies interp hsc_env pls noSrcSpan [mod]
-    if failed ok
-      then throwGhcExceptionIO (ProgramError "could not load module")
-      else return pls'
+    return (pls', ok)
+  when (failed ok) $
+    throwGhcExceptionIO (ProgramError "could not load module")
 
 {- **********************************************************************
 
@@ -862,18 +865,19 @@ loadObjects interp hsc_env pls objs = do
         if interpreterDynamic interp
             then do pls2 <- dynLoadObjs interp hsc_env pls1 wanted_objs
                     return (pls2, Succeeded)
-            else do mapM_ (loadObj interp) wanted_objs
+            else do loaded <- newIORef []
+                    let load obj = loadObj interp obj >> modifyIORef' loaded (obj :)
+                        undo     = readIORef loaded >>= mapM_ (unloadObj interp)
 
                     -- Link them all together
-                    ok <- resolveObjs interp
+                    ok <- (mapM_ load wanted_objs >> resolveObjs interp)
+                            `onException` undo
 
-                    -- If resolving failed, unload all our
-                    -- object modules and carry on
                     if succeeded ok then
                             return (pls1, Succeeded)
                       else do
-                            pls2 <- unload_wkr interp pls1
-                            return (pls2, Failed)
+                            undo
+                            return (pls, Failed)
 
 
 -- | Create a shared library containing the given object files
@@ -1146,10 +1150,6 @@ What we need to avoid is having more in the 'LoaderState' than is actually
 loaded. This can only happen while unloading, which is why purge the symbol cache
 before the unload.
 
-We should also make sure the emptied out loader state returned from unload_wkr
-gets actually written to the loader state, the failure to do so is tracked by
-#28104.
-
 -}
 
 -- ---------------------------------------------------------------------------
@@ -1168,16 +1168,13 @@ unload interp0 hsc_env
         -- Initialise the linker (if it's not been done already)
         initLoaderState interp0 hsc_env
 
-        _new_pls <- modifyLoaderState interp0 $ \interp pls -> do
-                 pls1 <- unload_wkr interp pls
-                 return (pls1, pls1)
-
-        return ()
+        withInterp interp0 $ \_ ->
+          modifyLoaderState interp0 unload_wkr >>= mapM_ throwIO
 
 unload_wkr
   :: Interp
   -> LoaderState
-  -> IO LoaderState
+  -> IO (LoaderState, Maybe SomeException)
 -- Does the core unload business
 -- (the wrapper blocks exceptions and deals with the LS get and put)
 
@@ -1186,41 +1183,47 @@ unload_wkr interp pls@LoaderState{..}  = do
   -- we're unloading some code.  -fghci-leak-check with the tests in
   -- testsuite/ghci can detect space leaks here.
 
-  let linkables_to_unload = moduleEnvElts objs_loaded ++ moduleEnvElts bcos_loaded
+  let objs_to_unload = mapModuleEnv nubOrd $
+        plusModuleEnv_C (++) (mapModuleEnv linkableUsageObjs objs_loaded)
+                             (mapModuleEnv linkableUsageObjs bcos_loaded)
 
   -- If we unloaded any object files at all, we need to purge the cache
   -- of lookupSymbol results.
   -- We do so before actually unloading, so the cache is never stale.
   --
   -- See Note [LoaderState may lag the interpreter]
-  when (not (null (filter (not . null . linkableUsageObjs) linkables_to_unload))) $
+  when (any (not . null) (moduleEnvElts objs_to_unload)) $
     purgeLookupSymbolCache interp
 
-  mapM_ unloadObjs linkables_to_unload
+  (objs_left, err) <- foldM unloadObjs (objs_loaded, Nothing) (moduleEnvToList objs_to_unload)
 
-  -- FIXME: this emptied state should be committed even on exceptions, see #28104
   let !new_pls = pls { bco_loader_state = modifyHomePackageBytecodeState bco_loader_state $ \_ -> emptyBytecodeState,
                        -- NB: we don't unload the external package
                        bcos_loaded   = emptyModuleEnv,
-                       objs_loaded   = emptyModuleEnv }
+                       objs_loaded   = objs_left }
 
-  return new_pls
+  return (new_pls, err)
   where
-    unloadObjs :: LinkableUsage -> IO ()
-    unloadObjs lnk
-      | interpreterDynamic interp = return ()
+    unloadObjs
+      :: (LinkableSet LinkableUsage, Maybe SomeException)
+      -> (Module, [FilePath])
+      -> IO (LinkableSet LinkableUsage, Maybe SomeException)
+    unloadObjs acc@(_, Just _) _ = return acc
+    unloadObjs (objs_left, Nothing) (mod, objs)
+      | interpreterDynamic interp = return (delModuleEnv objs_left mod, Nothing)
         -- We don't do any cleanup when linking objects with the
         -- dynamic linker.  Doing so introduces extra complexity for
         -- not much benefit.
 
       | otherwise
-      = mapM_ (unloadObj interp) (linkableUsageObjs lnk)
+      = do r <- try $ mapM_ (unloadObj interp) objs
                 -- The components of a BCO linkable may contain
                 -- dot-o files (generated from C stubs).
                 --
                 -- But the BCO parts can be unlinked just by
                 -- letting go of them (plus of course depopulating
                 -- the symbol table which is done in the main body)
+           return (delModuleEnv objs_left mod, either Just (const Nothing) r)
 
 showLS :: LibrarySpec -> String
 showLS (Objects nms)  = "(static) [" ++ intercalate ", " nms ++ "]"
