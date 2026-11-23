@@ -50,6 +50,27 @@ the new kind.
 [built-in arithmetic example](#passing-built-in-arithmetic-to-map)
 and [the stock transformer case](#a-transformer-kind-synonym).
 
+## Unchanged source on stock GHC and the fork
+
+Job 1636 compiled seven upstream `polykinds` tests on stock GHC 9.14.1
+and normal fork compiler `049ac2c031` (564). The tests use the same
+source on both compilers. Their files match the fork point at
+`19ff36f2ae`. Each has a normal compile registration with no extra
+options. All seven passed on stock GHC. The following table gives the fork diagnostics.
+
+| Unmodified tests | Diagnostic on 564 | Source feature |
+| --- | --- | --- |
+| `T11523`, `T12055`, `T14515`, `T14873`, `T19094`, `T19250` | GHC-83865 | A later use requires a different arrow or forall matchability from the one in its synonym. |
+| `T15874` | GHC-45219 | The invisible `forall` in `Varianced` has a different matchability from that required by its data family instance. |
+
+These seven tests are outside the 234 compatibility registrations and
+the 137 focused tests reported for 564. The latter include
+`deriving-via-compile`, which fails on the fork. The table records
+selected known incompatibilities. It gives no estimate for all of GHC
+or for Hackage.
+[Checked migration spellings](#compatibility-with-existing-haskell)
+and [the transformer example](#a-transformer-kind-synonym).
+
 ## Passing built-in arithmetic to Map
 
 `Map` takes an unmatchable type function and applies it to each element

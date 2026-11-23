@@ -38,6 +38,9 @@ the remaining `deriving-via-compile` case. The fork produced the same
 `MTrans` diagnostic as 562. The focused driver exited with status 1.
 [Transformer kind](roadmap/R23-unsaturated-type-families.md#a-transformer-kind-synonym).
 
+A separate stock-GHC comparison confirmed seven known matchability
+failures outside both selections. [Seven unchanged polykinds tests](roadmap/R23-unsaturated-type-families.md#unchanged-source-on-stock-ghc-and-the-fork).
+
 ## Standalone unsaturated type families
 
 A module can enable `UnsaturatedTypeFamilies` to pass a type family

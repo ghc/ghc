@@ -60,6 +60,8 @@ accept both a data constructor and a type family. R23 remains partial.
 The standalone flag now works without the umbrella. The fork also
 accepts direct partial applications of built-in arithmetic. The stock
 transformer kind synonym still needs a source migration.
+Seven other upstream source programs also require matchability
+annotations on the fork. [Stock GHC comparison](roadmap/R23-unsaturated-type-families.md#unchanged-source-on-stock-ghc-and-the-fork).
 [564 arithmetic checks](CHECKPOINTS.md#built-in-arithmetic-callbacks-and-type-let-case-results).
 [562 flag and interface checks](CHECKPOINTS.md#standalone-unsaturated-type-families).
 [560 verification](CHECKPOINTS.md#inferred-matchability-in-type-synonyms).
