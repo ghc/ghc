@@ -227,7 +227,17 @@ fi
     "${g[@]}" -XBangPatterns -fomit-interface-pragmas -c DependentPair.hs
     cp "$src/DependentProjection.hs" .
     if "${g[@]}" -c DependentProjection.hs >strict.log 2>&1 ||
-       ! grep -Fq '[GHC-05617]' strict.log || ! grep -Fq 'first (Pair' strict.log; then
+       ! grep -Fq 'DependentProjection.hs:7:42: error: [GHC-68947]' strict.log ||
+       ! grep -Fq 'second :: foreach (q :: DPair a p) -> p (first q)' strict.log; then
+        cat strict.log >&2
+        exit 1
+    fi
+
+    # With required type arguments off, the payload still cannot use that equation.
+    sed -i '1a{-# LANGUAGE NoRequiredTypeArguments #-}' DependentProjection.hs
+    if "${g[@]}" -c DependentProjection.hs >strict.log 2>&1 ||
+       ! grep -Fq 'DependentProjection.hs:9:25: error: [GHC-05617]' strict.log ||
+       ! grep -Fq 'first (Pair' strict.log; then
         cat strict.log >&2
         exit 1
     fi
