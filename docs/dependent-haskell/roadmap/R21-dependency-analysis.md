@@ -533,3 +533,23 @@ after it. Jobs 1434 and 1435 used the same-module synonym in the full
 qualified the normal two-stage compiler.
 [Release checks](../CHECKPOINTS.md#checked-character-predicates-in-the-defining-module) and
 [declaration groups and prior art](../REFERENCES.md#checked-character-equations-in-a-declaration-group).
+
+## Deriving and associated equations
+
+A datatype used by an early structural worker may have an attached
+`deriving Show` clause. GHC checks the worker's equations first. The
+regular instance pass derives `Show` once, with the instances for the
+rest of the group in scope. In the example, an ordinary reader can
+prove `Flipped 'Stop :~: 'Go` and use the derived instance to show
+`sample ()`. [Provider](../examples/open-evaluation/LocalDerivedAssociated.hs)
+and [reader](../examples/open-evaluation/LocalDerivedAssociatedClient.hs).
+
+An associated equation can also use an independent local function on
+its right-hand side. Either source order works. Job 1466 checked an
+imported class and a local class at `-O0` and `-O2`. All eight
+interface-only clients printed `True`. A function that needs the
+pending instance's dictionary still reports GHC-70566 at its use
+in the equation. Job 1464 compared eight deriving cases in both
+source orders against GHC 9.14.1. Each accepted case produced the
+same output. Each rejected case named the same deriving sites.
+[Deriving and scheduling references](../REFERENCES.md#attached-deriving-and-associated-equations-in-a-declaration-group).

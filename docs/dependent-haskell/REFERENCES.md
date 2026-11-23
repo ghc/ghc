@@ -55,6 +55,19 @@ argument type. It does not supply evidence to the surrounding result.
 [Agda instance candidates](https://agda.readthedocs.io/en/v2.8.0/language/instance-arguments.html)
 and [retained field example](roadmap/R24-constrained-type-families.md#family-domains-under-a-retained-binder).
 
+Agda's built-in `Σ` gives the second field type `B fst`. This is the
+model for storing `Payload flag` beside a runtime `flag`. Quick Look
+uses information from an application before its final type check. On the
+fork, the expected argument type can be a constrained family that
+reduces to a dependent pair. Each such reduction needs its domain in
+the caller's scope. Final subsumption still checks the original family
+application. Stock GHC describes associated type equations independently
+of the enclosing instance context.
+[Agda's built-in Sigma](https://github.com/agda/agda/blob/master/src/data/lib/prim/Agda/Builtin/Sigma.agda),
+[GHC proposal #274](https://ghc-proposals.readthedocs.io/en/latest/proposals/0274-quick-look-impredicativity.html),
+[GHC associated instance contexts](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#instance-contexts-and-associated-type-and-data-instances)
+and [R04 construction example](roadmap/R04-dependent-sums.md#construct-a-retained-pair-in-an-ordinary-argument).
+
 Proposal #281 supplies the Haskell syntax `forall c ->` and `(type c)`.
 Agda's dependent function space allows the type of a later argument to
 mention an earlier explicit parameter. R24 uses the same scope for a
@@ -6610,6 +6623,26 @@ splices and cycles remain subject to the existing checks.
 [Agda 2.8 mutual declarations](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#interleaved-mutual-blocks),
 [GHC Template Haskell declaration groups](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/template_haskell.html)
 and [R21 source example](roadmap/R21-dependency-analysis.md#checked-character-equations-in-their-defining-module).
+
+### Attached deriving and associated equations in a declaration group
+
+Agda's interleaved mutual blocks distinguish a declared name from its
+defining clauses. The Haskell analogue here is a type synonym that needs
+the equations of a local function. Checking that function early must
+still give an attached `deriving Show` access to instances elsewhere in
+the group. The Haskell 2010 Report requires a suitable class instance
+for each field. The fork saves the early datatype's deriving information
+and generates its instances in GHC's regular pass.
+[Agda interleaved declarations](https://agda.readthedocs.io/en/v2.8.0/language/mutual-recursion.html#interleaved-mutual-blocks)
+and [Haskell 2010, derived instances](https://www.haskell.org/onlinereport/haskell2010/haskellch11.html).
+
+An associated equation belongs to its enclosing instance. The fork
+checks a local function used on the right-hand side early only when
+that function is independent of the pending instance. The class methods
+and the equation stay together. A function that needs a dictionary
+from the instance would form a cycle.
+[GHC associated instances](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html#associated-instances)
+and [R21 example](roadmap/R21-dependency-analysis.md#deriving-and-associated-equations).
 
 ### Scheduling helpers and reifying an indexed result
 
