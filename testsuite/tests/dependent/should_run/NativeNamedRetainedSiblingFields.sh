@@ -50,7 +50,8 @@ main = do
     let q = negateFlags p
     print (natToInt (storedLength q), readPairs q)
     print (readOnlyFlags (negateFlags (NamedColumns (S Z) undefined (VCons True VNil))))
-    print (toList (namedLetters (omitFlags p)))
+    let r = omitFlags p
+    print (toList (namedLetters r))
 HS
     "${ghc[@]}" "$opt" -c Main.hs
     "${ghc[@]}" Main.o ../provider/{PackedVecLibrary,NamedSiblingColumns}.o -o observe
