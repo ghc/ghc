@@ -143,7 +143,6 @@ import GHC.Builtin.KnownOccs (typeRepIdOcc)
 import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.WiredIn.Prim
 
-import GHC.Types.Error
 import GHC.Types.Literal (litValue, mkLitIntWrap, mkLitWordWrap)
 import GHC.Types.Id ( idName, isClassOpId_maybe, mkLocalId, mkSysLocalM, sourceTableId_maybe, sourceTableKeepsExecutable )
 import GHC.Types.Name.Env
@@ -2263,13 +2262,10 @@ tcHsType mode src@(XHsType (HsTypeLetProductCheckRn (L loc name) arity rhs)) exp
             && isVanillaDataCon con
             && null (dataConRepArgBinders con)
             && tyConSingleDataCon_maybe parent == Just con) $
-      failWithTc (mkTcRnUnknownMessage (mkPlainError []
-        (quotes (ppr name) <+> text "must be the sole constructor of a regular datatype in this type let pattern.")))
+      failWithTc (TcRnTypeLetInvalidConstructor con)
     let expected = dataConSourceArity con
-    unless (arity == expected) $
-      failWithTc (mkTcRnUnknownMessage (mkPlainError []
-        (text "Wrong number of fields in the type let pattern for" <+> quotes (ppr name) <> dot
-         $$ text "Expected" <+> int expected <> comma <+> text "found" <+> int arity <> dot)))
+    checkTc (arity == expected)
+      (TcRnArityMismatch (AConLike (RealDataCon con)) expected arity)
     pure parent
   (_, params) <- newMetaTyVars (tyConTyVars parent)
   let product_kind = mkTyConApp parent (mkTyVarTys params)

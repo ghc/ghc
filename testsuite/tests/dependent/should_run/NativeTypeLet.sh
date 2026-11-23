@@ -210,7 +210,8 @@ HS
 
 reject() {
     local file=$1 location=$2 code=$3 message=$4 status=0
-    "${g[@]}" -c "$file.hs" >error.log 2>&1 || status=$?
+    shift 4
+    "${g[@]}" "$@" -c "$file.hs" >error.log 2>&1 || status=$?
     if [[ $status != 1 ]] ||
        ! grep -Fq "$file.hs:$location: error: [GHC-$code]" error.log ||
        ! grep -Fq "$message" error.log; then
@@ -226,21 +227,26 @@ import GHC.TypeNats (Nat)
 data Choice = Some Nat Nat | None
 type Bad = let Some _ _ = 'Some 2 3 in Bool
 HS
-status=0
-"${g[@]}" -c RefutableProduct.hs >error.log 2>&1 || status=$?
-test "$status" = 1
-grep -Fq 'must be the sole constructor of a regular datatype' error.log
+reject RefutableProduct 5:16-19 12838 \
+    'A type let pattern requires the sole constructor of a regular data type.' -ferror-spans
 
 cat >WrongProductArity.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
 module WrongProductArity where
-import PairBindings (Grid(..))
-type Bad = let Grid _ = 'Grid 2 3 in Bool
+import qualified PairBindings as P
+type Bad = let P.Grid _ = 'P.Grid 2 3 in Bool
 HS
-status=0
-"${g[@]}" -c WrongProductArity.hs >error.log 2>&1 || status=$?
-test "$status" = 1
-grep -Fq 'Expected 2, found 1.' error.log
+reject WrongProductArity 4:16-21 27346 \
+    'should have 2 arguments, but has been given 1' -ferror-spans
+
+cat >WrongValueArity.hs <<'HS'
+module WrongValueArity where
+import qualified PairBindings as P
+bad :: P.Grid -> Bool
+bad (P.Grid _) = True
+HS
+reject WrongValueArity 4:6-13 27346 \
+    'should have 2 arguments, but has been given 1' -ferror-spans
 
 cat >UnusedCase.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeFamilies #-}

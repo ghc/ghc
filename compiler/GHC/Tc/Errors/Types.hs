@@ -1332,8 +1332,8 @@ data TcRnMessage where
   -}
   TcRnSimplifiableConstraint :: !PredType -> !InstanceWhat -> TcRnMessage
 
-  {-| TcRnArityMismatch is an error that occurs when a type constructor is supplied with
-      fewer arguments than required.
+  {-| TcRnArityMismatch occurs when a constructor is supplied with the wrong
+      number of arguments.
 
       Examples(s):
         f Left = undefined
@@ -4626,6 +4626,9 @@ data TcRnMessage where
 
   -- | A constrained associated family occurs outside the supported subset.
   TcRnConstrainedFamilyUnsupported :: !TyCon -> !SDoc -> TcRnMessage
+
+  -- | The data constructor cannot be used in a type-level let pattern.
+  TcRnTypeLetInvalidConstructor :: !DataCon -> TcRnMessage
   deriving Generic
 
 ----

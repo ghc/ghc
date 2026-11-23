@@ -1140,6 +1140,11 @@ instance Diagnostic TcRnMessage where
     TcRnTypeLetDisabled
       -> mkSimpleDecorated $ text "A type-level" <+> quotes (text "let")
                               <+> text "requires -XExperimentalDependentTypes."
+    TcRnTypeLetInvalidConstructor con
+      -> mkSimpleDecorated $
+           text "The data constructor" <+> quotes (ppr con)
+             <+> text "cannot be used in a type let pattern."
+           $$ text "A type let pattern requires the sole constructor of a regular data type."
     TcRnTypeCaseDisabled
       -> mkSimpleDecorated $ text "A type-level" <+> quotes (text "case")
                               <+> text "requires -XExperimentalDependentTypes."
@@ -2559,6 +2564,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnTypeLetDisabled{}
       -> ErrorWithoutFlag
+    TcRnTypeLetInvalidConstructor{}
+      -> ErrorWithoutFlag
     TcRnTypeCaseDisabled{}
       -> ErrorWithoutFlag
     TcRnTypeCasePattern{} -> ErrorWithoutFlag
@@ -3286,6 +3293,8 @@ instance Diagnostic TcRnMessage where
     TcRnTypeLambdaDisabled{}
       -> noHints
     TcRnTypeLetDisabled{}
+      -> noHints
+    TcRnTypeLetInvalidConstructor{}
       -> noHints
     TcRnTypeCaseDisabled{}
       -> noHints
