@@ -719,7 +719,7 @@ synifyDataCon use_gadt_syntax dc =
         return $
           noLocA $
             ConDeclH98
-              { con_ext = noExtField
+              { con_ext = Nothing
               , con_name = name
               , con_telescope =
                   [ noLocA $ HsGadtForAll noExtField $
