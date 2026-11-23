@@ -249,7 +249,10 @@ function cabal_update() {
     info "Retrying cabal update in $delay seconds"
     sleep "$delay"
   done
-  cabal_update_once
+  cabal_update_once && return
+
+  [ -f "$CABAL_DIR/packages/hackage.haskell.org/01-index.tar" ] || return 1
+  warn "cabal update failed, continuing with the existing package index"
 }
 
 
