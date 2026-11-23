@@ -1344,7 +1344,8 @@ data RetainedGadtArg
   | GadtInvisibleArgs Type [TyVarBndr Specificity]
     -- ^ Matchability and binders of a nonempty invisible forall group.
   | GadtRequiredArgs Type [TyVarBndr ()]
-    -- ^ Matchability and binders of a nonempty required forall group.
+    -- ^ Matchability and binders of a required forall group. An empty group
+    -- has no matchability annotation or binder.
   | GadtContextArgs Cxt
     -- ^ Predicates of a nonempty context group.
   deriving (Show, Eq, Ord, Generic)

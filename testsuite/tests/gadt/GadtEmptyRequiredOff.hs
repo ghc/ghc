@@ -19,12 +19,25 @@ quoted = [d| data Quoted where
                QuotedLeading :: forall -> Bool -> Quoted
                QuotedLate :: Bool -> (forall -> Quoted)
            |]
-#elif defined(CHECK_SPLICE)
+#elif defined(CHECK_SPLICE_LEADING) || defined(CHECK_SPLICE_LATE) || defined(CHECK_SPLICE_STRUCTURED) || defined(CHECK_SPLICE_GADTC) || defined(CHECK_SPLICE_FIELD)
 import Language.Haskell.TH
 
 $( let parent = mkName "Spliced"
-       con = RetainedGadtC [mkName "Spliced"] []
-               (ForallVisT [] (AppT (AppT ArrowT (ConT ''Bool)) (ConT parent)))
+       names = [mkName "Spliced"]
+       result = ConT parent
+       boolArrow = AppT (AppT ArrowT (ConT ''Bool))
+#if defined(CHECK_SPLICE_LEADING)
+       con = RetainedGadtC names [] (ForallVisT [] (boolArrow result))
+#elif defined(CHECK_SPLICE_LATE)
+       con = RetainedGadtC names [] (boolArrow (ForallVisT [] result))
+#elif defined(CHECK_SPLICE_STRUCTURED)
+       con = RetainedGadtC names [GadtRequiredArgs (PromotedT (mkName "U")) []] result
+#elif defined(CHECK_SPLICE_GADTC)
+       con = GadtC names [] (ForallVisT [] result)
+#else
+       field = (Bang NoSourceUnpackedness NoSourceStrictness, ForallVisT [] (ConT ''Bool))
+       con = GadtC names [field] result
+#endif
    in pure [DataD [] parent [] Nothing [con] []] )
 #elif defined(CHECK_TYPE_DATA)
 type data TypeOnly a where

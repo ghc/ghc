@@ -757,8 +757,8 @@ cvtConstr _ _ do_con_name (GadtC c strtys ty) = case nonEmpty c of
     Just c -> do
         { c'      <- mapM do_con_name c
         ; args    <- mapM cvt_arg strtys
-        ; ty'     <- cvtType ty
-        ; mk_gadt_decl c' [] (PrefixConGADT noExtField args) ty'}
+        ; (telescope, ty') <- cvtGadtResult args ty
+        ; mk_gadt_decl c' telescope (PrefixConGADT noExtField args) ty'}
 
 cvtConstr _ parent_con do_con_name (RecGadtC c varstrtys ty) = case nonEmpty c of
     Nothing -> failWith RecGadtNoCons
@@ -775,6 +775,18 @@ cvtConstr type_data _ do_con_name (RetainedGadtC names args result) = case nonEm
     names' <- mapM do_con_name names
     (telescope, fields, suffix) <- cvtRetainedGadtArgs type_data args result
     mk_gadt_decl names' telescope (PrefixConGADT noExtField fields) suffix
+
+-- | Keep empty leading visible groups out of the result type of a nullary
+-- constructor. Later groups remain on the constructor spine.
+cvtGadtResult :: [HsConDeclField GhcPs] -> TH.Type
+              -> CvtM ([LHsGadtTelescope GhcPs], LHsType GhcPs)
+cvtGadtResult fields ty = do
+  result <- cvtGadtType ty
+  let (_, prefix, body) = splitLHsGadtTy (noLocA (mkHsImplicitSigType result))
+  pure $ if null fields && any empty_required prefix then (prefix, body) else ([], result)
+  where
+    empty_required (L _ (HsGadtForAll _ HsForAllVis{hsf_vis_bndrs = []})) = True
+    empty_required _ = False
 
 -- | Convert the prefix value fields and the ordered suffix separately.
 -- See Note [Terminal constructor foralls in TH].
@@ -819,13 +831,16 @@ cvtRetainedGadtArgs type_data args result = do
       pure (field { cdf_multiplicity = mult' } : fields, binders)
     prefix binders = pure ([], binders)
 
-    suffix [] = cvtType result
+    suffix [] = cvtGadtType result
     suffix (GadtIndexArg name domain : rest) =
       cvtRetainedBinder TH.BndrReq name domain (suffix rest)
     suffix (GadtInvisibleArgs ma tvs@(_ : _) : rest) = do
       tele <- mkHsForAllInvisTele noAnn <$> cvtTvs tvs
       forall_group ma tele rest
-    suffix (GadtRequiredArgs ma tvs@(_ : _) : rest) = do
+    suffix (GadtRequiredArgs _ [] : rest) = do
+      body <- suffix rest
+      returnLA (HsForAllTy noExtField (mkHsForAllVisTele noAnn []) body)
+    suffix (GadtRequiredArgs ma tvs : rest) = do
       tele <- mkHsForAllVisTele noAnn <$> cvtTvs tvs
       forall_group ma tele rest
     suffix (GadtContextArgs ctxt@(_ : _) : rest) = do
@@ -861,6 +876,11 @@ In the Type representation, a required group uses ForallVisT and an invisible
 group uses ForallT. A context alone uses ForallT without binders.
 Keep the matchability annotation when present. A ForallC wraps the leading
 invisible binders and context.
+
+Preserve an empty visible group on the constructor spine until the renamer
+checks RequiredTypeArguments. An empty structured group has no binder to
+annotate with matchability. Preserve the usual TH conversion of empty
+foralls in field types, constraints, and ordinary signatures.
 
 Use the same shape check as for source declarations. A grouped argument list
 can start with fields or leading binders. Recover the same leading groups
@@ -1841,8 +1861,15 @@ cvtSigTypeKind typeOrKind ty = do
   pure $ hsTypeToHsSigType $ parenthesizeHsType sigPrec ty'
 
 cvtTypeKind :: TypeOrKind -> TH.Type -> CvtM (LHsType GhcPs)
-cvtTypeKind typeOrKind ty
-  = do { (head_ty, tys') <- split_ty_app ty
+cvtTypeKind = cvtTypeKindOnGadtSpine False
+
+cvtGadtType :: TH.Type -> CvtM (LHsType GhcPs)
+cvtGadtType = cvtTypeKindOnGadtSpine True TypeLevel
+
+cvtTypeKindOnGadtSpine :: Bool -> TypeOrKind -> TH.Type -> CvtM (LHsType GhcPs)
+cvtTypeKindOnGadtSpine in_gadt typeOrKind ty
+  = do { let cvt_body = cvtTypeKindOnGadtSpine in_gadt TypeLevel
+       ; (head_ty, tys') <- split_ty_app_with_result (if in_gadt then Just cvt_body else Nothing) ty
        ; let m_normals = mapM extract_normal tys'
                                 where extract_normal (HsValArg _ ty) = Just ty
                                       extract_normal _ = Nothing
@@ -1929,7 +1956,7 @@ cvtTypeKind typeOrKind ty
              | null tys'
              , is_nonempty_forall body
              -> do { ma' <- cvtKind ma
-                   ; L loc hs_ty <- cvtTypeKind typeOrKind body
+                   ; L loc hs_ty <- cvtTypeKindOnGadtSpine in_gadt typeOrKind body
                    ; case hs_ty of
                        HsForAllTy{hst_tele = tele} ->
                          return (L loc (hs_ty { hst_tele = tele { hsf_matchability = Just ma' } }))
@@ -1939,7 +1966,7 @@ cvtTypeKind typeOrKind ty
              | null tys'
              -> do { tvs' <- cvtTvs tvs
                    ; cxt' <- cvtContext funPrec cxt
-                   ; ty'  <- cvtType ty
+                   ; ty'  <- cvt_body ty
                    ; loc <- getL
                    ; let loc' = noAnnSrcSpan loc
                    ; let tele   = mkHsForAllInvisTele noAnn tvs'
@@ -1951,15 +1978,17 @@ cvtTypeKind typeOrKind ty
            ForallVisT tvs ty
              | null tys'
              -> do { tvs' <- cvtTvs tvs
-                   ; ty'  <- cvtType ty
+                   ; ty'  <- cvt_body ty
                    ; loc  <- getL
                    ; let loc' = noAnnSrcSpan loc
                    ; let tele = mkHsForAllVisTele noAnn tvs'
-                   ; pure $ mkHsForAllTy loc' tele ty' }
+                   ; pure $ if in_gadt
+                       then L loc' (HsForAllTy noExtField tele ty')
+                       else mkHsForAllTy loc' tele ty' }
 
            ForEachT vis nm domain ty
              | null tys'
-             -> cvtRetainedBinder vis nm domain (cvtType ty)
+             -> cvtRetainedBinder vis nm domain (cvt_body ty)
 
            CaseT scrutinee rows -> do
              scrutinee' <- cvtTypeKind typeOrKind scrutinee
@@ -2182,13 +2211,37 @@ is_nonempty_forall (ForallVisT (_ : _) _) = True
 is_nonempty_forall _ = False
 
 split_ty_app :: TH.Type -> CvtM (TH.Type, [LHsTypeArg GhcPs])
-split_ty_app ty = go ty []
+split_ty_app = split_ty_app_with_result Nothing
+
+-- Only the result of a saturated arrow continues the constructor spine.
+split_ty_app_with_result :: Maybe (TH.Type -> CvtM (LHsType GhcPs))
+                         -> TH.Type -> CvtM (TH.Type, [LHsTypeArg GhcPs])
+split_ty_app_with_result cvt_result ty = go ty []
   where
-    go (AppT f a) as' = do { a' <- cvtType a; go f (HsValArg noExtField a':as') }
+    go (AppT f a) as' = do
+      a' <- case cvt_result of
+        Just cvt | all is_par as', arrow_result f -> cvt a
+        _ -> cvtType a
+      go f (HsValArg noExtField a' : as')
     go (AppKindT ty ki) as' = do { ki' <- cvtKind ki
                                  ; go ty (HsTypeArg noAnn ki' : as') }
     go (ParensT t) as' = do { loc <- getL; go t (HsArgPar loc: as') }
     go f as           = return (f,as)
+
+    is_par HsArgPar{} = True
+    is_par _ = False
+
+    arrow_result ty = case without_parens ty of
+      AppT f _ -> case without_parens f of
+        ArrowT -> True
+        AppT mul _ -> case without_parens mul of
+          MulArrowT -> True
+          _ -> False
+        _ -> False
+      _ -> False
+
+    without_parens (ParensT ty) = without_parens ty
+    without_parens ty = ty
 
 cvtTyLit :: TH.TyLit -> HsLit (GhcPass p)
 cvtTyLit (TH.NumTyLit i) = HsNatural noExtField (mkIntegralLit i)

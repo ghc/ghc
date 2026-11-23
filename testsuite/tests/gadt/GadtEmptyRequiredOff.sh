@@ -33,7 +33,7 @@ check() {
     fi
 }
 
-for shape in SOURCE QUOTE SPLICE TYPE_DATA TERM_REQUIRED; do
+for shape in SOURCE QUOTE SPLICE_LEADING SPLICE_LATE SPLICE_STRUCTURED SPLICE_GADTC TYPE_DATA TERM_REQUIRED; do
     check "$shape" default "$vdq"
     check "$shape" explicit '' "$explicit"
     check "$shape" off "$vdq" "$off"
@@ -45,6 +45,8 @@ done
 # Preserve the ordinary term grammar and the extension's lexical capture rules.
 check TERM_EMPTY default ''
 check TERM_EMPTY override '' "$implied" "$off"
+check SPLICE_FIELD default ''
+check SPLICE_FIELD override '' "$implied" "$off"
 check CAPTURE default ''
 check CAPTURE explicit 'term variables cannot be promoted' "$explicit"
 check CAPTURE implied 'term variables cannot be promoted' "$implied"
