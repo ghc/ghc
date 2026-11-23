@@ -887,3 +887,7 @@ test('NativeConstrainedFamily',
                    'NativePartialFamilyScope.hs', 'NativeImprovedFamilyScope.hs',
                    'NativeFamilyEquationScope.hs', 'NativeDerivedFamilyScope.hs'])],
      run_command, ['bash NativeConstrainedFamily.sh "{compiler}" "{libdir}"'])
+
+test('NativeSpecialiseZip',
+     [only_ways(['normal']), extra_files(['NativeSpecialiseZipProvider.hs'])],
+     multimod_compile_and_run, ['NativeSpecialiseZip', '-O2 -dcore-lint -dstg-lint'])

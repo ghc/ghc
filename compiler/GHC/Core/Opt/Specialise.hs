@@ -31,7 +31,9 @@ import GHC.Core.Unify     ( tcMatchTy )
 import GHC.Core.Rules
 import GHC.Core.Subst (substTickish)
 import GHC.Core.TyCon (tyConClass_maybe)
+import GHC.Core.TyCo.Rep (Type(DepFunTy, DepDictTy))
 import GHC.Core.Utils     ( exprIsTrivial, exprIsTopLevelBindable
+                          , applyTypeToArgs, isVacuousRetainedBinder
                           , mkCast, exprType, exprIsHNF
                           , stripTicksTop, mkInScopeSetBndrs )
 import GHC.Core.FVs
@@ -1237,7 +1239,9 @@ specExpr env (Tick tickish body)
 specExpr env expr@(App {})
   = do { let (fun_in, args_in) = collectArgs expr
        ; (fun_out, uds_fun)   <- specExpr env fun_in
-       ; (args_out, uds_args) <- mapAndCombineSM (specExpr env) args_in
+       ; (args_out, uds_args) <- case se_core_mode env of
+             OrdinaryCore -> mapAndCombineSM (specExpr env) args_in
+             RetainedCore -> specRetainedArgs env (exprType fun_out) args_in
        ; let uds_app  = uds_fun `thenUDs` uds_args
              env_args = zapSubst env `bringFloatedDictsIntoScope` ud_binds uds_app
                 -- zapSubst: we have now fully applied the substitution
@@ -1280,6 +1284,31 @@ specExpr env (Let bind body)
                                  specExpr body_env body
          -- All done
        ; return (foldr Let body' binds', uds) }
+
+-- | Specialise a call while preserving each operand used in its result type.
+-- See Note [Rules inside retained operands].
+specRetainedArgs :: SpecEnv -> Type -> [InExpr] -> SpecM ([OutExpr], UsageDetails)
+specRetainedArgs _ _ [] = pure ([], emptyUDs)
+specRetainedArgs env fun_ty (arg:args) = do
+  (arg', uses) <- if isValArg arg && indexed
+                    then pure (Core.substExpr (se_subst env) arg, emptyUDs)
+                    else specExpr env arg
+  (args', rest) <- specRetainedArgs env (applyTypeToArgs fun_ty [arg']) args
+  pure (arg' : args', uses `thenUDs` rest)
+  where
+    indexed = case coreFullView fun_ty of
+      DepFunTy _ b body -> not (isVacuousRetainedBinder b body)
+      DepDictTy{}       -> True
+      _                 -> False
+
+{- Note [Rules inside retained operands]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In `lengthMap f (zip xs ys)`, the result type mentions the source call
+`zip xs ys`. The zip rule replaces it with a call to build. Core cannot
+use that expression as the same index. Apply the current substitution
+to an indexed operand so that its local binders stay in scope. Other
+operands can fire rules and contribute specialisation requests as usual.
+-}
 
 -- See Note [Specialisation modulo dictionary selectors]
 --     Note [ClassOp/DFun selection]
