@@ -16,7 +16,7 @@ module GHC.ByteCode.Serialize
   , writeBytecodeLib
   , readBytecodeLib
   , readBytecodeLibInputsHash
-  , bytecodeLibInputsHash
+  , fingerprintBytecodeLibInputs
   , mkModuleByteCode
   , fingerprintModuleByteCodeContents
   , decodeOnDiskModuleByteCode
@@ -122,23 +122,19 @@ headers]. The constituent hashes are sorted before they are combined, so
 the order of the modules doesn't matter.
 -}
 
--- | The hash a bytecode library records for its inputs, given the hash of
--- each constituent.
+-- | The 'bytecodeLibInputsHash' of a bytecode library, given the hash of each
+-- constituent.
 -- See Note [Hash of bytecode libs]
-bytecodeLibInputsHash :: [Fingerprint] -> Fingerprint
-bytecodeLibInputsHash = fingerprintFingerprints . sort
+fingerprintBytecodeLibInputs :: [Fingerprint] -> Fingerprint
+fingerprintBytecodeLibInputs = fingerprintFingerprints . sort
 
-writeBytecodeLib
-  :: Fingerprint -- ^ Hash of the inputs, from 'bytecodeLibInputsHash'
-  -> BytecodeLib
-  -> FilePath
-  -> IO ()
-writeBytecodeLib inputs_hash lib path = do
+writeBytecodeLib :: BytecodeLib -> FilePath -> IO ()
+writeBytecodeLib lib path = do
   odbco <- encodeBytecodeLib lib
   createDirectoryIfMissing True (takeDirectory path)
   bh' <- openBinMem initBinMemSize
   bh <- addBinNameWriter bh'
-  writePersistentBytecodeHeader BytecodeLibraryFile inputs_hash bh
+  writePersistentBytecodeHeader BytecodeLibraryFile (bytecodeLibInputsHash lib) bh
   putWithUserData QuietBinIFace NormalCompression bh odbco
   writeBinMem bh path
 
@@ -178,6 +174,7 @@ decodeOnDiskBytecodeLib hsc_env odbco = do
   foreign_contents <- traverse (writeInterpreterLibraryFile (hsc_logger hsc_env) (hsc_tmpfs hsc_env) (tmpDir (hsc_dflags hsc_env)))  (bytecodeLibForeign odbco)
   pure $ BytecodeLib {
     bytecodeLibUnitId = bytecodeLibUnitId odbco,
+    bytecodeLibInputsHash = bytecodeLibInputsHash odbco,
     bytecodeLibFiles = bytecodeLibFiles odbco,
     bytecodeLibForeign = foreign_contents
    }
@@ -187,6 +184,7 @@ encodeBytecodeLib (BytecodeLib {..}) = do
   foreign_contents <- traverse readInterpreterLibraryFile bytecodeLibForeign
   pure $ BytecodeLib {
     bytecodeLibUnitId = bytecodeLibUnitId,
+    bytecodeLibInputsHash = bytecodeLibInputsHash,
     bytecodeLibFiles = bytecodeLibFiles,
     bytecodeLibForeign = foreign_contents
    }

@@ -129,7 +129,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
 
 import GHC.Utils.Fingerprint ( getFileHash )
-import GHC.ByteCode.Serialize ( bytecodeLibInputsHash, readBytecodeLibInputsHash )
+import GHC.ByteCode.Serialize ( fingerprintBytecodeLibInputs, readBytecodeLibInputsHash )
 import GHC.Tc.Utils.Monad (shutdownTcMPluginsIO, FrontendResult (..), tcg_plugins)
 
 
@@ -551,7 +551,7 @@ checkBytecodeLibraryLinkingNeeded _logger dflags unit_env linkables _pkg_deps = 
     Just _ -> do
         -- See Note [Hash of bytecode libs] in GHC.ByteCode.Serialize
         recorded <- readBytecodeLibInputsHash exe_file
-        let current = bytecodeLibInputsHash (map linkableHash linkables)
+        let current = fingerprintBytecodeLibInputs (map linkableHash linkables)
         if recorded == Just current
           then return UpToDate
           else return $ needsRecompileBecause ObjectsChanged

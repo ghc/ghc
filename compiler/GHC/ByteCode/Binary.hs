@@ -66,6 +66,7 @@ type BytecodeLib = BytecodeLibX (Maybe InterpreterLibrary)
 -- | A bytecode library is a collection of CompiledByteCode objects and a .so file containing the combination of foreign stubs
 data BytecodeLibX a = BytecodeLib {
     bytecodeLibUnitId :: UnitId,
+    bytecodeLibInputsHash :: Fingerprint, -- ^ See Note [Hash of bytecode libs] in GHC.ByteCode.Serialize
     bytecodeLibFiles :: [CompiledByteCode],
     bytecodeLibForeign :: a -- A library file containing the combination of foreign stubs. (Ie arising from CApiFFI)
 }
@@ -113,12 +114,14 @@ instance Binary OnDiskModuleByteCode where
 instance Binary OnDiskBytecodeLib where
   get bh = do
     bytecodeLibUnitId <- get bh
+    bytecodeLibInputsHash <- get bh
     bytecodeLibFiles <- get bh
     bytecodeLibForeign <- get bh
     pure BytecodeLib {..}
 
   put_ bh BytecodeLib {..} = do
     put_ bh bytecodeLibUnitId
+    put_ bh bytecodeLibInputsHash
     put_ bh bytecodeLibFiles
     put_ bh bytecodeLibForeign
 
