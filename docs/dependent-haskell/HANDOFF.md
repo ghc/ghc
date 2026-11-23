@@ -36,14 +36,19 @@ receipt includes the corrected Showcase and the original test suites.
 | 1863, 1880 | The warm native and typecheck-only upgrades recovered the sibling equation. An ordinary client consumed an unknown record at both optimization levels through a typed row eliminator. |
 | 1875, 1876 | The 574 compiler accepts `zip @a @b xs ys` in the composed length proof. The exported law passed after a fresh HaskLib installation with rewrite rules disabled. |
 | 1883, 1888, 1889, 1891, 1894 | The R16 component infers both element types from the lists. The implicit, partially explicit and fully explicit spellings agreed on demand at both optimization levels. Prefix, grouped and infix applications passed. The actual HaskLib package now builds with the implicit form. Vector append worked at its declared index at `-O0`. Its optimized provider's rewrite rule blocked both explicit and inferred proofs. Job 1894 passed the corrected vector test. |
-| 1871, 1884, 1890 | The matching compiler and external interpreter check the quoted row. All five checks in 1890 passed. A wildcard in a type case works directly and in a type quote. In a quoted type synonym it fails with GHC-65507, with or without a lambda. The baseline still rejects an enclosing variable captured by a spliced local signature. The combined candidate must accept that program. Job 1897 checks a separate fix for case-pattern wildcards in declaration quotes. |
-| 1882, 1885, 1892, 1895 | Source renaming resolved a length field used by later fields. Both native and typecheck-only builds then stalled checking the named record. A positional record and an ordinary record with selectors disabled compiled. Job 1895 deferred payload validation and compiled the provider. Its ordinary zip consumer still fails. Job 1898 compares handwritten and generated selectors from the same interface. |
+| 1871, 1884, 1890 | The matching compiler and external interpreter check the quoted row. All five checks in 1890 passed. A wildcard in a type case works directly and in a type quote. In a quoted type synonym it fails with GHC-65507, with or without a lambda. The baseline still rejects an enclosing variable captured by a spliced local signature. The combined candidate must accept that program. Job 1897 accepted both declaration quotes after the wildcard change. The comparison and lambda suites passed. The final case suite stopped before running because its input file was missing. Job 1904 replays it on the same compiler. |
+| 1882, 1885, 1892, 1895 | Source renaming resolved a length field used by later fields. Both native and typecheck-only builds then stalled checking the named record. A positional record and an ordinary record with selectors disabled compiled. Job 1895 deferred payload validation and compiled the provider. Its ordinary zip consumer still fails. Jobs 1898 and 1899 isolated the difference to a generated selector in an ordinary application. Both forms carry the expected length equation. Only the handwritten zip compiled. Job 1901 checks the generated call, typecheck-only interfaces and a diagnostic for record reification. |
 | 1866 | The private R23 change passed the original transformer test and 32 reification cases. An old installed provider still needs rebuilding. |
 
-The combined candidate for quoted row schemas and implicit proof
-composition is `c71890c7f1` in
-`r04-r17-combined-quoted-columns-20261123/source`. Merge the 577
-publication and run the candidate with its matching interpreter.
+Job 1900 is building the combined candidate for quoted row schemas and
+implicit proof composition at `1efc4bcaf2`. Its source includes the 577
+publication. Use `r04-r17-combined-quoted-columns-20261123/compiler.source`,
+`qualification/gates.tsv`, `cohorts/gates.tsv` and `run-all.exit` under
+the same experiment directory. Its expected Showcase has 578 outputs.
+Job 1902 compares the old and new Template Haskell payload encodings.
+Job 1903 can release 7.84 GB from the superseded quotation and row
+compilers after another live-use check. Its Git references and receipts
+are in `retirement-r17-before-578-20261123`.
 The generated compiler trees for 564, 566, 567, 568 and 569 were retired.
 The commits, recipes and test results remain. The two retention manifests
 are `retirement-normal-564-566-20261123/retired.tsv` and
