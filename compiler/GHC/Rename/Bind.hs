@@ -495,7 +495,7 @@ rnBindLHS name_maker _ (PatSynBind x psb@PSB{ psb_id = rdrname })
 
 rnBindLHS _ _ b = pprPanic "rnBindHS" (ppr b)
 
-rnLBind :: (Name -> ([Name], [(VisArity, [Name])]))  -- Scoped type and runtime names
+rnLBind :: (Name -> ScopedSignatureBinders)
         -> LHsBindLR GhcRn GhcPs
         -> RnM (LHsBind GhcRn, [Name], Uses)
 rnLBind sig_fn (L loc bind)
@@ -504,7 +504,7 @@ rnLBind sig_fn (L loc bind)
        ; return (L loc bind', bndrs, dus) }
 
 -- assumes the left-hands-side vars are in scope
-rnBind :: (Name -> ([Name], [(VisArity, [Name])]))  -- Scoped type and runtime names
+rnBind :: (Name -> ScopedSignatureBinders)
        -> HsBindLR GhcRn GhcPs
        -> RnM (HsBind GhcRn, [Name], Uses)
 rnBind _ bind@(PatBind { pat_lhs = pat
@@ -538,10 +538,11 @@ rnBind sig_fn bind@(FunBind { fun_id = name
                             , fun_matches = matches })
        -- invariant: no free vars here when it's a FunBind
   = do  { let plain_name = unLoc name
-              (ty_names, runtime_scopes) = sig_fn plain_name
+              (ty_names, runtime_scopes, written_kinds) = sig_fn plain_name
               (leading, interior) = span ((== 0) . fst) runtime_scopes
 
         ; (matches', rhs_fvs) <- bindSigTyVarsFV ty_names $
+                                  withWrittenSignatureKinds written_kinds $
                                   bindLocalNamesFV (concatMap snd leading) $
                                     rnMatchGroupWithScopes interior
                                         (mkPrefixFunRhs name noAnn) rnLExpr matches
@@ -561,7 +562,7 @@ rnBind sig_fn bind@(FunBind { fun_id = name
       }
 
 rnBind sig_fn (PatSynBind x bind)
-  = do  { (bind', name, fvs) <- rnPatSynBind (fst . sig_fn) bind
+  = do  { (bind', name, fvs) <- rnPatSynBind (fstOf3 . sig_fn) bind
         ; return (PatSynBind x bind', name, fvs) }
 
 rnBind _ (VarBind { var_ext = x }) = dataConCantHappen x
@@ -689,20 +690,39 @@ depAnalBinds binds_w_dus
 --           (x,y) = e
 --      In e, 'a' will be in scope, and it'll be the one from 'y'!
 
+-- | The erased names, retained names, and written kinds scoped over a definition.
+type ScopedSignatureBinders = ([Name], [(VisArity, [Name])], LocalSignatureKinds)
+
+-- | Scope kinds only while the corresponding signature binds the variables.
+withWrittenSignatureKinds :: LocalSignatureKinds -> RnM a -> RnM a
+withWrittenSignatureKinds [] action = action
+withWrittenSignatureKinds kinds action = do
+  scoped <- xoptM LangExt.ScopedTypeVariables
+  if scoped
+    then updGblEnv (\env -> env { tcg_rn_local_lambdas =
+          (\(scope, lift_sig) -> (scope ++ kinds, lift_sig)) <$> tcg_rn_local_lambdas env }) action
+    else action
+
 -- | Find erased and invisible retained names that scope over a definition.
 -- See Note [Invisible retained definitions].
-mkScopedSigBndrs :: [LSig GhcRn] -> Name -> ([Name], [(VisArity, [Name])])
-mkScopedSigBndrs sigs = \n -> lookupNameEnv env n `orElse` ([], [])
+mkScopedSigBndrs :: [LSig GhcRn] -> Name -> ScopedSignatureBinders
+mkScopedSigBndrs sigs = \n -> lookupNameEnv env n `orElse` ([], [], [])
   where
     env = mkHsSigEnv get_scoped sigs
 
     get_scoped (L _ (ClassOpSig _ _ names sig_ty))
-      = Just (names, (hsScopedTvs sig_ty, []))
-    get_scoped (L _ (TypeSig _ _ names sig_ty))
-      = Just (names, (hsWcScopedTvs sig_ty, after_context (hsSigWcType sig_ty)))
+      = Just (names, (hsScopedTvs sig_ty, [], []))
+    get_scoped (L _ (TypeSig _ _ names sig_ty@HsWC{hswc_body = sig}))
+      = let scoped = hsWcScopedTvs sig_ty
+        in Just (names, (scoped, after_context (hsSigWcType sig_ty), written scoped sig))
     get_scoped (L _ (PatSynSig _ names sig_ty))
-      = Just (names, (hsScopedTvs sig_ty, []))
+      = Just (names, (hsScopedTvs sig_ty, [], []))
     get_scoped _ = Nothing
+
+    written scoped (L _ HsSig{sig_bndrs = HsOuterExplicit{hso_bndrs = binders}}) =
+      [(v, kind) | L _ HsTvb{tvb_var = HsBndrVar _ v, tvb_kind = HsBndrKind _ kind} <- binders
+                 , unLoc v `elem` scoped]
+    written _ _ = []
 
     after_context ty
       | L _ (HsQualTy _ _ body) <- ignoreParens ty = after_context body

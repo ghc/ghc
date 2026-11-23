@@ -35,6 +35,7 @@ module GHC.Tc.Types(
 
         -- Renamer types
         HsCtxt,
+        LocalSignatureKinds,
         ImportAvails(..), emptyImportAvails, plusImportAvails,
         ImportUserSpec(..),
         ImpUserList(..), isDependOnlyImport,
@@ -300,6 +301,9 @@ type IfL        = IfM IfLclEnv                --    Nested
 
 -- | Historical "renaming monad" (now it's just 'TcRn').
 type RnM  = TcRn
+
+-- | Written kinds of erased binders in enclosing value signatures.
+type LocalSignatureKinds = [(LocatedN Name, LHsType GhcRn)]
 
 -- | Historical "type-checking monad" (now it's just 'TcRn').
 type TcM  = TcRn
@@ -719,6 +723,12 @@ data TcGblEnv
         tcg_rn_decls :: Maybe (HsGroup GhcRn),
           -- ^ Renamed decls, maybe.  @Nothing@ \<=> Don't retain renamed
           -- decls.
+
+        tcg_rn_local_lambdas
+          :: Maybe (LocalSignatureKinds, LocalSignatureKinds -> HsDocContext
+                    -> LHsSigWcType GhcPs -> RnM (LHsSigWcType GhcRn, FreeNames)),
+          -- ^ Scope and helper accumulator for local type lambdas.
+          -- Set only while renaming value bindings in one declaration group.
 
         tcg_dependent_files :: TcRef [FilePath], -- ^ dependencies from addDependentFile
         tcg_dependent_dirs  :: TcRef [FilePath], -- ^ dependencies from addDependentDirectory

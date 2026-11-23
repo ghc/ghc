@@ -156,7 +156,11 @@ rnLocalHsSigWcType :: NameSet -> HsDocContext -> LHsSigWcType GhcPs
 rnLocalHsSigWcType bound_names doc ty@(HsWC { hswc_body = sig_ty })
   = do { free_vars <- filterInScopeM (extract_lhs_sig_ty sig_ty)
        ; rnWithRetainedAliases bound_names RetainedPartialSignature free_vars sig_ty $
-           rnHsSigWcType doc ty }
+           do { level <- getThLevel
+              ; lift_lambdas <- tcg_rn_local_lambdas <$> getGblEnv
+              ; case (level, lift_lambdas) of
+                  (Comp, Just (scope, lift_sig)) -> lift_sig scope doc ty
+                  _ -> rnHsSigWcType doc ty } }
 
 -- | Rename a visible type argument with aliases for lexical runtime indices.
 -- See Note [Runtime indices in visible type arguments].

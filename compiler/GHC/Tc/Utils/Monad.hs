@@ -449,6 +449,7 @@ initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc =
                              then Just []
                              else maybe_rn_syntax []
           , tcg_rn_decls            = maybe_rn_syntax emptyRnGroup
+          , tcg_rn_local_lambdas    = Nothing
           , tcg_tr_module           = Nothing
           , tcg_binds               = emptyLHsBinds
           , tcg_imp_specs           = []

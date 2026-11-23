@@ -762,6 +762,7 @@ data LiftedTypeSite
   = FieldTypeSite
   | RetainedFieldTypeSite [RdrName]
   | SignatureTypeSite
+  | LocalLambdaTypeSite [(RdrName, RdrName)]
   | ForallTypeSite Bool  -- The scope permits lifting a type lambda.
   | RetainedTypeSite [RdrName]
   deriving Eq
@@ -770,11 +771,12 @@ data LiftedTypeSite
 -- See Note [Lifting types from signatures and fields].
 liftDeclarationTypes :: [(RdrName, Maybe (GlobalRdrElt, Name))]
                      -> [(RetainedCaseKey, RdrName)] -> (Int -> String)
-                     -> Bool -> Bool -> HsGroup GhcPs
+                     -> Bool -> Bool -> Maybe ([(RdrName, RdrName)], [LiftedTypeCapture])
+                     -> HsGroup GhcPs
                      -> (HsGroup GhcPs, [TyClGroup GhcPs], LiftedDecls,
                          [(LocatedN RdrName, GlobalRdrElt)], [LocatedN RdrName],
                          [(RetainedCaseKey, OccName)])
-liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcards group
+liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcards local_scope group
   | not (null synonyms)
   = (group{hs_valds = values, hs_tyclds = type_groups}, [anchors], names, concat uses, missing, helpers)
   | otherwise = (group, [], [], [], [], [])
@@ -968,15 +970,19 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
                   {hswc_body = L sig_loc sig@HsSig{sig_bndrs = outer, sig_body = body}}))) =
       let occ = rdrNameOcc (unLoc owner)
           first = fromMaybe 0 (lookupOccEnv counters occ)
-          (body', aliases, (next, _)) = liftBody SignatureTypeSite owner
+          site = maybe SignatureTypeSite (LocalLambdaTypeSite . fst) local_scope
+          (body', aliases, (next, _)) = liftBody site owner
                                     (signatureCaptures outer body) body (first, [])
           sig' = L sig_loc (sig{sig_body = body'})
       in (extendOccEnv counters occ next, (VbSig (L loc (TypeSig sig_ann mods names
                                                        wc{hswc_body = sig'})), aliases))
     liftBind counters bind = (counters, (bind, []))
 
-    signatureCaptures outer body = outerCaptures outer
-      [v | v <- extractHsTyRdrTyVars body, isNothing (join (lookup (unLoc v) source_heads))]
+    signatureCaptures outer body =
+      maybe [] snd local_scope ++ outerCaptures outer
+        [v | v <- extractHsTyRdrTyVars body
+           , isNothing (join (lookup (unLoc v) source_heads))
+           , isNothing (local_scope >>= lookup (unLoc v) . fst)]
 
     outerCaptures HsOuterImplicit{} occurrences = implicitCaptures occurrences
     outerCaptures HsOuterExplicit{hso_bndrs = binders} _ = explicitCaptures binders
@@ -993,6 +999,7 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
 
     liftedAnchor site _ ty@(L _ (XHsType HsTypeLambda{}))
       | lift_cases, signatureLambdaSite site, copyable ty = Just ("$signature-lambda:", Nothing)
+    liftedAnchor LocalLambdaTypeSite{} _ _ = Nothing
     liftedAnchor FieldTypeSite _ ty@(L _ (XHsType HsTypeLambda{}))
       | lift_cases, copyable ty = Just ("$field-lambda:", Nothing)
     liftedAnchor SignatureTypeSite _ ty@(L _ (XHsType HsTypeLet{}))
@@ -1030,6 +1037,7 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
     signatureSite _ = False
 
     signatureLambdaSite SignatureTypeSite = True
+    signatureLambdaSite LocalLambdaTypeSite{} = True
     signatureLambdaSite (ForallTypeSite allowed) = allowed
     signatureLambdaSite _ = False
 
@@ -1086,10 +1094,14 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
       = Just (FieldTypeSite, locals, body)
     innerScope site _ HsForEachTy{hst_bndrs = binders, hst_body = body}
       | not (fieldSite site)
+      , not (localLambdaSite site)
       , Just locals <- writtenCaptures binders
       , not (null locals)
       = Just (RetainedTypeSite (map (unLoc . snd) locals ++ retainedNames site), locals, body)
     innerScope _ _ _ = Nothing
+
+    localLambdaSite LocalLambdaTypeSite{} = True
+    localLambdaSite _ = False
 
     liftBody site owner scope whole@(L loc _) (salt, seen)
       | Just (prefix, key) <- liftedAnchor site scope whole
@@ -1101,7 +1113,7 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
       , Set.null missing
       , all (copyableCapture site whole) used
       = case key >>= (`lookup` seen) of
-          Just occ -> (applyAnchor loc occ used, [], (salt + 1, seen))
+          Just occ -> (applyAnchor site loc occ used, [], (salt + 1, seen))
           Nothing ->
             let occ = mkTcOcc (prefix ++ occNameString (rdrNameOcc (unLoc owner))
                                  ++ ":" ++ helper_suffix salt)
@@ -1120,7 +1132,7 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
                   (share_key, captures, call_uses) <- sharedRetainedCaseKey site scope used whole key heads
                   -- A shared alias also applies the family to its private formals.
                   pure (share_key, renameCaptures copied captures, call_uses)
-            in (applyAnchor loc occ used, [((alias, (occ, Nothing)), shared, unbound)], (salt + 1, seen'))
+            in (applyAnchor site loc occ used, [((alias, (occ, Nothing)), shared, unbound)], (salt + 1, seen'))
     liftBody site owner scope (L loc quantified) (salt, seen)
       | Just (inner, locals, body) <- innerScope site scope quantified
       , let names = map (unLoc . snd) locals
@@ -1148,7 +1160,12 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
       in (L loc (HsKindSig ann body' kind), aliases, next)
     liftBody site owner scope ty state = liftTypeChildren (liftBody site owner scope) ty state
 
-    applyAnchor loc occ = applyCaseAlias loc (mkRdrUnqual occ)
+    applyAnchor site loc occ captures =
+      applyCaseAlias loc (mkRdrUnqual occ) $ case site of
+        LocalLambdaTypeSite actuals ->
+          [(header, fmap (\rdr -> fromMaybe rdr (lookup rdr actuals)) name)
+          | (header, name) <- captures]
+        _ -> captures
     applyCaseAlias loc name = foldl' (\f (_, v) -> L loc (HsAppTy noExtField f (typeName v)))
                                     (typeName (L (l2l loc) name))
 
@@ -1933,7 +1950,8 @@ rnSrcDeclsWithLambdas sigma named_wildcards lift_cases early_hidden early_scopes
      if dependent && not is_boot
      then do { heads <- if lift_cases then retainedSourceHeads sigs' tycl_decls else pure []
              ; let input = emptyRdrGroup{hs_valds = val_decls, hs_tyclds = tycl_decls}
-                   (updated, anchors, aliases, uses, unbound, _) = liftDeclarationTypes heads [] show lift_cases named_wildcards input
+                   (updated, anchors, aliases, uses, unbound, _) =
+                     liftDeclarationTypes heads [] show lift_cases named_wildcards Nothing input
                    (cases, case_names) = liftTypeCases emptyRdrGroup{hs_tyclds = anchors}
              ; (late, lambdas, late_scopes) <- liftTypeLambdas sigma cases
              ; let late_hidden = aliases ++ case_names ++ [(fam, Just owner) | (fam, owner) <- lambdas]
@@ -1973,8 +1991,11 @@ rnSrcDeclsWithLambdas sigma named_wildcards lift_cases early_hidden early_scopes
      if lift_cases && not is_boot
      then do { splice_types <- newTcRef []
              ; splice_cases <- newTcRef (0, [])
+             ; local_lambdas <- newTcRef (0 :: Int)
              ; let rename_splice = rnSplicedSignatureCases sigma named_wildcards local_fix_env splice_types splice_cases
-             ; binds <- rnValBindsRHSWith (rnHsSigWcTypeWithSplice rename_splice)
+                   lift_local = rnLocalSignatureLambdas sigma named_wildcards local_fix_env splice_types local_lambdas
+             ; binds <- updGblEnv (\env -> env{tcg_rn_local_lambdas = Just ([], lift_local)}) $
+                          rnValBindsRHSWith (rnHsSigWcTypeWithSplice rename_splice)
                           (TopSigCtxt val_bndr_set) new_lhs
              ; types <- reverse <$> readTcRef splice_types
              ; pure (binds, types) }
@@ -2061,6 +2082,100 @@ rnSrcDeclsWithLambdas sigma named_wildcards lift_cases early_hidden early_scopes
    return (final_tcg_env, rn_group)
                     }}}}}
 
+{- Note [Lifting type lambdas from local signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The local signature renamer runs with the enclosing lexical Names in scope.
+Carry their written kinds while renaming the corresponding definitions.
+Select a binder only if its Name is still visible. A shadowing pattern or
+signature can therefore exclude an outer binder with the same occurrence.
+
+The first supported kinds are names and applications. Copy them in
+telescope order, with external Names intact. A copied kind can refer to an
+earlier visible capture. The generated helper binds fresh parameters.
+Its application uses the exact original Names at the signature site.
+Leave the signature unchanged when a needed capture cannot be copied.
+
+Emit the helpers in the current declaration group, using the same
+accumulator as signature splices. The local signature hook runs only
+during ordinary compilation. It does not execute or copy splices.
+-}
+
+-- | Lift a local type lambda after its lexical scope has entered the renamer.
+-- See Note [Lifting type lambdas from local signatures].
+rnLocalSignatureLambdas
+  :: RdrName -> Bool -> MiniFixityEnv -> TcRef [([TyClGroup GhcRn], FreeNames)]
+  -> TcRef Int -> LocalSignatureKinds -> HsDocContext -> LHsSigWcType GhcPs
+  -> RnM (LHsSigWcType GhcRn, FreeNames)
+rnLocalSignatureLambdas sigma named_wildcards fix_env generated local_lambdas kinds
+  doc@(TypeSigCtx names@(_:_)) ty@HsWC{hswc_body = L _ HsSig{sig_bndrs = outer, sig_body = body}}
+  | hasLambda body && copyable ty
+  = do
+      local <- getLocalRdrEnv
+      ordinal <- readTcRef local_lambdas
+      let formals = case outer of
+              HsOuterImplicit{} -> []
+              HsOuterExplicit{hso_bndrs = binders} -> mapMaybe hsLTyVarName binders
+          ambient = localSignatureCaptures local formals kinds
+          actuals = [(unLoc name, nameRdrName actual) | ((_, name), actual) <- ambient]
+          visible = [actual | var <- extractHsTyRdrTyVars body, unLoc var `notElem` formals
+                            , Just actual <- [lookupLocalRdrEnv local (unLoc var)]]
+          needed = all (`elem` map snd ambient) visible
+          no_named_hole = not named_wildcards ||
+            all (not . startsWithUnderscore . rdrNameOcc . unLoc) (extractHsTyRdrTyVars body)
+          signature = noLocA (TypeSig noAnn [] names ty)
+          input = emptyRdrGroup{hs_valds = ValBinds noExtField [VbSig signature]}
+          suffix salt = "local-" ++ show ordinal ++ "-" ++ show salt
+          (updated, anchors, aliases, _, _, _) =
+            liftDeclarationTypes [] [] suffix True named_wildcards (Just (actuals, map fst ambient)) input
+      case (anchors, hs_valds updated) of
+        (_:_, ValBinds _ [VbSig (L _ (TypeSig _ _ _ result))])
+          | needed, no_named_hole -> do
+              (late, lambdas, scopes) <- liftTypeLambdas sigma emptyRdrGroup{hs_tyclds = anchors}
+              let hidden = aliases ++ [(fam, Just owner) | (fam, owner) <- lambdas]
+                  declarations = hs_tyclds late
+              (envs, _) <- getLocalNonValBinders fix_env emptyRdrGroup{hs_tyclds = declarations}
+              renamed <- restoreEnvs envs $ setLocalRdrEnv emptyLocalRdrEnv $
+                rnTyClDecls hidden scopes declarations
+              updTcRef generated (renamed :)
+              updTcRef local_lambdas (+ 1)
+              restoreEnvs envs (rnHsSigWcType doc result)
+        _ -> rnHsSigWcType doc ty
+  where
+    hasLambda :: Data a => a -> Bool
+    hasLambda node
+      | Just (L _ (XHsType HsTypeLambda{})) <- cast node :: Maybe (LHsType GhcPs) = True
+      | otherwise = or (gmapQ hasLambda node)
+rnLocalSignatureLambdas _ _ _ _ _ _ doc ty = rnHsSigWcType doc ty
+
+-- | Copy the visible written kinds, keeping their original dependency order.
+localSignatureCaptures :: LocalRdrEnv -> [RdrName] -> LocalSignatureKinds
+                       -> [(LiftedTypeCapture, Name)]
+localSignatureCaptures local formals = catMaybes . snd . mapAccumL copy emptyNameSet
+  where
+    copy earlier (located, kind)
+      | rdr `notElem` formals
+      , lookupLocalRdrEnv local rdr == Just name
+      , Just kind' <- copyKind earlier kind
+      = let source = rdr <$ located
+            binder = fmap (\b -> b{tvb_kind = HsBndrKind noExtField kind'})
+                          (liftedTypeVarBinder source)
+        in (extendNameSet earlier name, Just ((binder, source), name))
+      | otherwise = (earlier, Nothing)
+      where
+        name = unLoc located
+        rdr = mkRdrUnqual (nameOccName name)
+
+    copyKind earlier ty = case ignoreParens ty of
+      L loc (HsAppTy _ fun arg) -> do
+        fun' <- copyKind earlier fun
+        arg' <- copyKind earlier arg
+        pure (L loc (HsAppTy noExtField fun' arg'))
+      L loc (HsTyVar _ promoted var)
+        | let name = getName (unLoc var)
+        , name `elemNameSet` earlier
+        -> pure (L loc (HsTyVar noAnn promoted (mkRdrUnqual (nameOccName name) <$ var)))
+      kind -> namedSpliceType kind
+
 -- | Lift cases from the parsed result of a top-level signature splice.
 -- See Note [Lifting cases from signature splices].
 rnSplicedSignatureCases
@@ -2087,7 +2202,7 @@ rnSplicedSignatureCases sigma named_wildcards fix_env generated splice_cases sit
               CompleteSignatureSplice -> (complete_helpers, show)
               NestedSignatureSplice{} -> ([], \salt -> "splice" ++ show ordinal ++ "-" ++ show salt)
         let (updated, anchors, aliases, uses, _, helpers) =
-              liftDeclarationTypes heads (map (fmap nameRdrName) earlier) suffix True named_wildcards input
+              liftDeclarationTypes heads (map (fmap nameRdrName) earlier) suffix True named_wildcards Nothing input
         case (anchors, hs_valds updated) of
           (_:_, ValBinds _ [VbSig (L _ (TypeSig _ _ _ HsWC{hswc_body = L _ HsSig{sig_body = ty}}))])
             | Just result <- unwrap_retained retained ty -> do
