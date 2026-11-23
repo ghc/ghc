@@ -288,6 +288,7 @@ zip two vectors at their shared stored length: [('r',True),('s',False)]
 zip two named fields at their stored length: [('x',True)]
 read a supplied field when its sibling is omitted: [True]
 replace a named field at the original stored length: (1,[('x',False)])
+replace the stored length and both named payloads: (0,[])
 put two columns in a row indexed by the record length: ("rs",[True,False])
 project the length of a known dependent package in a type: Refl
 project from two payload families with the same dependent function: ("xx",7)
