@@ -20,14 +20,18 @@ and interactive compiler regression.
 [progress proof](examples/open-evaluation/BookBetaReduction.hs),
 [provider requirements](roadmap/R16-open-term-evaluator.md#typed-substitution-under-a-binder).
 
-[PLFH batch 24](https://github.com/Tritlo/PLFH/tree/2fd9b9a5a832bcb4ef91f2c6bd69e703bb084c7f)
-contains the complete proof and a negative test for accidental capture.
-On the published book, job 2992 checked all 28 modules at native `-O0`
-and default `-O2`. Each module also compiled independently against
-source-hidden native interfaces at both levels. All four runs rejected
-the seven negative programs. The native runs matched all 113 book
-observations. Of the 40 original reports, 33 compiled at `-O0` and 30
-at default `-O2`. See the [book verification instructions](#build-and-verify).
+[PLFH batch 25](https://github.com/Tritlo/PLFH/tree/69042437df9b44a099e44e1e53c981045cf0ee29)
+includes the complete proof, a negative capture test, and addition and
+multiplication in the object language. Job 3021 checked 28 modules at
+native `-O0` and default `-O2`. Each module also compiled against the
+native interfaces of its dependencies at both levels, with no source
+available for those dependencies. All four runs rejected the seven
+negative programs. The native runs matched 114 book observations.
+Of the 41 original reports, 33 compiled at `-O0` and 30 at default
+`-O2`. The additional report isolates the two-binder substitution gap.
+Job 3000 also matched all 615 Showcase outputs in both native modes
+and default GHCi on the compiler in `4570cbe2f8`.
+[Book verification instructions](#build-and-verify).
 
 [HaskLib.Nat.plusComm](hasklib/HaskLib/Nat.hs) proves that addition
 commutes. Book patch `f332a78d0f` reuses it in Induction and Equality.
@@ -57,7 +61,8 @@ Job 2996 matched the 113 book observations at native `-O0`, default
   234/234 compatibility cases and 136/138 focused tests. The two failures
   were the old `NativeDependentCoreRun` expectation and the known
   `deriving-via-compile` diagnostic. Job 2974 passed the revised
-  fixture on the same compiler, giving 137/138 across the two runs. The complete original results are under
+  fixture on the same compiler, giving 137/138 across the two runs.
+  The complete original results are under
   `_build/on-demand/plfh-batch18-normal-next-20261124`.
 - Three compiler agents use a shared queue with four GHC build slots,
   16 logical CPUs and 64 GB of memory.
@@ -844,7 +849,7 @@ Check `verified.pass`, `modules.tsv`, `negative.tsv` and `reports.tsv`.
 The original reports run once per optimization level. A report in
 `fixed/` must compile at both levels. By default the checker builds
 fresh no-code providers. That check reaches the open substitution
-publication gap in batch 24. To check batch 24 against native interfaces,
+publication gap in the DeBruijn chapter. To check against native interfaces,
 pass `--native-interfaces` immediately after `check-plfh-revision`.
 This recompiles each book module using only the native `.hi` files of
 its dependencies. The checker audits the resulting interfaces and runs

@@ -87,6 +87,14 @@ a comparison implementation. External solvers remain later work.
   The result supplies one step. A recursive term can keep unfolding.
   [PLFA DeBruijn, Progress](https://plfa.github.io/DeBruijn/#progress),
   [Haskell proof](examples/open-evaluation/BookBetaReduction.hs).
+- **Two bound variables.** PLFA's `case×` example extends the environment
+  twice under a pattern that binds both components of a pair. PLFH's list
+  case binds the head and tail in the same way. The newest variable has
+  index `Z`, the other has index `S Z`, and an outer variable crosses
+  both binders. This gives three distinct cases for checking double
+  substitution.
+  [PLFA More, Single and double substitution](https://plfa.github.io/More/#single-and-double-substitution),
+  [PLFH batch 25 reproducer](https://github.com/Tritlo/PLFH/blob/69042437df9b44a099e44e1e53c981045cf0ee29/reproducers/ReproOpsDoubleSubst.hs).
 - **Representing a checked callback.** Danvy and Nielsen describe
   defunctionalization with constructors for captured values. The fork
   uses private constructors for replacement, shifting, and lifting a

@@ -104,7 +104,7 @@ for opt in O0 O2; do
     mkdir "$helpers" "$logs"
     cd "$helpers"
     "${ghc[@]}" "-$opt" "-i$provider" "-i$docs/hasklib" "-i$docs/examples/open-evaluation" \
-        --make -no-link -outputdir . "$docs/hasklib/HaskLib.hs" "$work/reproducers/ReproOps.hs" \
+        --make -no-link -outputdir . "$docs/hasklib/HaskLib.hs" "$work"/reproducers/ReproOps*.hs \
         >"$logs/helpers.log" 2>&1
     for src in "${reports[@]}"; do
         name=$(basename "$src" .hs)

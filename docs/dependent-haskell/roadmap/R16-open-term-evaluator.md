@@ -842,6 +842,15 @@ Publishing the same equations from a fresh no-code provider remains
 open. Its simple interfaces must account for relevant imported rewrite
 rules before a client can use their equations.
 
+PLFH batch 25 isolates a separate native-provider gap. A list pattern
+binds the head and the tail. Renaming its body extends the renaming
+twice, and substitution extends the substitution twice. The current
+compiler then withholds even the single-substitution equation for this
+term type. A double substitution must also map the two new indices to
+the correct values. The published DeBruijn example exercises one binder.
+[PLFA More, Single and double substitution](https://plfa.github.io/More/#single-and-double-substitution),
+[book reproducer and expected diagnostic](https://github.com/Tritlo/PLFH/blob/69042437df9b44a099e44e1e53c981045cf0ee29/reproducers/R13_DoubleBinderSubstClosure.hs).
+
 ## M155. Reachable helper chains
 
 A checked case can now use a helper that calls another helper. The
