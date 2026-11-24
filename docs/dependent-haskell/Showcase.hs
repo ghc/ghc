@@ -1947,6 +1947,8 @@ main = do
         (case measureReverseLength HaskLib.size reverseInput Refl of
              (n, Refl) -> n)
     prefixBound <- newIORef (HaskLib.Succ HaskLib.Zero) >>= readIORef
+    observe "apply the same partially applied addition to equal sizes"
+        (HaskLibClient.addUnder prefixBound prefixBound HaskLib.Zero)
     prefixInput <- newIORef (True : error "forced the list beyond the prefix") >>= readIORef
     observe "take a runtime-bounded prefix and prove its length"
         (HaskLib.takeSize prefixBound prefixInput, HaskLib.lengthTakeSize prefixBound prefixInput)

@@ -1,7 +1,7 @@
 {-# LANGUAGE GHC2024, ExperimentalDependentTypes #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 
-module Client (zipLaw, lengthAppendSingleton, checkAppendSingleton, checkReverse, zipMapLaw, checkZipMap) where
+module Client (zipLaw, addUnder, lengthAppendSingleton, checkAppendSingleton, checkReverse, zipMapLaw, checkZipMap) where
 
 import qualified HaskLib as H
 
@@ -16,7 +16,7 @@ lengthAppendSingleton :: forall a. foreach (xs :: [a]) -> foreach (x :: a)
 lengthAppendSingleton xs x =
     H.lengthAppend xs [x]
         `H.trans` H.plusSucc (H.size xs) H.Zero
-        `H.trans` H.congSucc (H.plusZero (H.size xs))
+        `H.trans` H.cong @'H.Succ (H.plusZero (H.size xs))
 
 -- | Check the proof without inspecting any list elements.
 checkAppendSingleton :: [Bool] -> Bool -> Bool
@@ -40,3 +40,9 @@ zipMapLaw pre combine xs ys =
 checkZipMap :: (Bool -> Char) -> (Char -> Int -> Ordering) -> [Bool] -> [Int] -> Bool
 checkZipMap pre combine xs ys =
     case zipMapLaw pre combine xs ys of H.Refl -> True
+
+-- | Move a successor through an inner addition under a fixed left operand.
+addUnder :: foreach (m :: H.Size) -> foreach (n :: H.Size) -> foreach (p :: H.Size)
+         -> H.plus m (H.plus n ('H.Succ p)) H.:~: H.plus m ('H.Succ (H.plus n p))
+addUnder m n p =
+    H.cong @(H.plus m) (H.plusSucc n p :: H.plus n ('H.Succ p) H.:~: 'H.Succ (H.plus n p))

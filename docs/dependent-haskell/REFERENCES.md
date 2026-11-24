@@ -6176,6 +6176,35 @@ functions of the same type can therefore require different proofs.
 [proposal #242 on family arity](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#arity-of-type-families)
 and [named callback checks](../../testsuite/tests/dependent/should_run/NativeNamedCallback.sh).
 
+### Congruence with a retained argument
+
+PLFA proves `cong f` by matching the supplied equality with `refl`.
+Its addition rearrangement uses congruence under addition by a fixed
+left operand. HaskLib uses the same proof with `Refl`. A visible type
+argument selects the function. The function can be a matchable data
+constructor or an unmatchable type family. Both uses require only
+forward congruence.
+[PLFA Equality, congruence](https://plfa.inf.ed.ac.uk/19.08/Equality/#congruence-and-substitution),
+[PLFA Induction](https://plfa.inf.ed.ac.uk/19.08/Induction/) and
+[GHC proposal 242 on matchability](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html).
+
+GHC's existing application checker instantiates inferred kind arguments
+before checking a visible type argument. Checking `@(plus m)` fixes the
+domain and codomain to `Size`. The fork reads those assignments before it
+uses the equality argument to choose both endpoints. It checks the
+chosen endpoints against the same binder kinds. The proof determines
+both endpoints even when the function is noninjective.
+[Quick Look proposal 274](https://ghc-proposals.readthedocs.io/en/latest/proposals/0274-quick-look-impredicativity.html)
+and [the application checker](../../compiler/GHC/Tc/Gen/App.hs).
+
+An expression annotation may use a runtime argument that is already in
+scope. Proposal 378 describes how a term variable can occur in a type.
+The fork checks the lexical identity and the domain of that variable at
+the annotation, as it does for an explicit type argument. A different
+variable on the same domain still requires a proof of equality.
+[GHC proposal 378, term variables in types](https://ghc-proposals.readthedocs.io/en/latest/proposals/0378-dependent-type-design.html#term-variables-in-types)
+and [expression signature checking](../../compiler/GHC/Tc/Gen/HsType.hs).
+
 ### Checking a retained equality continuation
 
 Agda's `subst` transports a value between instances of a predicate by

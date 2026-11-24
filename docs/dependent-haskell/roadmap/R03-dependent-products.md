@@ -603,6 +603,22 @@ opens the proof and uses the predecessor to index the vector tail.
 The bound also lets `indexVec` use the checked position with another
 vector of the same length.
 
+## Expression annotations and proof arguments
+
+Within a `foreach` definition, a complete expression annotation can
+refer to the retained argument. For example, in
+`(plusZero n :: plus n 'Zero :~: n)`, each occurrence of `n` refers to
+the same lexical value. Giving the annotation a different retained
+argument reports the type mismatch at the expression. Linear values and
+out-of-stage values remain subject to the existing scope checks.
+
+A partially applied addition can also appear as the visible type
+argument in `cong @(plus m) (plusZero n)`. The equality proof supplies
+the two endpoints. This uses the same congruence combinator as
+`cong @'Succ (plusZero n)`.
+[Package examples](../hasklib-test/Client.hs) and
+[design provenance](../REFERENCES.md#congruence-with-a-retained-argument).
+
 ## Write indexed constructors in retained applications
 
 `constructedViews p` passes `FZ` and `FS p` directly to `viewFin`.
