@@ -111,3 +111,17 @@ cp "$inputs/NativeCheckedClosureProvider.hs" "$inputs/NativeCheckedClosure.hs" .
     NativeCheckedClosure.hs -e 'print caseBinder' >observed
 grep -Fxq Refl observed
 test ! -e NativeCheckedClosureProvider.o
+
+mkdir "$work/interactive-double"
+cd "$work/interactive-double"
+cp "$inputs/"{NativeCheckedClosureDoubleProvider.hs,NativeCheckedClosureDouble.hs} .
+"${ghc[@]}" --interactive -ignore-dot-ghci -fwrite-source-equations \
+    NativeCheckedClosureDouble.hs -e 'print underBoth' >observed
+grep -Fxq Refl observed
+test ! -e NativeCheckedClosureDoubleProvider.o
+if "${ghc[@]}" --interactive -ignore-dot-ghci -fforce-recomp -fwrite-source-equations \
+       -DWRONG_DOUBLE_CAPTURE NativeCheckedClosureDouble.hs -e '()' >wrong.log 2>&1 ||
+   ! grep -Fq '[GHC-83865]' wrong.log; then
+    cat wrong.log >&2
+    exit 1
+fi
