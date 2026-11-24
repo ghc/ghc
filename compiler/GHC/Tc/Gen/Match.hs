@@ -484,11 +484,7 @@ tcRetainedCase :: Bool -> Id -> MatchGroup GhcRn (LHsExpr GhcRn) -> ExpRhoType
 tcRetainedCase _ _ (MG { mg_alts = L _ [] }) _ = return Nothing
 tcRetainedCase dependent index matches@(MG { mg_alts = L loc alternatives }) (Check result_ty)
   = do { givens <- if dependent then dependent_givens else return []
-       ; captures <- if dependent
-                     then do { vars <- dependent_captures givens
-                             ; mapM_ check_capture vars
-                             ; return vars }
-                     else return []
+       ; captures <- if dependent then dependent_captures givens else return []
        ; let explicit = dependent &&
                (not (null captures) || not (null givens) || depends result_ty)
        ; application <- if explicit || not (isTauTy result_ty)
@@ -549,7 +545,7 @@ tcRetainedCase dependent index matches@(MG { mg_alts = L loc alternatives }) (Ch
                                tcExtendIdEnv2 [(idName index, fresh_index)
                                               , (idName fresh_index, fresh_index)] check
                            else check
-              ; mapM_ (tcEmitBindingUsage . singleUsageUE) captures
+              ; mapM_ (tcEmitBindingUsage . scaleUE ManyTy . singleUsageUE) captures
               ; let fun = HsLam noAnn LamSingle checked
                     index_arg = noLocA (HsVar noExtField (noLocA index))
                     arguments = map (noLocA . HsVar noExtField . noLocA) captures
@@ -603,8 +599,6 @@ tcRetainedCase dependent index matches@(MG { mg_alts = L loc alternatives }) (Ch
                  | isLocalId var, not (isCoVar var), depends (varType var)
                  -> return (Just var)
                _ -> return Nothing }
-    check_capture var = unless (isManyTy (idMult var)) $
-      failWithTc (TcRnRetainedQuantificationError (RetainedPatternType (varType var)))
 
     constructor (L match_loc (Match { m_pats = L _ [pat]
                                    , m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] _) :| [] } }))
@@ -1131,6 +1125,12 @@ runtime index. Generalize each referenced local whose type depends on that
 index as a later value argument. Check the constructor clauses with the existing
 retained match rule, then apply the checked function to the scrutinee and those
 locals. The constructor rule transports both later arguments and the result.
+Record each captured argument as a Many use, as for an ordinary unrestricted
+function argument. In `case box of Just (Pack t x) -> case t of ...`, the
+multiplicity of x can still depend on the outer case's fresh metavariable.
+The enclosing pattern checks this usage and can infer Many. A syntactic test
+of the multiplicity here rejects x before that check. A linear binder still
+has to satisfy its original multiplicity.
 
 Generalize incoming evidence whose predicate depends on the index, even when no
 source Name refers to that evidence. The lexical native Given scope records the
