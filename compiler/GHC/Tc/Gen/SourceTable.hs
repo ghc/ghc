@@ -1935,10 +1935,19 @@ only after all its branches pass. A cycle between different owners has no
 first checked member, so the collector rejects it and its dependents.
 Do not resolve a failed local candidate through an earlier installed table.
 
-Helper calls must be saturated and have no type or evidence arguments.
-Check their term argument types against the nominal family binder kinds and
-check the result kind before constructing the family application. This also
-excludes higher-order operands and polymorphic helper instantiations.
+Helper calls must supply every type and value argument and require no
+evidence arguments. Match the solved signature with the checked family's
+kind. Instantiate the argument and result kinds with the actual type
+arguments before building the family application. This permits:
+
+  rev []     = []
+  rev (x:xs) = app (rev xs) [x]
+
+The recursive call still takes the original tail. The checked equations
+for app supply their own demand on the first list. Admit a built-in
+bracket literal only when provider RULES are disabled. Otherwise its
+desugaring can introduce build, with rules beyond the checked call
+heads. A written cons and nil uses the constructors directly.
 
 The family RHS records each helper's family Name. Recover its exact owner
 through SourceTableId when installing or using a table. Follow this closure
@@ -1984,18 +1993,19 @@ variable pattern restriction before the solved clauses are available.
 sourceTableTyCons :: Bool -> LHsBinds GhcTc -> TcM [(Id, TyCon)]
 sourceTableTyCons local binds = do
     strict <- xoptM LangExt.Strict
+    rules <- goptM Opt_EnableRewriteRules
     structural <- if local && not strict
                   then fmap catMaybes $ forM binds $ \bind ->
                     runMaybeT (localStructuralTable (unLoc bind) <|> localListReverseTable bind)
                   else pure []
-    collect strict structural candidates
+    let candidates = mapMaybe (sourceRows (not rules) . unLoc) binds
+        candidate_names = mkNameSet [idName f | (f, _, _, _, _) <- candidates]
+    collect strict candidate_names structural candidates
   where
-    candidates = mapMaybe (sourceRows . unLoc) binds
-    candidate_names = extendNameSetList emptyNameSet [idName f | (f, _, _, _, _) <- candidates]
     local_names = extendNameSetList emptyNameSet $
       concatMap (map idName . collectHsBindBinders CollNoDictBinders . unLoc) binds
 
-    collect strict checked pending = do
+    collect strict candidate_names checked pending = do
       let available = extendNameSetList emptyNameSet (map (idName . fst) checked)
           ready (_, _, _, _, rows) = all (\f -> not (idName f `elemNameSet` candidate_names)
                                                || idName f `elemNameSet` available)
@@ -2003,7 +2013,7 @@ sourceTableTyCons local binds = do
           (next, later) = partition ready pending
       if null next then pure checked else do
         tables <- catMaybes <$> traverse (certify strict checked) next
-        collect strict (checked ++ tables) later
+        collect strict candidate_names (checked ++ tables) later
 
     rowCalls (SourceRow _ _ _ _ _ rhs) = sourceCalls rhs
 
@@ -2020,11 +2030,11 @@ sourceTableTyCons local binds = do
       ty <- liftZonkM (zonkTcType (varType actual))
       pure $ do
         fam <- table
-        (args, result) <- ordinaryArrows ty
-        guard (not (null args) && length args == tyConArity fam)
-        guard (eqTypes args (map tyVarKind (tyConTyVars fam)))
-        guard (result `eqType` tyConResKind fam)
-        pure (fam, args, result)
+        (binders, args, result) <- constructorHelperType ty <|>
+          (\(inputs, output) -> ([], inputs, output)) <$> ordinaryArrows ty
+        guard (not (null args) && length binders + length args == tyConArity fam)
+        guard (ty `eqType` tyConKind fam)
+        pure (fam, binderVars binders, args, result)
 
     certify strict checked (fun, order, body_tvs, evidence, rows) = do
       clean <- allM emptyEvidence evidence
@@ -5752,25 +5762,25 @@ data SourceRow = SourceRow SrcSpan DataCon [Type] [Maybe Id] [Id] SourceRhs
 
 -- | The expression forms allowed in one source equation.
 data SourceRhs = Field Id | Construct DataCon [SourceRhs] | Recur [Type] Id
-               | Call Id [SourceRhs]
+               | Call Id [Type] [SourceRhs]
 
 -- | Collect non-self calls, including calls inside operands.
 sourceCalls :: SourceRhs -> [Id]
 sourceCalls (Field _) = []
 sourceCalls (Construct _ args) = concatMap sourceCalls args
 sourceCalls (Recur _ _) = []
-sourceCalls (Call fun args) = fun : concatMap sourceCalls args
+sourceCalls (Call fun _ args) = fun : concatMap sourceCalls args
 
 -- | A closed input, or a datatype applied to its lifted body skolems.
 -- See Note [Closed source tables].
 data SourceInput = ClosedInput Type [Type] | PolyInput TyCon [TyVar] [Type]
 
 -- | Collect the constructors and evidence for a candidate source function.
-sourceRows :: HsBind GhcTc -> Maybe (Id, LeftOrRight, [TyVar], [TcEvBinds], [SourceRow])
-sourceRows binding = do
+sourceRows :: Bool -> HsBind GhcTc -> Maybe (Id, LeftOrRight, [TyVar], [TcEvBinds], [SourceRow])
+sourceRows bracket_lists binding = do
     (fun, mono, body_tvs, evidence, matches) <- sourceMatches binding
     let self v = v == fun || v == mono
-        read_rows order = (order,) . unzip <$> traverse (sourceRow order self) matches
+        read_rows order = (order,) . unzip <$> traverse (sourceRow bracket_lists order self) matches
     (order, (row_evidence, rows)) <- read_rows CLeft <|> read_rows CRight
     pure (fun, order, body_tvs, evidence ++ row_evidence, rows)
 
@@ -5853,7 +5863,7 @@ checkedStructuralSource order binding = do
           let predecessors = case right of
                 CaseConstructor _ [] [CaseField field] -> [field]
                 _ -> []
-          output <- MaybeT (pure (sourceRhs CLeft self predecessors body))
+          output <- MaybeT (pure (sourceRhs False CLeft self predecessors body))
           let visit under_constructor = \case
                 Field v | any (hasCaseField v) [left, right] -> Just (CaseField v)
                 Construct dc args | dataConTyCon dc == root
@@ -5950,9 +5960,17 @@ checkedDomains strict order body_tvs ty rows = do
     tvs <- traverse ordinary_binder telescope
     (FTF_T_T, ma, mult, first_ty, rest_ty) <- splitFunTy_maybe tau
     guard (ma `eqType` unmatchableDataConTy && isManyTy mult)
+    let homogeneous_list first carried result =
+          not strict && fmap fst (caseDatatype first) == Just listTyCon &&
+          all (eqType first) (result : carried)
+        open_list = do
+          (_, first : carried, result) <- constructorHelperType ty
+          guard (homogeneous_list first carried result)
+          pure (carried, result)
+        instantiate_body = substTyWith tvs (mkTyVarTys body_tvs)
     (arg_ty, carried, final_ty) <- case order of
       CLeft -> do
-        (carried, result) <- ordinaryArrows rest_ty
+        (carried, result) <- ordinaryArrows rest_ty <|> open_list
         pure (first_ty, carried, result)
       CRight -> do
         guard (null tvs)
@@ -5974,18 +5992,19 @@ checkedDomains strict order body_tvs ty rows = do
                 fields <- openDataConFieldTypes con args
                 guard (all (caseKind args) fields)
           mapM_ ordinary (tyConDataCons tc)
-        let params_in_body = map (substTyWith tvs (mkTyVarTys body_tvs)) args
+        let params_in_body = map instantiate_body args
         pure (tc, PolyInput tc body_tvs params_in_body)
     -- See Note [Carried arguments of a source equation].
-    guard (null carried || (null tvs && not strict))
-    (result, result_params) <- ordinaryDataType final_ty
-    guard (null result_params ||
-           (result == listTyCon && null carried && null tvs &&
-            eqTypes result_params [arg_ty] && isStructuralSize domain arg_ty))
+    unless (homogeneous_list arg_ty carried final_ty) $ do
+      guard (null carried || (null tvs && not strict))
+      (result, result_params) <- ordinaryDataType final_ty
+      guard (null result_params ||
+             (result == listTyCon && null carried && null tvs &&
+              eqTypes result_params [arg_ty] && isStructuralSize domain arg_ty))
     let expected = tyConDataCons domain
         actual   = [con | SourceRow _ con _ _ _ _ <- rows]
     guard (length actual == length expected && mkUniqSet actual == mkUniqSet expected)
-    pure (input, carried, mkTyConApp result result_params)
+    pure (input, map instantiate_body carried, instantiate_body final_ty)
 
   where
     ordinary_binder (ma, Bndr tv (Invisible SpecifiedSpec))
@@ -6033,8 +6052,8 @@ ordinaryDataType ty
       tcIsLiftedTypeKind (typeKind field) && noFreeVarsOfType field && isTauTy field
 
 -- | Read one unguarded source equation with no local bindings.
-sourceRow :: LeftOrRight -> (Id -> Bool) -> LMatch GhcTc (LHsExpr GhcTc) -> Maybe (TcEvBinds, SourceRow)
-sourceRow order self (L loc (Match { m_pats = L _ pats, m_grhss = rhss }))
+sourceRow :: Bool -> LeftOrRight -> (Id -> Bool) -> LMatch GhcTc (LHsExpr GhcTc) -> Maybe (TcEvBinds, SourceRow)
+sourceRow bracket_lists order self (L loc (Match { m_pats = L _ pats, m_grhss = rhss }))
   | pickLR order (True, lengthIs pats 2)
   , pat : rest <- sourceOperandOrder order pats
   , ConPat (ConPatTc params [] [] evs WpHole []) (L _ (RealDataCon input)) details <- unParen pat
@@ -6046,7 +6065,7 @@ sourceRow order self (L loc (Match { m_pats = L _ pats, m_grhss = rhss }))
         _                -> Nothing
       binders <- traverse fieldBinder fields
       carried <- traverse carriedBinder rest
-      output <- sourceRhs order self carried rhs
+      output <- sourceRhs bracket_lists order self carried rhs
       pure (evs, SourceRow (locA loc) input params binders carried output)
   where
     unParen :: LPat GhcTc -> Pat GhcTc
@@ -6061,11 +6080,11 @@ sourceRow order self (L loc (Match { m_pats = L _ pats, m_grhss = rhss }))
     carriedBinder p = case unParen p of
       VarPat _ (L _ v) -> Just v
       _ -> Nothing
-sourceRow _ _ _ = Nothing
+sourceRow _ _ _ _ = Nothing
 
 -- | Recognise constructors, helper calls, and decreasing self calls.
-sourceRhs :: LeftOrRight -> (Id -> Bool) -> [Id] -> HsExpr GhcTc -> Maybe SourceRhs
-sourceRhs order self carried = go []
+sourceRhs :: Bool -> LeftOrRight -> (Id -> Bool) -> [Id] -> HsExpr GhcTc -> Maybe SourceRhs
+sourceRhs bracket_lists order self carried = go []
   where
     go :: [HsExpr GhcTc] -> HsExpr GhcTc -> Maybe SourceRhs
     go args (HsPar _ e)   = go args (unLoc e)
@@ -6075,17 +6094,25 @@ sourceRhs order self carried = go []
     go args (XExpr (WrapExpr (WpTyApp _) con@(XExpr (ConLikeTc (RealDataCon dc)))))
       | dc == nilDataCon || dc == consDataCon = go args con
     go args (XExpr (ConLikeTc (RealDataCon con))) = Construct con <$> traverse (go []) args
+    go [] (ExplicitList _ items) | bracket_lists =
+      foldr (\x xs -> Construct consDataCon [x, xs]) (Construct nilDataCon [])
+        <$> traverse (go [] . unLoc) items
     go [] (HsVar _ (L _ v)) = Just (Field v)
-    go args expr | Just tys <- selfTypeArgs expr = call tys args
-    go args (HsVar _ (L _ f)) | isExternalName (idName f) = Call f <$> traverse (go []) args
+    go args expr
+      | Just (f, tys) <- appliedHead expr, self f = call tys args
+      | Just (f, tys) <- appliedHead expr, isExternalName (idName f) =
+          Call f tys <$> traverse (go []) args
     go _ _ = Nothing
 
-    selfTypeArgs :: HsExpr GhcTc -> Maybe [Type]
-    selfTypeArgs (HsPar _ e) = selfTypeArgs (unLoc e)
-    selfTypeArgs (HsVar _ (L _ f)) | self f = Just []
-    selfTypeArgs (HsAppType ty fun _) = (++ [ty]) <$> selfTypeArgs (unLoc fun)
-    selfTypeArgs (XExpr (WrapExpr wrap fun)) = (++) <$> selfTypeArgs fun <*> typeApps wrap
-    selfTypeArgs _ = Nothing
+    appliedHead :: HsExpr GhcTc -> Maybe (Id, [Type])
+    appliedHead (HsPar _ e) = appliedHead (unLoc e)
+    appliedHead (HsVar _ (L _ f)) = Just (f, [])
+    appliedHead (HsAppType ty fun _) = fmap (++ [ty]) <$> appliedHead (unLoc fun)
+    appliedHead (XExpr (WrapExpr wrap fun)) = do
+      (f, inner) <- appliedHead fun
+      outer <- typeApps wrap
+      pure (f, inner ++ outer)
+    appliedHead _ = Nothing
 
     typeApps :: HsWrapper -> Maybe [Type]
     typeApps WpHole = Just []
@@ -6116,21 +6143,28 @@ freshInput (PolyInput root skolems args) = do
     let params = map (substTyWith skolems (mkTyVarTys vars)) args
     pure (vars, mkTyConApp root params, params)
 
+-- | Instantiate the solved body kinds with the binders of this equation.
+instantiateInput :: SourceInput -> [TyVar] -> Type -> Type
+instantiateInput ClosedInput{} _ = id
+instantiateInput (PolyInput _ skolems _) vars = substTyWith skolems (mkTyVarTys vars)
+
 -- | Check a branch before supplying the family at its recursive calls.
-sourceBranch :: (Id -> TcM (Maybe (TyCon, [Type], Type)))
+sourceBranch :: (Id -> TcM (Maybe (TyCon, [TyVar], [Type], Type)))
              -> LeftOrRight -> SourceInput -> [Type] -> Type -> SourceRow -> TcM (Maybe (TyCon -> CoAxBranch))
 sourceBranch lookup_call order input carried_types result (SourceRow loc con pat_args fields carried output) = do
     args <- liftZonkM (zonkTcTypes pat_args)
     carried_tys <- liftZonkM (zonkTcTypes (map varType carried))
-    same_calls <- checkCalls output
+    checked_output <- runMaybeT (checkCalls output)
     callees <- traverse (\f -> fmap (f,) <$> lookup_call f) (sourceCalls output)
-    if same_calls && eqTypes args pattern_args && eqTypes carried_tys carried_types
+    if eqTypes args pattern_args && eqTypes carried_tys carried_types
        && length fields == dataConSourceArity con then do
       (quantified, domain, params) <- freshInput input
       let field_types = map scaledThing (dataConInstOrigArgTys con params)
           family_args = mkTyVarTys quantified
+          instantiate = instantiateInput input quantified
+          carried_kinds = map instantiate carried_types
       tvs <- zipWithM fieldVar fields field_types
-      carried_tvs <- zipWithM (fieldVar . Just) carried carried_types
+      carried_tvs <- zipWithM (fieldVar . Just) carried carried_kinds
       pure $ do
         checked_callees <- sequence callees
         let lhs = mkTyConApp (promoteDataCon con) (params ++ mkTyVarTys tvs)
@@ -6138,7 +6172,8 @@ sourceBranch lookup_call order input carried_types result (SourceRow loc con pat
             binders = quantified ++ tvs ++ carried_tvs
             carried_scope = zip (map Just carried) carried_tvs
         guard (all isTyFamFree patterns)
-        rhs <- check_rhs checked_callees domain family_args (zip fields tvs) carried_scope result output
+        rhs <- check_rhs checked_callees instantiate domain family_args (zip fields tvs) carried_scope
+                         (instantiate result) =<< checked_output
         pure (\fam -> mkCoAxBranch binders [] [] patterns (rhs fam)
                         (map (const Nominal) binders) loc)
     else pure Nothing
@@ -6147,49 +6182,61 @@ sourceBranch lookup_call order input carried_types result (SourceRow loc con pat
       ClosedInput _ params -> ([], params)
       PolyInput _ skolems params -> (mkTyVarTys skolems, params)
 
-    checkCalls (Field _) = pure True
-    checkCalls (Construct _ args) = allM checkCalls args
-    checkCalls (Call _ args) = allM checkCalls args
-    checkCalls (Recur tys _) = eqTypes call_args <$> liftZonkM (zonkTcTypes tys)
+    checkCalls field@Field{} = pure field
+    checkCalls (Construct con args) = Construct con <$> traverse checkCalls args
+    checkCalls (Call f tys args) =
+      Call f <$> lift (liftZonkM (zonkTcTypes tys)) <*> traverse checkCalls args
+    checkCalls recur@(Recur tys _) = do
+      guard =<< lift (eqTypes call_args <$> liftZonkM (zonkTcTypes tys))
+      pure recur
 
     fieldVar field ty = do
       let occ = maybe (mkTyVarOcc "_") (setOccNameSpace tvName . nameOccName . varName) field
       name <- newSysName occ
       pure (mkTyVar name ty)
 
-    check_rhs callees domain family_args fields_scope carried_scope expected rhs = case rhs of
-      Field v -> do
-        tv <- lookup (Just v) (fields_scope ++ carried_scope)
-        guard (tyVarKind tv `eqType` expected)
-        pure (const (mkTyVarTy tv))
-      Recur _ v -> do
-        -- See Note [Carried arguments of a source equation].
-        tv <- lookup (Just v) fields_scope
-        guard (tyVarKind tv `eqType` domain && result `eqType` expected)
-        let operands = mkTyVarTys (sourceOperandOrder order (tv : map snd carried_scope))
-        pure (\fam -> mkTyConApp fam (family_args ++ operands))
-      Construct dc args -> do
-        (tc, params) <- ordinaryDataType expected
-        guard (null params || (tc == listTyCon && expected `eqType` result))
-        guard (dataConTyCon dc == tc && length args == dataConSourceArity dc)
-        let arg_tys = map scaledThing (dataConInstOrigArgTys dc params)
-        children <- zipWithM (check_rhs callees domain family_args fields_scope carried_scope) arg_tys args
-        pure (\fam -> mkTyConApp (promoteDataCon dc) (params ++ [child fam | child <- children]))
-      Call fun args -> do
-        (table, arg_tys, res_ty) <- lookup fun callees
-        guard (length args == length arg_tys && res_ty `eqType` expected)
-        children <- zipWithM (check_rhs callees domain family_args fields_scope carried_scope) arg_tys args
-        pure (\fam -> mkTyConApp table [child fam | child <- children])
+    check_rhs callees instantiate domain family_args fields_scope carried_scope = go
+      where
+        go expected rhs = case rhs of
+          Field v -> do
+            tv <- lookup (Just v) (fields_scope ++ carried_scope)
+            guard (tyVarKind tv `eqType` expected)
+            pure (const (mkTyVarTy tv))
+          Recur _ v -> do
+            -- See Note [Carried arguments of a source equation].
+            tv <- lookup (Just v) fields_scope
+            guard (tyVarKind tv `eqType` domain && instantiate result `eqType` expected)
+            let operands = mkTyVarTys (sourceOperandOrder order (tv : map snd carried_scope))
+            pure (\fam -> mkTyConApp fam (family_args ++ operands))
+          Construct dc args -> do
+            (tc, params) <- ordinaryDataType expected <|> do
+              (list, [element]) <- caseDatatype expected
+              guard (list == listTyCon)
+              pure (list, [element])
+            guard (null params || (tc == listTyCon && expected `eqType` instantiate result))
+            guard (dataConTyCon dc == tc && length args == dataConSourceArity dc)
+            let arg_tys = map scaledThing (dataConInstOrigArgTys dc params)
+            children <- zipWithM go arg_tys args
+            pure (\fam -> mkTyConApp (promoteDataCon dc) (params ++ [child fam | child <- children]))
+          Call fun tys args -> do
+            (table, parameters, arg_tys, res_ty) <- lookup fun callees
+            let actual_tys = map instantiate tys
+                specialize = substTyWith parameters actual_tys
+            guard (equalLength parameters actual_tys && all (tcIsLiftedTypeKind . typeKind) actual_tys)
+            guard (equalLength args arg_tys && specialize res_ty `eqType` expected)
+            children <- zipWithM go (map specialize arg_tys) args
+            pure (\fam -> mkTyConApp table (actual_tys ++ [child fam | child <- children]))
 
 -- | Give the table the representation of a closed, non-injective family.
 makeFamily :: Name -> LeftOrRight -> SourceInput -> [Type] -> Type -> [TyCon -> CoAxBranch] -> TcM TyCon
 makeFamily fun order input carried_types result branches = do
     (quantified, domain, _) <- freshInput input
+    let instantiate = instantiateInput input quantified
     args <- zipWithM argVar ("x" : "y" : map (("arg" ++) . show) [3 :: Int ..])
-                    (sourceOperandOrder order (domain : carried_types))
+                    (sourceOperandOrder order (domain : map instantiate carried_types))
     let binders = mkNamedTyConBinders (Invisible SpecifiedSpec) quantified ++
                   mkAnonTyConBinders args
-    makeSourceFamily fun binders result branches
+    makeSourceFamily fun binders (instantiate result) branches
   where
     argVar occ ty = do { n <- newSysName (mkTyVarOcc occ); pure (mkTyVar n ty) }
 
