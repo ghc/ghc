@@ -12,9 +12,16 @@ At `0b2ad262df`, default GHCi runs the entire batch 27 book in
 bytecode. All 123 observations match the native run. This includes
 the **More** progress proof with the debugger enabled. A separate
 debugger test stops inside substitution and inspects a local value.
-Job 3162 also passed three registered compiler tests. The next book
-revision, [batch 28](https://github.com/Tritlo/PLFH/tree/67dc34b68d1dfcf4d379594986281831c20ae7fd),
+Job 3162 also passed three registered compiler tests.
+
+[Batch 28](https://github.com/Tritlo/PLFH/tree/67dc34b68d1dfcf4d379594986281831c20ae7fd)
 adopts the multiplication fix and adds a report about abstract renamings.
+Job 3179 checked all 29 modules at both native optimization levels
+and rechecked every module against its dependencies' native interfaces.
+Both executables matched all 129 runtime observations. All four runs
+rejected the nine negative programs with their expected diagnostics.
+The compiler accepted 35/42 original reports at `-O0` and 32/42 at
+default `-O2`. The new renaming report received GHC-70565 at both levels.
 
 Showcase revision `6a608b4f38` proves that decoding an existential
 list witness preserves its position even when the next element has the
