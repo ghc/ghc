@@ -1,8 +1,9 @@
-{-# LANGUAGE ExperimentalDependentTypes #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
 
 -- | Natural number operations used by the PLFH Induction chapter.
-module BookNaturals (monus, times, pow) where
+module BookNaturals (monus, times, pow, threePowFour, threeMonusTwo, twoMonusThree) where
 
+import Data.Type.Equality ((:~:)(Refl))
 import HaskLib.Nat (Nat(..), plus)
 
 -- | Subtract natural numbers, stopping at zero.
@@ -20,3 +21,15 @@ times (Succ m) n = plus n (times m n)
 pow :: Nat -> Nat -> Nat
 pow m Zero     = Succ Zero
 pow m (Succ n) = times m (pow m n)
+
+-- | Three to the fourth power is eighty-one.
+threePowFour :: pow 3 4 :~: 81
+threePowFour = Refl
+
+-- | Truncated subtraction returns the difference when it is positive.
+threeMonusTwo :: monus 3 2 :~: 1
+threeMonusTwo = Refl
+
+-- | Truncated subtraction stops at zero.
+twoMonusThree :: monus 2 3 :~: 0
+twoMonusThree = Refl

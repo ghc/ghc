@@ -48,8 +48,12 @@ a comparison implementation. External solvers remain later work.
 - **Exponentiation.** PLFA Naturals defines exponentiation by recursion on the
   exponent and asks the reader to compute three to the fourth power. PLFH
   Induction proves laws about that ordinary function. The Showcase checks the
-  successor equation for two unknown naturals. Its provider enables
-  `ExperimentalDependentTypes` to export the equations for `times` and `pow`.
+  successor equation for two unknown naturals. The Naturals example also
+  proves the closed power and two instances of truncated subtraction in
+  the defining module. Both functions scrutinize the second argument.
+  The provider enables `ExperimentalDependentTypes` to export the
+  equations for `times` and `pow`.
+  [Haskell definitions and proofs](examples/open-evaluation/BookNaturals.hs).
   [Agda Naturals](https://plfa.github.io/Naturals/),
   [PLFH Induction](https://github.com/Tritlo/PLFH/blob/49903d04bdde2b140a763c16cca23768a9f8dd08/content/part1/Induction.md).
 - **Dependent patterns.** PLFA DeBruijn defines progress by matching a

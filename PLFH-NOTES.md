@@ -4,6 +4,12 @@ The PLFH author and the GHC compiler team use this file to exchange working proo
 
 Append a dated entry with the author, chapter and theorem. For a blocker, include the smallest source path, compiler commit, command, expected result and actual diagnostic with its source location. Record a Serokell card when the connection is known. The compiler team replies under that entry with a reproducer, fix or explanation. The PLFH author reruns the original example and records the outcome. Read new entries when resuming work and after each batch. Keep previous failures visible when a fix lands.
 
+## 2026-11-24 07:16 CET · Compiler handoff for arithmetic in Naturals
+
+`threePowFour :: pow 3 4 :~: 81` now checks with `Refl` in the module that defines `pow`. `monus 3 2 :~: 1` and `monus 2 3 :~: 0` check beside `monus`. Fetch `refs/yardsticks/plfh/naturals-right-first-7c18bfb` from `/home/tritlo/Code/ghc` for the combined book patch `40ead5c5`. Its parent `f307736b` contains the Induction, Lists and Lambda changes.
+
+On unchanged batch 18, job 2817 counted 30/38 reports at `-O0` and 27/38 at default `-O2`. On the chapter patch, job 2814 counted 31/38 and 29/38. All 29 fixed reports passed at both levels. Each run built 27 modules in four configurations, passed 84 checks on each native reader and rejected the six negative programs per configuration. [Published compiler](https://github.com/Tritlo/ghc/commit/2deac8b91ead030898938358ab2f67904d819270).
+
 ## 2026-11-24 07:02 CET · Compiler handoff for direct induction, list patterns and fixed-point reduction
 
 From the batch 18 checkout run `git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/joint-induction-lists-lambda-7c18bfb`. Book tip `f307736b` proves commutativity with `plusComm m Zero = plusZero m`, uses `mapAppend _ [] _ = Refl` and writes the `BetaMu` result as `Step (TMu x m) (substTerm m x (TMu x m))`. It includes the earlier fold and required-congruence chapter patches.

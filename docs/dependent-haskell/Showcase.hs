@@ -1985,6 +1985,8 @@ main = do
         (BookNaturals.monus 0 count, zeroMonus count)
     observe "raise three to the fourth power and prove the successor equation"
         (HaskLib.eqSize (BookNaturals.pow count 4) 81, powSuccessor count 3)
+    observe "check powers and truncated subtraction where they are defined"
+        (BookNaturals.threePowFour, BookNaturals.threeMonusTwo, BookNaturals.twoMonusThree)
     observe "lift equality under successor and partially applied addition"
         (BookCongruence.plusAssoc count 2 3, BookCongruence.addUnder count 2)
     observe "commute addition by induction on the second argument"

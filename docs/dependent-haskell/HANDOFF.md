@@ -8,26 +8,23 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
-[Compiler `9d310102c7`](https://github.com/Tritlo/ghc/commit/9d310102c7222750985c6918102a8db75f44ace2)
-checks direct equations that split the second retained argument. PLFH
-Induction writes `plusComm m Zero = plusZero m`. Lists writes
-`mapAppend _ [] _ = Refl`. The Lambda fixed-point rule uses `TMu` without
-a promotion tick inside `substTerm`. Ordinary namespace lookup still
-requires a tick if a type constructor shadows the data constructor.
-Job 2810 matched all 611 Showcase outputs in GHCi and in native code at
-`-O0` and default `-O2`.
+[Compiler `2deac8b91e`](https://github.com/Tritlo/ghc/commit/2deac8b91ead030898938358ab2f67904d819270)
+checks `threePowFour :: pow 3 4 :~: 81` in the same module as ordinary
+`pow`. The proof is `threePowFour = Refl`. The same declaration ordering
+supports truncated subtraction. All three closed examples and the proof
+of commutativity are in the [Showcase](Showcase.hs). Job 2823 matched
+all 612 observations at native `-O0`, default `-O2` and in GHCi.
+[R21 implementation and limits](roadmap/R21-dependency-analysis.md#recursion-on-the-second-argument-in-plfh-naturals).
 
 On [unchanged PLFH batch 18](https://github.com/Tritlo/PLFH/tree/7c18bfbdcbef8b3df23ddaee4b80373609346f8f),
-job 2793 found **29 of 38 original reports compile at `-O0` and 26 at
-default `-O2`**. The unchanged `R03_FunctionColumnSplit` still hits the guard for append
-rewrite rules at default `-O2`. The joint book patch `f307736b` uses the new equations
-and corrects the earlier fold proof. Job 2781 found 30 and 28 passes
-on that book. All 28 reports in its fixed directory compile at both
-levels. Both revisions passed the 27-module interface audit in four
-configurations, the 84 runtime checks per native build and six negative
-checks per configuration. From the book checkout, run
-`git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/joint-induction-lists-lambda-7c18bfb`.
-[Earlier fold and congruence proofs](CHECKPOINTS.md#required-congruence-and-sum-over-append).
+job 2817 found **30 of 38 original reports compile at `-O0` and 27 at
+default `-O2`**. Job 2814 checked the joint book patch `40ead5c5`,
+including the corrected fold proof and the Lists setting for append
+rewrite rules. It found 31 and 29 passes. All 29 reports in the book's
+fixed directory compile at both levels. Each book audit covered 27
+modules in four modes, 84 runtime checks per native reader and six
+negative programs per mode. To fetch the joint chapter patch locally, run
+`git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/naturals-right-first-7c18bfb`.
 
 ## Next compiler work
 
@@ -42,17 +39,14 @@ checks per configuration. From the book checkout, run
   free replacement under a lambda. Job 2589 checked both proofs at
   `-O0` and `-O2`. General beta reduction still needs
   an equation for substitution when the function body is unknown.
-- Job 2525 built both stages of the 602-example compiler `f6aff88d40`.
-  All 46 selected registrations, package checks and Showcase checks passed.
-  Compatibility passed 233 of 234. `NativeBinaryEnum` used the old test
-  expectation corrected in `83f46cf3ce`. The focused suite passed 137
-  of 138 with the known `MTrans` diagnostic. Job 2680 built both stages of the
-  607-example source `a745ffc9b8`. Its selected registrations passed 47 of 49.
-  `NativeOpenIndexedAppend` and `NativeNamedRetainedSiblingFields` failed
-  their expected diagnostics. Both pass on the 602 compiler in the registered
-  configuration. Preserve the `-dynamic` flag for the append comparison.
-  Check `_build/on-demand/plfh-batch15-normal-607-20261124/build.pass`,
-  `qualification/gates.tsv` and `cohorts/gates.tsv` for final results.
+- Job 2680 built both stages of the 607-example source `a745ffc9b8`.
+  The selected tests passed 47/49, compatibility passed 231/234 and
+  the focused suite passed 136/138. The package and all three Showcase
+  gates passed. Jobs 2817 and 2831 verified the indexed append, named
+  sibling and opaque callback diagnostics after integration. The two
+  focused failures were `NativeDependentCoreRun` (copied source certificate)
+  and the known `deriving-via-compile` diagnostic. Use the independent
+  build for the next checkpoint to compare the complete cohorts.
 - Three compiler agents use a shared queue with four GHC build slots,
   16 logical CPUs and 64 GB of memory.
   A runnable local benchmark pauses the GHC queue and freezes the shared

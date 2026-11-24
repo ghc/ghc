@@ -571,6 +571,23 @@ qualified the normal two-stage compiler.
 [Release checks](../CHECKPOINTS.md#checked-character-predicates-in-the-defining-module) and
 [declaration groups and prior art](../REFERENCES.md#checked-character-equations-in-a-declaration-group).
 
+## Recursion on the second argument in PLFH Naturals
+
+The Naturals chapter defines ordinary `pow` and `monus` and checks
+`pow 3 4 :~: 81`, `monus 3 2 :~: 1` and `monus 2 3 :~: 0` in the
+same declaration group. The renamer schedules these functions when the
+second argument supplies the decreasing constructor field. The type
+checker verifies the defining rows and their recursive operands before
+publishing equations. A changed recursive argument or a rule that
+changes the result still prevents the proof.
+
+Job 2803 checked the chapter, source-hidden readers, incorrect results
+and operand demand. Job 2814 checked all 27 book modules in native
+and fresh no-code builds at `-O0` and `-O2`. General ordering of mixed
+declaration groups remains open.
+[PLFA Naturals](https://plfa.github.io/Naturals/)
+and [Haskell definitions and proofs](../examples/open-evaluation/BookNaturals.hs).
+
 ## Deriving and associated equations
 
 A datatype used by an early structural worker may have an attached
