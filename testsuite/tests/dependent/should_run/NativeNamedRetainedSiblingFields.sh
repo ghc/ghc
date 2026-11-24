@@ -536,4 +536,24 @@ data Bad where
     Bad :: foreach (n :: Nat) -> { badField :: Vec Char n } -> Bad
 HS
     reject 'GHC-89246' BadRecordSyntax.hs
+
+    cat > BadRecordResultHead.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures #-}
+module BadRecordResultHead where
+
+data Result (b :: Bool) where
+    MkResult :: { sel :: Bool } -> Result (sel 'True)
+HS
+    reject 'GHC-45510' BadRecordResultHead.hs
+
+    cat > BadRecordFieldHead.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures #-}
+module BadRecordFieldHead where
+
+data Indexed (b :: Bool) = Indexed
+
+data Result where
+    MkResult :: { sel :: Bool, payload :: Indexed (sel 'True) } -> Result
+HS
+    reject 'GHC-45510' BadRecordFieldHead.hs
 done

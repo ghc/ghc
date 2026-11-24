@@ -2855,13 +2855,40 @@ filterInScopeNonClassM cls_tvs vars
 
 -- | Collect implicit constructor binders after resolving names in both namespaces.
 -- See Note [Implicit quantification in dependent constructor signatures].
-filterGadtConTyVars :: FreeKiTyVars -> RnM FreeKiTyVars
-filterGadtConTyVars vars = do
+filterGadtConTyVars :: ConDecl GhcPs -> FreeKiTyVars -> RnM FreeKiTyVars
+filterGadtConTyVars decl vars = do
   dependent <- xoptM LangExt.ExperimentalDependentTypes
   if dependent
     then do { envs <- getRdrEnvs
-            ; return (filterInScope CaptureTermVars envs vars) }
+            ; return (filterOut (already_bound envs . unLoc) vars) }
     else return vars
+  where
+    already_bound envs rdr
+      | rdr `elem` field_indices = inScope DontCaptureTermVars envs rdr
+      | otherwise                = inScope CaptureTermVars envs rdr
+
+    field_indices
+      | ConDeclGADT{con_g_args = RecConGADT _ (L _ fields)} <- decl
+      = [ rdr | L _ field <- fields
+              , L _ rdr <- extractHsTyRdrTyVars (cdf_type (cdrf_spec field))
+              , Just label <- [demoteRdrNameTv rdr]
+              , label `elem` [unLoc (foLabel (unLoc name))
+                             | L _ rec <- fields, name <- cdrf_names rec]
+              , rdr `notElem` applied ]
+      | otherwise = []
+
+    applied = [unLoc occurrence | occurrence <- application_heads decl
+                                , any (same_occurrence occurrence) vars]
+    same_occurrence a b = unLoc a == unLoc b && getLocA a == getLocA b
+
+    application_heads :: Data a => a -> FreeKiTyVars
+    application_heads node = maybeToList head_name ++ concat (gmapQ application_heads node)
+      where
+        head_name = case cast node :: Maybe (LHsType GhcPs) of
+          Just ty@(L _ HsAppTy{})     -> hsTyGetAppHead_maybe ty
+          Just ty@(L _ HsAppKindTy{}) -> hsTyGetAppHead_maybe ty
+          Just ty@(L _ HsOpTy{})      -> hsTyGetAppHead_maybe ty
+          _                           -> Nothing
 
 {- Note [Implicit quantification in dependent constructor signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2876,6 +2903,12 @@ Quantifying step as well would let a caller choose a different function
 with visible type application. Resolve names before checking whether GHC
 can use the function in the type. A missing set of checked equations
 must not change the type of the exported constructor.
+
+An own record field can share its name with an independent type index.
+In { n :: Nat, xs :: Vec a n }, the field type Vec a n introduces n as
+an index. A use in the result alone does not get this exception. Keep
+term lookup when a free occurrence is an application head in the
+signature. Compare occurrence locations to ignore shadowed applications.
 
 An explicit forall still binds its names. Modules that do not enable
 ExperimentalDependentTypes keep the usual GADT implicit binders.
