@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, RankNTypes #-}
+{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds, RankNTypes #-}
 
 module NativeCheckedClosureDoubleProvider where
 
@@ -32,10 +32,31 @@ renameExpr f (Both n b) = Both (renameExpr f n) (renameExpr f b)
 renameExpr f (Bind n) = Bind (renameExpr (extendName f) n)
 renameExpr f (BindBoth n) = BindBoth (renameExpr (extendName (extendName f)) n)
 
+#ifdef NAMED_WEAKENING
+{-# NOINLINE weakenSlot #-}
+weakenSlot :: forall g b a. Slot g a -> Slot (Push g b) a
+weakenSlot x = Old x
+
+#ifdef EXTRA_EXT_HELPER
+{-# INLINE sneakyAtNew #-}
+sneakyAtNew :: Expr (Push d b) b
+sneakyAtNew = At New
+#endif
+
+extendExpr :: (forall a. Slot g a -> Expr d a)
+           -> (forall s. Slot (Push g b) s -> Expr (Push d b) s)
+#ifdef EXTRA_EXT_HELPER
+extendExpr _ New = sneakyAtNew
+#else
+extendExpr _ New = At New
+#endif
+extendExpr f (Old x) = renameExpr weakenSlot (f x)
+#else
 extendExpr :: (forall a. Slot g a -> Expr d a)
            -> (forall s. Slot (Push g b) s -> Expr (Push d b) s)
 extendExpr _ New = At New
 extendExpr f (Old x) = renameExpr Old (f x)
+#endif
 
 walk :: (forall a. Slot g a -> Expr d a) -> Expr g s -> Expr d s
 walk f (At x) = f x

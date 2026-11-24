@@ -145,6 +145,68 @@ for opt in -O0 -O2; do
         grep -Fq '[GHC-83605]' rule.log
         grep -Fq 'extendName' rule.log
     fi
+
+    mkdir -p "$work/$opt/subst"/{provider,reader}
+    cd "$work/$opt/subst/provider"
+    cp "$inputs/NativeCheckedClosureDoubleProvider.hs" .
+    "${ghc[@]}" "$opt" -DNAMED_WEAKENING -fwrite-source-equations \
+        -c NativeCheckedClosureDoubleProvider.hs
+    "${ghc[@]}" --show-iface NativeCheckedClosureDoubleProvider.hi >provider.iface
+    grep -Fq 'SourceTable T:weakenSlot' provider.iface
+    grep -Fq 'CheckedClosureSourceTable T:extendExpr' provider.iface
+    grep -Fq 'CheckedClosureSourceTable T:walk' provider.iface
+
+    cd "$work/$opt/subst/reader"
+    cp ../provider/NativeCheckedClosureDoubleProvider.hi "$inputs/NativeCheckedClosureDouble.hs" .
+    "${ghc[@]}" "$opt" -DABSTRACT_SUBST -c NativeCheckedClosureDouble.hs
+    test ! -e NativeCheckedClosureDoubleProvider.o
+    if "${ghc[@]}" "$opt" -fforce-recomp -DABSTRACT_SUBST -DWRONG_SUBST_EXT \
+         -c NativeCheckedClosureDouble.hs >wrong-ext.log 2>&1; then
+        cat wrong-ext.log
+        exit 1
+    fi
+    grep -Fq '[GHC-05617]' wrong-ext.log
+    if "${ghc[@]}" "$opt" -fforce-recomp -DABSTRACT_SUBST -DWRONG_SUBST \
+         -c NativeCheckedClosureDouble.hs >wrong-subst.log 2>&1; then
+        cat wrong-subst.log
+        exit 1
+    fi
+    grep -Fq '[GHC-83865]' wrong-subst.log
+
+    for rule_flag in LOCAL_EXT_RULE LOCAL_WALK_RULE; do
+        if "${ghc[@]}" "$opt" -fforce-recomp -fenable-rewrite-rules -Wno-inline-rule-shadowing \
+             -DABSTRACT_SUBST_EQ "-D$rule_flag" -c NativeCheckedClosureDouble.hs >local-rule.log 2>&1; then
+            cat local-rule.log
+            exit 1
+        fi
+        grep -Fq '[GHC-83605]' local-rule.log
+    done
+
+    if [[ $opt == -O2 ]]; then
+        cp "$inputs/NativeCheckedClosureDoubleRule.hs" .
+        for pair in "SUBST_EXT_RULE:extendExpr" "SUBST_WALK_RULE:walk"; do
+            flag=${pair%%:*}
+            expected=${pair#*:}
+            "${ghc[@]}" "$opt" -Wno-inline-rule-shadowing -fforce-recomp "-D$flag" \
+                -c NativeCheckedClosureDoubleRule.hs
+            if "${ghc[@]}" "$opt" -fforce-recomp -DHELPER_RULE -DABSTRACT_SUBST \
+                 -c NativeCheckedClosureDouble.hs >subst-rule.log 2>&1; then
+                cat subst-rule.log
+                exit 1
+            fi
+            grep -Fq '[GHC-83605]' subst-rule.log
+            grep -Fq "$expected" subst-rule.log
+        done
+    fi
+
+    cd "$work/$opt/subst/provider"
+    "${ghc[@]}" "$opt" -fforce-recomp -DNAMED_WEAKENING -DEXTRA_EXT_HELPER \
+        -fwrite-source-equations -c NativeCheckedClosureDoubleProvider.hs
+    "${ghc[@]}" --show-iface NativeCheckedClosureDoubleProvider.hi >withheld.iface
+    if grep -Eq 'CheckedClosureSourceTable T:(extendExpr|walk)' withheld.iface; then
+        cat withheld.iface
+        exit 1
+    fi
 done
 
 mkdir "$work/interactive"
