@@ -3245,12 +3245,14 @@ without changing the rule owner's Core. Skip new no-code candidates in
 modules with source rules. Also skip them in modules with plugins so
 no-code compilation does not start running Core plugin passes.
 
-The driver discards these candidates if the module needs the retained
-program pipeline. That pipeline still requires an object or bytecode
-backend. This check emits equations without a Core program. A module
-that explicitly requests simplified Core uses its existing path and
-does not create these candidates. See validateSimpleSourceTables in
-GHC.Driver.Main.Passes.
+For a retained module, use its restricted simplifier and one retained
+Gentle iteration with rules disabled. Discard the candidates if the body
+does not support this iteration. Check the same owner and equations
+against the result. This emits equations without a Core program. The
+retained program pipeline still requires an object or bytecode backend.
+A module that explicitly requests simplified Core uses its existing path
+and does not create these candidates. See validateSimpleSourceTables
+in GHC.Driver.Main.Passes.
 
 A local signature can instead require an ordinary nominal table. See
 Note [Checked list reverse]. Do not remove that table after optimization.
