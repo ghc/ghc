@@ -3706,6 +3706,12 @@ tcInstFunWithExpected = tcInstFunWithExpectedCache Nothing
 
 {- Note [Native inference after visible type applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A visible type argument can fix the kinds of the remaining binders. In
+cong @(plus m) proof, for example, the callback fixes its domain and
+codomain to Size. Zonk the remaining telescope before selecting erased
+arguments from the proof. Apply the choices to that same telescope so
+the binder-kind check sees the assignments made by the type argument.
+
 ITYARG checks each written type argument once. After leading type arguments,
 use the substituted signature to infer native arguments before IALL
 allocates the remaining type variables. Keep the original head and checked
@@ -3865,17 +3871,19 @@ tcInstFunWithPrefix look_arg prefix_only prefix vta_cache expected_rho inst_plan
                             ; case attempted of
                                 Just _ -> return Nothing
                                 Nothing -> do
-                                  { (_, _, cache, choices) <-
+                                  { residual <- liftZonkM (zonkTcType fun_ty)
+                                  ; (_, _, cache, choices) <-
                                       tcRetainedArgInstEnabled (Just (count written_type_arg acc))
                                         do_ql expected_rho
-                                        rn_head args tc_fun fun_ty
+                                        rn_head args tc_fun residual
                                   ; writeTcRef ref (Just cache)
-                                  ; return choices } }
+                                  ; return ((, residual) <$> choices) } }
                     _ -> return Nothing
-                ; choices <- case inferred of
-                    Just _ -> return inferred
-                    Nothing -> tcRetainedPartialResultPlan do_ql expected_rho args tc_fun fun_ty
-                ; go1 choices fun_orig pos acc fun_ty args } }
+                ; case inferred of
+                    Just (choices, residual) -> go1 (Just choices) fun_orig pos acc residual args
+                    Nothing -> do
+                      { choices <- tcRetainedPartialResultPlan do_ql expected_rho args tc_fun fun_ty
+                      ; go1 choices fun_orig pos acc fun_ty args } } }
 
     is_type_arg ETypeArg{} = True
     is_type_arg _ = False
