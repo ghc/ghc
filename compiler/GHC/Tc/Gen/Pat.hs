@@ -1363,6 +1363,8 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
                     tcConTyArgs tenv penv (concatMap snd late_ty_args) action
 
         ; if null ex_tvs && null eq_spec && null theta
+             && not (isJust index && isNativeIndexedGadtCon data_con)
+             -- See Note [Native indexed branch evidence] in GHC.Core.
           then do { -- The common case; no class bindings etc
                     -- (see Note [Arrows and patterns])
                     (val_arg_pats', res) <-

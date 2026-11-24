@@ -3108,6 +3108,7 @@ data IfaceEvidence
   | LexicalPackageRuleEvidence | OrphanErasedUserRuleEvidence | AnchoredErasedRuleEvidence
   | RetainedUserRuleEvidence | ImportedRetainedRuleEvidence
   | IndexedConstructorCaseEvidence | IndexedConstructorFieldsEvidence
+  | IndexedOrdinaryConstructorCaseEvidence
   | IndexedConstructorOperandEvidence
   | IndexedConstructorExistentialCaseEvidence | GeneralIndexedConstructorOperandEvidence
   | RetainedUserUnfoldingEvidence | LinearUnpackEvidence | RetainedCharOperandEvidence

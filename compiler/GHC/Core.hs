@@ -48,6 +48,7 @@ module GHC.Core (
         containsRetainedNaturalLiteral, isBoxedBigNaturalLiteral,
         isNativeIndexAlt, isNativeIndexDataAlt, isNativeIndexAliasAlt, isNativeIndexAliasBinder,
         isNativeIndexedDataAlt, splitNativeIndexedDataAlt, isNativeIndexedGadtCon,
+        isNativeIndexedOrdinaryCon,
         splitNativeIndexedPatternEvidence, nativeIndexedCon_maybe,
 
         mkBinds,
@@ -129,7 +130,7 @@ import GHC.Core.Class (classMethods)
 import GHC.Core.Predicate (getClassPredTys_maybe)
 import GHC.Core.DataCon
 import GHC.Core.TyCon ( TyCon, isPromotedDataCon_maybe, isVanillaAlgTyCon,
-                        tyConTyVars, tyConResKind, tyConKind, tyConSingleDataCon_maybe,
+                        tyConTyVars, tyConResKind, tyConKind, tyConDataCons, tyConSingleDataCon_maybe,
                         isBoxedDataTyCon, isTypeDataTyCon, tyConDataFamCoercion_maybe )
 import GHC.Unit.Module
 
@@ -3601,6 +3602,7 @@ isNativeIndexDataAlt con args
   , isBoxedDataTyCon (dataConTyCon con)
   , null (dataConRepArgBinders con) || dataConHasPromotedRetained con
   , (_, [], [], [], _, _) <- dataConFullSig con
+  , not (isNativeIndexedGadtCon con)
   = True
   | otherwise = False
 
@@ -3620,6 +3622,12 @@ splitNativeIndexedDataAlt con args
 -- | Check the ordinary GADT constructor shape supported by indexed evidence.
 isNativeIndexedGadtCon :: DataCon -> Bool
 isNativeIndexedGadtCon = isJust . nativeIndexedGadtSpecs_maybe
+
+-- | Identify the ordinary siblings that need the indexed proof representation.
+isNativeIndexedOrdinaryCon :: DataCon -> Bool
+isNativeIndexedOrdinaryCon con
+  | (_, [], [], [], _, _) <- dataConFullSig con = isNativeIndexedGadtCon con
+  | otherwise = False
 
 -- | Separate the ordinary GADT equalities from the virtual branch proof.
 -- See Note [Native indexed branch evidence].
@@ -3678,21 +3686,24 @@ nativeIndexedCon_maybe domain con binders
       | otherwise = Nothing
 
 nativeIndexedGadtSpecs_maybe :: DataCon -> Maybe [EqSpec]
-nativeIndexedGadtSpecs_maybe con
-  | let tc = dataConTyCon con
-  , isVanillaAlgTyCon tc, isBoxedDataTyCon tc
-  , null (dataConRepArgBinders con)
-  , (_, exs, specs, [], fields, _) <- dataConFullSig con
-  , all isTyVar exs, null (dataConStupidTheta con)
-  , dataConRepArity con == length specs + length fields
-  , all (\(Scaled mult ty) -> (isOneTy mult || isManyTy mult) && isNativeOpaqueValueType ty) fields
-  , all (not . isBanged) (dataConImplBangs con)
-  , case specs of
-      [] -> not (null exs)
-      [spec] -> not (null fields) || not (null exs) || noFreeVarsOfType (eqSpecType spec)
-      _ -> False
-  = Just specs
-  | otherwise = Nothing
+nativeIndexedGadtSpecs_maybe = eligible True
+  where
+    eligible allow_ordinary con
+      | let tc = dataConTyCon con
+      , isVanillaAlgTyCon tc, isBoxedDataTyCon tc
+      , null (dataConRepArgBinders con)
+      , (_, exs, specs, [], fields, _) <- dataConFullSig con
+      , all isTyVar exs, null (dataConStupidTheta con)
+      , dataConRepArity con == length specs + length fields
+      , all (\(Scaled mult ty) -> (isOneTy mult || isManyTy mult) && isNativeOpaqueValueType ty) fields
+      , all (not . isBanged) (dataConImplBangs con)
+      , case specs of
+          [] -> not (null exs)
+                || (allow_ordinary && any (isJust . eligible False) (tyConDataCons tc))
+          [spec] -> not (null fields) || not (null exs) || noFreeVarsOfType (eqSpecType spec)
+          _ -> False
+      = Just specs
+      | otherwise = Nothing
 
 {- Note [Native indexed branch evidence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3719,6 +3730,13 @@ An indexed branch can bind erased arguments without binding any fields.
 For FZ :: Fin (S n), the ordinary alternative binds n and the nominal
 equality with S n. Form the promoted FZ at that n. The proof identifies
 the matched value at the scrutinee kind and adds no runtime argument.
+
+An ordinary constructor can be a sibling of an eligible GADT constructor.
+For example, Mu :: Term (Ext g a) a -> Term g a has no EqSpec or
+existential arguments. Its branch still identifies the retained scrutinee
+with Mu applied to the actual field. The kind conversion is reflexive.
+Use the indexed representation for these mixed alternatives. Keep this
+case disjoint from isNativeIndexDataAlt, which serves structural domains.
 
 Agda's indexed constructor split refines the indices and binds the
 constructor fields in the branch context. See
