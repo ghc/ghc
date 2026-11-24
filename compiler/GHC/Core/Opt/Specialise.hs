@@ -3151,6 +3151,7 @@ wantCallsFor _env f
       DFunId {}        -> True
       VanillaId {}     -> True
       SourceTableId {} -> True
+      CheckedClosureSourceTableId {} -> True
       JoinId {}        -> True
       WorkerLikeId {}  -> True
       RepPolyId {}     -> True

@@ -28,6 +28,10 @@ caseBinder :: P.replace
                 P.Lit :~: P.Test P.Lit P.Lit (P.At P.New)
 caseBinder = Refl
 
+-- The specialiser sees a term-level call to the imported checked closure.
+applyReplacement :: P.Expr g a -> P.Expr (P.Push g a) b -> P.Expr g b
+applyReplacement value body = P.replace body value
+
 type CanStep :: forall g a. P.Expr g a -> Type
 data CanStep m where
     CanStep :: Step m n -> CanStep m
