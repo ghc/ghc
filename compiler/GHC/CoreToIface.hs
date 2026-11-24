@@ -733,8 +733,17 @@ toIfaceExpr (App f a)       = toIfaceApp f [a]
 toIfaceExpr (Case s x ty as)
   | null as                 = IfaceECase (toIfaceExpr s) (toIfaceType ty)
   | otherwise               = IfaceCase scrut (mkIfLclName (getOccFS x))
-                                  (map toIfaceAlt as)
+                                  (map (toIfaceAltWith legacy_structural) as)
   where
+    -- A concrete instance of an opaque declaration can still use the
+    -- old structural encoding. The reader checks coverage for that tag.
+    legacy_structural =
+      isNativeIndexType (idType x) &&
+      case splitTyConApp_maybe (idType x) of
+        Just (tc, _) -> DEFAULT `elem` constructors ||
+                        all ((`elem` constructors) . DataAlt) (tyConDataCons tc)
+        Nothing -> False
+    constructors = [con | Alt con _ _ <- as]
     -- Inlining a retained application can leave a constructed scrutinee.
     -- The branch proof then requires the same reader support as the application.
     scrut | any (\alt -> isNativeIndexAlt alt || isNativeIndexAliasAlt alt) as
@@ -794,18 +803,23 @@ toIfaceTopBind b =
 
 ---------------------
 toIfaceAlt :: CoreAlt -> IfaceAlt
+toIfaceAlt = toIfaceAltWith False
+
+-- | Encode a branch. Use the old structural tag only inside a checked case.
 -- See Note [Native index alias evidence in interfaces] in GHC.IfaceToCore.
-toIfaceAlt (Alt DEFAULT [cv] rhs)
+toIfaceAltWith :: Bool -> CoreAlt -> IfaceAlt
+toIfaceAltWith _ (Alt DEFAULT [cv] rhs)
   | isCoVar cv, isLocalId cv
   = IfaceAlt IfaceDefaultAltWithProof [mkIfLclName (getOccFS cv)] (toIfaceExpr rhs)
-toIfaceAlt alt@(Alt DEFAULT (_:_) _)
+toIfaceAltWith _ alt@(Alt DEFAULT (_:_) _)
   = pprPanic "toIfaceAlt: invalid index alias proof binder" (ppr alt)
-toIfaceAlt alt@(Alt (DataAlt con) bs rhs)
+toIfaceAltWith legacy_structural alt@(Alt (DataAlt con) bs rhs)
   | isNativeIndexedDataAlt con bs
   = case splitAt (length bs - 1) bs of
       (_, [cv]) | isCoVar cv, isLocalId cv ->
         let iface_con
-              | isNativeOpaqueOrdinaryCon con = IfaceOpaqueOrdinaryAltWithProof
+              | isNativeOpaqueOrdinaryCon con =
+                  if legacy_structural then IfaceDataAltWithProof else IfaceOpaqueOrdinaryAltWithProof
               | isNativeIndexedOrdinaryCon con = IfaceIndexedOrdinaryAltWithProof
               | isNativeIndexedDiagonalCon con = IfaceIndexedDiagonalAltWithProof
               | dataConSourceArity con > 0 = IfaceIndexedFieldsAltWithProof
@@ -825,7 +839,7 @@ toIfaceAlt alt@(Alt (DataAlt con) bs rhs)
         in IfaceAlt iface_con (map (mkIfLclName . getOccFS) bs) (toIfaceExpr rhs)
       _ -> pprPanic "toIfaceAlt: invalid native constructor proof binder" (ppr alt)
   -- See Note [Native constructor evidence in interfaces] in GHC.IfaceToCore.
-toIfaceAlt (Alt c bs r) = IfaceAlt (toIfaceCon c) (map (mkIfLclName . getOccFS) bs) (toIfaceExpr r)
+toIfaceAltWith _ (Alt c bs r) = IfaceAlt (toIfaceCon c) (map (mkIfLclName . getOccFS) bs) (toIfaceExpr r)
 
 ---------------------
 toIfaceCon :: AltCon -> IfaceConAlt
