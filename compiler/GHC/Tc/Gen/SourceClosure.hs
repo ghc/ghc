@@ -570,18 +570,20 @@ data IndexedLookup = IndexedLookup Id [TyVar] [Type] Type [(IndexedPattern, Inde
 -- | Read the two nested matches of a structurally decreasing lookup.
 indexedLookup :: [(Id, CoreExpr)] -> Id -> CoreExpr -> Maybe IndexedLookup
 indexedLookup bindings owner rhs = do
-    guard (exprType rhs `eqType` varType owner)
-    (parameters@[scope], [left, right], body) <- function rhs
-    let (_, tau) = splitForAllTyVars (exprType rhs)
-    (matches, [Scaled left_mult left_kind, Scaled right_mult right_kind], result) <- pure (splitFunTys tau)
-    guard (all (`eqType` unmatchableDataConTy) matches &&
+    (parameters@[scope], [left, right], Core.Case (Core.Var input) _ result alts) <- function rhs
+    guard (input == left)
+    let left_kind = varType left
+        right_kind = varType right
+    ([(scope_match, declared_scope)], tau) <- pure (splitForAllTyVars (varType owner))
+    let instantiate = substTyWith [declared_scope] [mkTyVarTy scope]
+    (matches, [Scaled left_mult left_type, Scaled right_mult right_type], result_type) <- pure (splitFunTys tau)
+    guard (varType scope `eqType` varType declared_scope &&
+           all (`eqType` unmatchableDataConTy) (scope_match : matches) &&
            all isManyTy [left_mult, right_mult] &&
-           eqTypes [left_kind, right_kind, result] [varType left, varType right, exprType body])
+           eqTypes (map instantiate [left_type, right_type, result_type]) [left_kind, right_kind, result])
     (left_tc, [left_scope]) <- splitTyConApp_maybe left_kind
     (right_tc, [right_scope]) <- splitTyConApp_maybe right_kind
     guard (eqTypes [left_scope, right_scope] (map mkTyVarTy [scope, scope]))
-    Core.Case (Core.Var input) _ _ alts <- pure body
-    guard (input == left)
     [(con, binders, rest)] <- pure [(dc, bs, e) | Core.Alt (Core.DataAlt dc) bs e <- alts,
                                                not (patternFailure e)]
     guard (all (validOuterAlt con) alts)
