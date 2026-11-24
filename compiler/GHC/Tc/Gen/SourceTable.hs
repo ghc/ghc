@@ -3320,6 +3320,14 @@ those rows as provisional. Publish them only when final Core checks the
 same patterns and results. A type with an unknown right operand cannot
 select a rule for monus Zero n until it knows that operand's constructor.
 
+The retained Core pipeline can keep the failure join and repeat a case
+on an operand that an outer branch already matched. In the right-first
+checker, remember the constructor and fields selected by each branch.
+A repeated case must have an alternative for that constructor. Use the
+original field binders in that alternative. A return of the case binder
+can use a known nullary constructor. Skip a lazy join binding. The
+checker still rejects a reachable jump to it.
+
 A leaf can return a direct recursive call. Apply the same operand checks
 as for recursion under a constructor. For example, monus and eqSize
 recurse on both predecessor fields after matching two successors.
@@ -5069,9 +5077,12 @@ checkedConstructorRows :: ConstructorCaseMode -> Bool -> Bool -> (TyCon -> Bool)
                        -> [Type] -> Type -> [ConstructorCaseTree] -> Id -> Core.CoreExpr
                        -> Maybe [ConstructorCaseRow]
 checkedConstructorRows mode bind_aliases tail_self public witness_root helper recursive parameters result patterns root =
-    checkBody patterns [] (Just root)
+    checkBody patterns [] [] (Just root)
   where
-    checkCase partial_root patterns aliases scrutinee
+    -- See Note [Checked cases on two structural sizes].
+    structural_right = mode == RightStructuralConstructorCase
+
+    checkCase partial_root patterns aliases known scrutinee
               (Core.Case (Core.Var actual) binder case_result alternatives) = do
       guard (resolveCaseAlias aliases actual == scrutinee &&
              varType binder `eqType` varType actual && case_result `eqType` result)
@@ -5080,13 +5091,13 @@ checkedConstructorRows mode bind_aliases tail_self public witness_root helper re
       let branch_aliases
             | bind_aliases = (binder, scrutinee) : aliases
             | otherwise = aliases
-      branches <- traverse (checkAlt partial_root patterns branch_aliases scrutinee tc args)
+      branches <- traverse (checkAlt partial_root patterns branch_aliases known scrutinee tc args)
                            alternatives
       guard (completeCase tc (map fst branches))
       pure (concatMap snd branches)
-    checkCase _ _ _ _ _ = Nothing
+    checkCase _ _ _ _ _ _ = Nothing
 
-    checkAlt partial_root patterns aliases scrutinee tc args
+    checkAlt partial_root patterns aliases known scrutinee tc args
              (Core.Alt (Core.DataAlt dc) fields body) = do
       guard (dataConTyCon dc == tc && dataConUserTyVars dc == dataConUnivTyVars dc)
       let domain = mkTyConApp tc args
@@ -5108,14 +5119,17 @@ checkedConstructorRows mode bind_aliases tail_self public witness_root helper re
           replace call = (False, call)
           (replaced, patterns') = unzip (map replace patterns)
       guard (or replaced)
-      let checked = checkBody patterns' aliases Nothing body
+      let known'
+            | structural_right = (scrutinee, (dc, fields)) : known
+            | otherwise = known
+          checked = checkBody patterns' aliases known' Nothing body
       rows <- if partial_root
               then pure [row | Just [row@(ConstructorCaseRow lhs _)] <- [checked]
                              , lengthIs lhs (length patterns')
                              , and (zipWith samePattern lhs patterns')]
               else checked
       pure (dc, rows)
-    checkAlt _ _ _ _ _ _ _ = Nothing
+    checkAlt _ _ _ _ _ _ _ _ = Nothing
 
     samePattern (CaseField v) (CaseField w) = v == w
     samePattern (CaseConstructor c _ fields) (CaseConstructor d _ others) =
@@ -5130,17 +5144,29 @@ checkedConstructorRows mode bind_aliases tail_self public witness_root helper re
       | Just dc == witness_root = caseKind (parameters ++ fields) kind
       | otherwise = casePublicKind public (parameters ++ fields) kind
 
-    checkBody patterns aliases first_case body = case body of
-      Core.Case (Core.Var next) _ _ _ ->
-        checkCase (mode == IndependentConstructorCase && isJust first_case) patterns aliases
-          (fromMaybe (resolveCaseAlias aliases next) first_case) body
+    checkBody patterns aliases known first_case body = case body of
+      Core.Case (Core.Var next) binder ty alternatives
+        | structural_right, isNothing first_case
+        , let selected = resolveCaseAlias aliases next
+        , Just (dc, fields) <- lookup selected known
+        , varType binder `eqType` varType next, ty `eqType` result
+        , Just (Core.Alt _ actual rhs) <- find (matches_con dc) alternatives
+        , all isId actual, eqTypes (map varType actual) (map varType fields) ->
+            checkBody patterns ((binder, selected) : zip actual fields ++ aliases)
+                      known Nothing rhs
+        | otherwise ->
+            checkCase (mode == IndependentConstructorCase && isJust first_case)
+              patterns aliases known (fromMaybe (resolveCaseAlias aliases next) first_case) body
+      Core.Let (Core.NonRec join _) rest
+        | structural_right, isJoinId join ->
+            checkBody patterns aliases known first_case rest
       Core.Let (Core.NonRec binder (Core.Var target)) rest
         | isId binder, binder /= target, not (scoped binder)
         , isNothing (lookup binder aliases)
         , varType binder `eqType` varType target
         , let selected = resolveCaseAlias aliases target
         , scoped selected ->
-            checkBody patterns ((binder, selected) : aliases) first_case rest
+            checkBody patterns ((binder, selected) : aliases) known first_case rest
       Core.Case test binder ty
         [ Core.Alt (Core.DataAlt rejected) [] no, Core.Alt (Core.DataAlt accepted) [] yes ]
         | mode == BooleanConstructorCase, isNothing first_case
@@ -5167,8 +5193,16 @@ checkedConstructorRows mode bind_aliases tail_self public witness_root helper re
           , varType v `eqType` result
           , pattern@CaseConstructor{} : _ <- patterns
           = Just pattern
+        check_result (Core.Var v)
+          | structural_right
+          , Just (dc, []) <- lookup (resolveCaseAlias aliases v) known
+          , varType v `eqType` result
+          = Just (CaseConstructor dc [] [])
         check_result rhs = (guard tail_self *> check_self rhs) <|>
           checkCaseResult public public_kind helper select check_self result rhs
+
+    matches_con dc (Core.Alt (Core.DataAlt actual) _ _) = dc == actual
+    matches_con _ _ = False
 
 recursiveCaseOperand :: (Id, ConstructorCaseTree) -> Id -> Maybe (Bool, ConstructorCaseTree)
 recursiveCaseOperand (original, pattern) field
