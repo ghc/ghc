@@ -30,3 +30,29 @@ preserve :: Rel t u -> Present t -> Present u
 preserve Same witness = witness
 preserve (Branches left right) (Both l r) =
     Both (preserve left l) (preserve right r)
+
+data Depth = Stop | Next Depth
+
+data Env (n :: Depth) where
+    Empty :: Env 'Stop
+    Push :: Env n -> Bool -> Env ('Next n)
+
+type Insert :: forall n. Env n -> Env ('Next n) -> Type
+data Insert e e' where
+    First :: Insert e ('Push e 'False)
+    Later :: Insert e e' -> Insert ('Push e a) ('Push e' a)
+
+type Den :: forall n. Env n -> Type
+data Den e where
+    Intro :: Den ('Push e a) -> Den e
+
+type Packed :: forall n. Env n -> Type
+data Packed e where
+    Pack :: Insert e e' -> Den e' -> Packed e
+
+-- The recursive call fixes the kinds of the existential match through
+-- unification. The casted Givens still refer to those metavariables.
+nested :: Insert e e' -> Den e -> Packed e
+nested ins (Intro body) =
+    case nested (Later ins) body of
+        Pack (Later rest) den -> Pack rest (Intro den)
