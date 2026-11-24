@@ -3116,11 +3116,13 @@ instance Binary ConSourceGroup where
         _ -> fail "Invalid constructor argument group tag"
 
 instance Binary IfaceConDecl where
-    put_ bh (IfCon a1 a2 a3 a12 a4 a5 a6 ctxt a8 arg_binders a9 a10 a11 _) = do
+    put_ bh (IfCon a1 a2 a3 univ_bndrs a4 a5 a6 ctxt a8 arg_binders a9 a10 a11 _) = do
         unless (null arg_binders || null ctxt) $
           requireIfaceEvidenceVersion bh RetainedConstructorContextEvidence
-        unless (null arg_binders || null a9) $
+        unless (null arg_binders || null a9) $ do
           requireIfaceEvidenceVersion bh RetainedNamedRecordEvidence
+          unless (null univ_bndrs) $
+            requireIfaceEvidenceVersion bh RetainedRecordParametersEvidence
         putIfaceTopBndr bh a1
         put_ bh a2
         put_ bh a3
@@ -3134,7 +3136,7 @@ instance Binary IfaceConDecl where
         mapM_ (put_ bh) a9
         put_ bh a10
         put_ bh a11
-        put_ bh a12
+        put_ bh univ_bndrs
     get bh = do
         a1 <- getIfaceTopBndr bh
         a2 <- get bh
