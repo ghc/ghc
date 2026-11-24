@@ -1864,6 +1864,11 @@ field. Preserve the checked constructor tree until erasure as well.
 Replacing it with a fresh Core variable would require transporting the
 later proof through its constructor's result index.
 
+In `toFrom (encode Base)`, the constructor `Base` can carry an index,
+while the outer call is headed by the local function `encode`. If the
+constructor check cannot describe the whole operand, try the local
+function check. Use its index for the whole call through CorePrep.
+
 An HPC tick leaves the nominal index unchanged. Preserve the tick in the
 same thunk that contains the instrumented operand. The strict alias case
 for an ordinary constructor would enter this thunk before the callee needs

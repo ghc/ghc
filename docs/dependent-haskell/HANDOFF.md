@@ -28,6 +28,17 @@ observations in the three modes.
 [membership induction](examples/open-evaluation/BookAnyWitnessProof.hs),
 [parallel reduction](examples/open-evaluation/BookParallel.hs).
 
+At `46abd6733e`, the second inverse law also accepts `encode proof`
+directly. CorePrep retains the index of this local function call when
+it names the operand for code generation. Job 3232 checked the original
+composed program at `c4943a42d7`: 31 modules in each of four modes,
+nine negative programs per mode, and 134 matching native observations.
+Job 3241 checked that ignoring the result of a throwing encoder leaves
+it unevaluated. To fetch the composed proof in a book checkout, use
+`git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/composed-membership-confluence-3b4892f`.
+[CorePrep Note](../../compiler/GHC/CoreToStg/Prep.hs),
+[regression](../../testsuite/tests/dependent/should_run/NativeIndexedIsoOperand.hs).
+
 At `0b2ad262df`, default GHCi runs the entire batch 27 book in
 bytecode. All 123 observations match the native run. This includes
 the **More** progress proof with the debugger enabled. A separate
@@ -95,10 +106,9 @@ Job 2996 matched the 113 book observations at native `-O0`, default
 - R16. Check the new batch 28 Bisimulation report. The result of
   `simRename` mentions the ordinary renamer applied to an abstract
   function that must work at every object-language type.
-- Review the CorePrep correction for a proof applied to `encode proof`.
-  The compiler can name that expression during lowering. The result
-  type must still refer to the index the typechecker assigned to it.
-  Job 3211 reproduced the Core Lint mismatch in book commit `c4943a42d7`.
+- In **Adequacy**, check that a closed type family respects the equality
+  learned by matching a retained witness. Any nested call to a checked
+  function still needs its rewrite-rule dependencies recorded.
 - A no-code reader can use a separately compiled native provider. A fresh
   no-code provider withholds the substitution equation. Job 2968 reproduced
   GHC-70565 at the beta endpoint at both optimization levels. Publication
