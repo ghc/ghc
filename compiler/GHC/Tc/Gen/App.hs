@@ -4737,8 +4737,13 @@ tcRetainedFunctionArg domain arg = setSrcSpanA (getLoc arg) $
           case thing of
             Just (ATcId { tct_id = actual }) -> liftZonkM (zonkId actual) >>= tcRetainedFunctionVar domain
             _ -> unsupported
-    _ -> unsupported
+    _
+      | HsApp{} <- unLoc (stripParensLHsExpr arg) -> check_prefix
+      | OpApp{} <- unLoc (stripParensLHsExpr arg) -> check_prefix
+      | otherwise -> unsupported
   where
+    check_prefix = fst <$> tcRetainedArgWith Core.nativeIndexFunctionArgIndex domain arg
+
     unsupported :: TcM a
     unsupported = failWithTc $ TcRnRetainedQuantificationError RetainedFunctionArgument
 
@@ -4765,10 +4770,10 @@ Resolve the certificate through the written occurrence's defining Id.
 Record that use and its dependencies with tcLookupSourceTableId. This
 checks the same rewrite rules as a saturated source call.
 
-A unary source family takes the same erased arguments as its term owner.
-Leave its value binder unsaturated at a function-valued retained argument.
-Substituting the index for the callback saturates that family wherever the
-callback was applied to a value. The U arrow prevents using the application
+A source family takes the erased arguments of its term owner. A retained
+callback can supply a checked prefix of the value arguments. Leave one
+value binder unsaturated. Substituting the index for the callback saturates
+the family wherever the callback was applied to a value. The U arrow prevents using the application
 as evidence for the identity of either input. The ordinary argument check
 keeps the original function occurrence and its selected type arguments.
 A lexical variable still has its own index, even when its right-hand side
@@ -4821,11 +4826,16 @@ evidence. See Note [Wildcards in retained operand domains].
 -- | Resolve a retained argument at its known domain without checking its value.
 -- See Note [Retained argument application].
 tcRetainedArg :: Type -> LHsExpr GhcRn -> TcM (Core.CoreExpr, LHsExpr GhcRn)
-tcRetainedArg domain arg
+tcRetainedArg = tcRetainedArgWith Core.retainedArgIndex
+
+-- | Resolve the operand and check its index at the expected domain.
+tcRetainedArgWith :: (Core.CoreExpr -> Maybe Type) -> Type -> LHsExpr GhcRn
+                  -> TcM (Core.CoreExpr, LHsExpr GhcRn)
+tcRetainedArgWith reify domain arg
   = setSrcSpanA (getLoc arg) $
     do { domain <- constructor_domain domain arg
        ; result@(core_arg, _) <- resolve emptyNameEnv domain arg
-       ; case Core.retainedArgIndex core_arg of
+       ; case reify core_arg of
            Just index
              | typeKind index `tcEqType` domain -> return result
              | otherwise -> do { domain' <- liftZonkM (zonkTcType domain)
@@ -5019,6 +5029,13 @@ tcRetainedArg domain arg
                    XExpr (HsRecSelRn field) -> Just (unLoc (foLabel field), [])
                    _ -> retainedSourceHead fun
            ; (core_fun, fun') <- case source_head of
+               Just (n, []) | not (isExternalName n) -> do
+                   actual <- tcLookupIdMaybe n
+                   case actual of
+                     Just v | isNativeIndexFunctionId v -> do
+                       fun_id <- liftZonkM (zonkId v)
+                       pure (Core.Var fun_id, fun)
+                     _ -> setSrcSpanA (getLoc fun) unsupported
                Just (n, written) -> do
                      certified <- if isExternalName n
                        then tcLookupIdMaybe n >>= maybe (pure Nothing) tcLookupSourceTableId

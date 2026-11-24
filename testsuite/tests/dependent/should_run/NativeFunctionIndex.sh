@@ -72,10 +72,12 @@ strictIdentity !x = x
 HS
 
 cat > ReadIsoIdentity.hs <<'HS'
-{-# LANGUAGE CPP, ExperimentalDependentTypes, GADTs, TypeOperators #-}
+{-# LANGUAGE AllowAmbiguousTypes, CPP, ExperimentalDependentTypes, GADTs, Modifiers #-}
+{-# LANGUAGE ScopedTypeVariables, TypeApplications, TypeOperators #-}
 module Main where
 
-import Data.Type.Equality ((:~:)(Refl))
+import Data.Type.Equality ((:~:)(Refl), trans)
+import GHC.Matchability (Matchability)
 import BookIsomorphism
 import IsoIdentity
 
@@ -105,10 +107,41 @@ strict _ = Refl
 {-# RULES "change identity at False" identity False = True #-}
 #endif
 
+#ifdef WRONG_COMPOSITION
+wrongComposition :: Iso a a -> Iso a a -> Iso a a
+wrongComposition (MkIso f g gf fg) (MkIso h k kh hk) =
+    MkIso (h . f) (g . k) (composeLeft f g h k gf kh) (composeLeft f g h k gf kh)
+#endif
+
+cong :: forall {a} {b} {m :: Matchability} (f :: a %m -> b) x y.
+        x :~: y -> f x :~: f y
+cong Refl = Refl
+
+composeLeft :: foreach (f :: a -> b) -> foreach (g :: b -> a)
+            -> foreach (h :: b -> c) -> foreach (k :: c -> b)
+            -> (foreach (x :: a) -> g (f x) :~: x)
+            -> (foreach (y :: b) -> k (h y) :~: y)
+            -> foreach (x :: a) -> g (k (h (f x))) :~: x
+composeLeft f g _ _ gf kh x = trans (cong @g (kh (f x))) (gf x)
+
+isoTrans :: forall a b c. Iso a b -> Iso b c -> Iso a c
+isoTrans (MkIso f g gf fg) (MkIso h k kh hk) =
+    MkIso @a @c (h . f) (g . k)
+        (composeLeft f g h k gf kh)
+        (composeLeft k h g f hk fg)
+
+ignored :: foreach (x :: Bool) -> x :~: x
+ignored _ = Refl
+
+withoutForcing :: (Bool -> Bool) -> Bool
+withoutForcing f = case ignored (f False) of Refl -> True
+
 main :: IO ()
 main = do
     observe reflIso
     observe preludeReflIso
+    observe (isoTrans sample (case sample of MkIso f g left right -> MkIso g f right left))
+    print (withoutForcing (error "forced callback"))
   where
     observe :: Iso Bool Bool -> IO ()
     observe (MkIso to from left right) =
@@ -137,10 +170,15 @@ for level in 0 2; do
         identity_cmd=("${g[@]}" "-O$level" -fno-enable-rewrite-rules)
         "${identity_cmd[@]}" -c ReadIsoIdentity.hs
         "${identity_cmd[@]}" ReadIsoIdentity.o ../provider/{BookIsomorphism,IsoIdentity}.o -o identity
-        printf '(False,True,True)\n(False,True,True)\n' | diff -u - <(./identity)
+        printf '(False,True,True)\n(False,True,True)\n(False,True,True)\nTrue\n' | diff -u - <(./identity)
         if "${identity_cmd[@]}" -fforce-recomp -DWRONG_ROUND_TRIP -c ReadIsoIdentity.hs >wrong-trip.log 2>&1 ||
            ! grep -Fq 'error: [GHC-83865]' wrong-trip.log; then
             cat wrong-trip.log >&2
+            exit 1
+        fi
+        if "${identity_cmd[@]}" -fforce-recomp -DWRONG_COMPOSITION -c ReadIsoIdentity.hs >wrong-composition.log 2>&1 ||
+           ! grep -Fq 'error: [GHC-83865]' wrong-composition.log; then
+            cat wrong-composition.log >&2
             exit 1
         fi
         if "${identity_cmd[@]}" -fforce-recomp -DSTRICT_IDENTITY -c ReadIsoIdentity.hs >strict.log 2>&1 ||

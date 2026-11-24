@@ -2673,11 +2673,15 @@ nativeSourceCallIndex expr
   = snd <$> computedIndexExpr expr
   | otherwise = Nothing
 
--- | Compute the index of a constructor tree with source calls or coverage ticks.
+-- | Compute a checked source call, retained constructor tree, or lexical call index.
 -- See Note [Source calls in retained arguments].
 nativeComputedIndex :: CoreExpr -> Maybe Type
 nativeComputedIndex expr
   | has_computation expr = snd <$> computedIndexExpr expr
+  | App (Var _) _ <- expr
+  , Just index <- exprToNativeCaseIndex expr
+  , Just{} <- nativeCallSpine_maybe index
+  = Just index
   | otherwise = Nothing
   where
     has_computation (Tick HpcTick{} _) = True
@@ -2694,6 +2698,9 @@ nativeDeferredArgIndex e
                                  || isNativeDataFamilyCon con) e
   = snd <$> computedIndexExpr e
   | Just index <- nativeComputedIndex e = Just index
+  | (_, args) <- collectArgs e
+  , any isValArg args
+  , Just index <- nativeSourceFunctionArgIndex e = Just index
   | otherwise = nativeClassSelectorIndex e
 
 -- | Reuse structural constructor checks without enabling beta or cast conversion.
@@ -2800,6 +2807,13 @@ index. Keep their runtime placement. Require a source call or coverage tick
 so the structural normalizer keeps its own policy and precedence. CorePrep
 substitutes variables in the checked tree without evaluating or duplicating
 a field.
+
+For proof (f x), the function f can be lexical. The case index reader can
+identify the same call without inspecting the function. Require a unary
+application at the root and a native call index. Keep the application as a
+deferred operand. The proof can ignore its argument, so lowering must keep
+the call lazy.
+
 The original Core application supplies the runtime head. A family
 application on its own is insufficient to reconstruct that Id. Keep
 the expression when composing substitutions. Keep the structural
@@ -2854,7 +2868,8 @@ nativeIndexFunctionArgIndex arg
   = Just (TermVarTy fun)
   | otherwise = Nothing
 
--- | Reify a source function before its retained value argument.
+-- | Reify a checked source function with one value argument remaining.
+-- See Note [Named retained callbacks] in GHC.Tc.Gen.App.
 nativeSourceFunctionArgIndex :: CoreExpr -> Maybe Type
 nativeSourceFunctionArgIndex arg
   -- The defining module still represents a checked source owner as a
@@ -2862,15 +2877,26 @@ nativeSourceFunctionArgIndex arg
   | (Var fun, args) <- collectArgs arg
   , isExternalName (idName fun)
   , Just family <- sourceTableId_maybe fun
-  , Just (tys, body, _, [_]) <- sourceIndexHead fun family args
-  , Just _ <- nativeIndexFunctionTypeTys_maybe body
-  , let index = mkTyConApp family tys
-  , typeKind index `eqType` body
+  , let (type_args, values) = span isTypeArg args
+  , Just (tys, body, family_subst, binders) <- sourceIndexHead fun family type_args
+  , let (used, remaining) = splitAt (length values) binders
+  , [_] <- remaining
+  , Just (indices, arrow) <- foldM (apply family_subst) ([], body) (zip used values)
+  , Just _ <- nativeIndexFunctionTypeTys_maybe arrow
+  , let index = mkTyConApp family (tys ++ reverse indices)
+  , typeKind index `eqType` arrow
   = Just index
   | otherwise = Nothing
+  where
+    apply subst (indices, ty) (binder, value) = do
+      (FTF_T_T, _, mult, domain, result) <- splitFunTy_maybe ty
+      index <- retainedArgIndex value
+      guard (isManyTy mult && typeKind index `eqType` domain
+             && domain `eqType` TyCoSubst.substTy subst (tyVarKind binder))
+      pure (index : indices, result)
 
 -- | Recover an index for an existing strict case, including an opaque call.
--- This does not admit a call as a lazy retained application argument.
+-- Admission as a retained argument is checked by nativeComputedIndex.
 -- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
 exprToNativeCaseIndex :: CoreExpr -> Maybe Type
 exprToNativeCaseIndex =
