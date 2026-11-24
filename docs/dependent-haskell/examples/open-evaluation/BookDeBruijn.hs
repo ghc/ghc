@@ -4,7 +4,7 @@
 -- | Typed terms and substitution from the PLFH DeBruijn chapter.
 -- Adapted from PLFH batch 21 under CC BY 4.0. See REFERENCES.md.
 module BookDeBruijn (Ty(..), Ctx(..), Lookup(..), Term(..), Value(..),
-                     ext, rename, exts, subst, substSingle) where
+                     ext, rename, exts, subst, substSingle, substDouble) where
 
 import Data.Kind (Type)
 
@@ -64,6 +64,10 @@ subst sigma (Mu n)       = Mu (subst (exts sigma) n)
 -- | Substitute a single closed/open term `w` for variable `Z` in `n` (N [ W ]).
 substSingle :: Term (CExt g a) b -> Term g a -> Term g b
 substSingle n w = subst (\case { Z -> w; S x -> Var x }) n
+
+-- | Replace the two newest variables and carry outer variables through.
+substDouble :: Term (CExt (CExt g a) b) c -> Term g a -> Term g b -> Term g c
+substDouble n older newer = subst (\case { Z -> newer; S Z -> older; S (S x) -> Var x }) n
 
 -- | Evidence that a typed term is a value.
 type Value :: forall (g :: Ctx) (a :: Ty). Term g a -> Type

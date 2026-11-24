@@ -184,6 +184,7 @@ import qualified BookCongruence
 import qualified BookFoldProof
 import qualified BookLambdaUnfold
 import qualified BookBetaReduction
+import qualified BookDeBruijn
 import qualified BookAnyWitnessProof
 import qualified BookReverseProof
 import qualified BookNaturals
@@ -2005,6 +2006,8 @@ main = do
                 BookBetaReduction.freeIndexAfterBeta
     observe "prove progress for application, successor case, recursion and a value"
         BookBetaReduction.progressExamples
+    observe "replace two variables of the same type in de Bruijn order"
+        (BookBetaReduction.replacementOrder BookDeBruijn.Zero (BookDeBruijn.Suc BookDeBruijn.Zero))
     observe "preserve an open predicate proof in a promoted existential witness"
         (BookAnyWitnessProof.packHeadPreservesProof @(BookAnyWitnessProof.EvidenceBit False))
     observe "sum two lists with the right-fold append proof"

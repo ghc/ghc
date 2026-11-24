@@ -1,11 +1,12 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, EmptyCase, GADTs, PolyKinds #-}
-{-# LANGUAGE StandaloneKindSignatures, TypeAbstractions, TypeApplications #-}
+{-# LANGUAGE StandaloneKindSignatures, TypeAbstractions, TypeApplications, TypeOperators #-}
 -- | Progress and capture-avoiding beta reduction for the PLFH DeBruijn terms.
 module BookBetaReduction (Step(..), Progress(..), progress, progressExamples,
-                          captureAvoided, freeIndexAfterBeta) where
+                          captureAvoided, freeIndexAfterBeta, replacementOrder) where
 
 import BookDeBruijn
 import Data.Kind (Type)
+import Data.Type.Equality ((:~:)(Refl))
 
 -- | One call-by-value reduction. The endpoints have the same context and type.
 type Step :: forall (g :: Ctx) (a :: Ty). Term g a -> Term g a -> Type
@@ -88,6 +89,12 @@ caseBeta (VSuc @v w) = PStep (BetaSuc @CEmpty @a @m @n @v w)
 -- | Unfold the fixed point by substituting it into its body.
 muStep :: forall a (n :: Term (CExt CEmpty a) a). Progress (Mu n)
 muStep = PStep (BetaMu @CEmpty @a @n)
+
+-- | The scrutinee and the zero branch select different variables of the same type.
+replacementOrder :: foreach (older :: Term CEmpty TNat) -> foreach (newer :: Term CEmpty TNat)
+                 -> substDouble (Case (Var Z) (Var (S Z)) (Var Z)) older newer
+                    :~: Case newer older (Var Z)
+replacementOrder _ _ = Refl
 
 type Outer = CExt CEmpty TNat
 type Fn = TArr TNat TNat
