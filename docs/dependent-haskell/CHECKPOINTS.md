@@ -6,6 +6,39 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Nested Soundness patterns and identity isomorphisms
+
+The [R11 fix](https://github.com/Tritlo/ghc/commit/3326acd9b1fea98090eb5e8f3f89b5a85e44d849)
+keeps the original cast when projecting equality evidence from a nested
+GADT pattern. Job 2561 compiled the Soundness chapter with its environment
+pattern inlined at both optimization levels. An intentionally wrong field
+retained its GHC-25897 diagnostic. Job 2573 rebuilt the 27 modules in
+published PLFH `0fd43f5` in four configurations. Of 31 original reports,
+22 compiled at `-O0` and 21 at default `-O2`. R11 was the only report
+whose result changed since job 2505. The two native readers passed 66
+observations each. Each of the four builds rejected five negative clients.
+
+The [603rd Showcase observation](examples/open-evaluation/BookIsoRefl.hs)
+instantiates the polymorphic identity isomorphism at `Maybe Bool` and
+opens its two inverse proofs. Job 2559 matched all 603 observations at
+native `-O0`, default `-O2` and in GHCi on compiler `8b37fdfd34`.
+Job 2574 repeated the checks with the R11 fix and its updated GADT fixture.
+The proof module disables rewrite rules. Job 2551 ran the Isomorphism
+chapter patch and recorded 54 passes. A changed identity rule, a strict
+identity and a false round trip remained separate negative tests.
+
+On the published De Bruijn chapter a reader can prove
+`substSingle ('Var 'Z) w :~: w` from the provider's full optimized
+interface. Job 2556 also tested capture avoidance under a lambda in
+the earlier `49903d0` chapter. With compiler `549657008d`, job 2589
+also checked the capture-avoiding shift through the current chapter's
+full optimized interface, at both reader optimization levels. The reader
+rejects the endpoint that would capture the variable. The evaluator
+recognizes the compiler-generated weakening of the callback's argument
+multiplicity. A stripped or fresh no-code provider omits
+the unfoldings required for that proof. General substitution for a
+neutral function body remains open.
+
 ## Polymorphic proofs from the published book
 
 Job 2505 checked [PLFH `0fd43f5`](https://github.com/Tritlo/PLFH/tree/0fd43f5353c4c3ae7670bac668ff2abe8f3c67ea)

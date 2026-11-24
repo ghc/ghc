@@ -14,22 +14,20 @@ Soundness chapter can use the nested pattern directly. Job 2561 checked
 both programs at `-O0` and `-O2`. A wrong environment field still
 reports GHC-25897. The same compiler includes the De Bruijn application
 and typed substitution checks and the polymorphic identity isomorphism.
+Job 2573 built all 27 published PLFH modules in native and fresh no-code
+modes at `-O0` and default `-O2`. Both native readers passed 66 runtime
+checks. All five negative programs gave the expected diagnostic in each
+build. Of the same 31 original reports, **22 compile at `-O0` and 21 at
+default `-O2`**. R11 accounts for the improvement at both levels.
+The [verification record](CHECKPOINTS.md#nested-soundness-patterns-and-identity-isomorphisms)
+gives the example and the interface requirements for substitution.
 
-[Compiler `34582bce54`](https://github.com/Tritlo/ghc/commit/34582bce5489634e15d9fc16a53d37b19dcc58e5)
-checks [published PLFH `0fd43f5`](https://github.com/Tritlo/PLFH/tree/0fd43f5353c4c3ae7670bac668ff2abe8f3c67ea).
-Job 2505 built all 27 modules in native and fresh no-code modes at `-O0`
-and default `-O2`. Every interface audit passed. Both native readers ran
-66 observations. All five negative programs reported the expected errors
-in each build. Of 31 original reports, 21 compile at `-O0` and 20 at
-default `-O2`. The difference is the append rule in `R13_ShuntAccumOpenEq`.
-
-[Showcase revision `f6aff88d40`](https://github.com/Tritlo/ghc/commit/f6aff88d4040111518f1d148aaf0be20c01f009d)
-uses the same isomorphism definition as the interface regression. Job 2510
-matched all 602 observations at native `-O0`, default `-O2` and in GHCi.
-The book's map-length alias checks without explicit type arguments. A
-polymorphic isomorphism stores its functions with both inverse laws.
-The record regression and mixed subtraction modules pass their controls.
-[Proofs and verification](CHECKPOINTS.md#polymorphic-proofs-from-the-published-book).
+The [Showcase](Showcase.hs) now uses Prelude `id` as both directions of
+`Iso a a`. Its proof module disables rewrite rules. Job 2574 matched
+all 603 observations at native `-O0`, default `-O2` and in GHCi.
+The difference between the book's two reproducer counts comes from the
+append rule in `R13_ShuntAccumOpenEq`.
+[Book revision](https://github.com/Tritlo/PLFH/tree/0fd43f5353c4c3ae7670bac668ff2abe8f3c67ea).
 
 The Isomorphism chapter patch is separate. From the book checkout, run
 `git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/generic-iso-refl-0fd43f5`.
@@ -45,8 +43,10 @@ records the chapter handoff.
   checks both congruence branches and the value/value branch when the
   caller supplies recursive progress and beta. Jobs 2529 and 2533 checked
   the three branches, two false endpoints and the compatibility controls.
-  With the required interface unfoldings, the compiler reduces
-  `substSingle ('Var 'Z) w` to `w`. General beta reduction still needs
+  With the full optimized interface from the published De Bruijn chapter,
+  the compiler reduces `substSingle ('Var 'Z) w` to `w` and shifts a
+  free replacement under a lambda. Job 2589 checked both proofs at
+  `-O0` and `-O2`. General beta reduction still needs
   an equation for substitution when the function body is unknown.
 - Job 2429 built both stages of the 600-example compiler `76e67f4fdb`.
   The 42 registrations reported the known independent record-index failure.

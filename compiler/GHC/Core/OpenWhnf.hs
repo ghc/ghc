@@ -524,8 +524,8 @@ used as a callback. For example, the substitution extension passes the
 successor of a typed lookup to renaming. Accept the compiler's weakening
 from One to Many when the argument and result types agree. Reflexive
 type binders and a downgrade from nominal to representational preserve
-this condition. The adaptation changes how often the caller can use
-the function. It does not change the observed application.
+this condition. The target arrow makes a weaker guarantee about how the
+function uses its argument. The callback still runs the same code.
 -}
 
 -- | Recognize lifted, lazy constructor fields with the ordinary representation.
