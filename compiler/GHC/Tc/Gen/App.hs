@@ -102,6 +102,7 @@ import GHC.Data.FastString
 import Language.Haskell.Syntax.Text ( unpackHText )
 
 import GHC.Utils.Misc
+import GHC.Utils.Monad ( anyM, orM )
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 
@@ -6540,7 +6541,7 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
           | [first_arg, _] <- value_args
           , hasNoConcreteTyVars fun
           , maybe False isTauTy expected
-          , is_nominal_continuation domains result
+          , isNominalEqualityContinuation domains result
           = Just first_arg
           | otherwise = Nothing
         equality_continuation = isJust equality_first_arg
@@ -6684,16 +6685,6 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
                            else return (fun, sigma, cache, Nothing) }
                  _ -> return (fun, sigma, cache, Nothing) } }
   where
-    -- See Note [Checking a nominal equality continuation].
-    is_nominal_continuation [Scaled _ first_arg, Scaled _ continuation] result
-      | isTauTy first_arg
-      , FunTy { ft_af = af, ft_arg = pred_ty, ft_res = body } <- coreFullView continuation
-      , isInvisibleFunArg af
-      , Just (tc, _) <- splitTyConApp_maybe pred_ty
-      , tc `hasKey` eqTyConKey
-      = isTauTy body && eqType body result
-    is_nominal_continuation _ _ = False
-
     is_type_arg ETypeArg{} = True
     is_type_arg _ = False
 
@@ -6755,15 +6746,56 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
     infer_args tvs (inferable : rest) (domain : domains) pos
                (EValArg { ea_arg = arg } : args)
       = do { entry <- if inferable && any (`elemVarSet` tyCoVarsOfType (scaledThing domain)) tvs
-                      then addArgCtxt (pos + fromMaybe 0 after_vta) rn_head arg $
-                           do { (usage, (typed, actual)) <- tcCollectingUsage (tcInferRho arg)
-                              ; return [(pos, (typed, actual, usage))] }
+                      then do { defer <- case expected of
+                                   Just _  -> tcRetainedNeedsExpected arg
+                                   Nothing -> return False
+                              ; if defer then return [] else
+                                  addArgCtxt (pos + fromMaybe 0 after_vta) rn_head arg $
+                                  do { (usage, (typed, actual)) <- tcCollectingUsage (tcInferRho arg)
+                                     ; return [(pos, (typed, actual, usage))] } }
                       else return []
            ; entries <- infer_args tvs rest domains (pos+1) args
            ; return (entry ++ entries) }
     infer_args tvs inferable domains pos (_ : args)
       = infer_args tvs inferable domains pos args
 tcRetainedArgInstCached _ _ _ _ _ fun sigma = return (fun, sigma, [], Nothing)
+
+-- | Recognize a function whose result comes from a nominal equality continuation.
+isNominalEqualityContinuation :: [Scaled Type] -> Type -> Bool
+isNominalEqualityContinuation [Scaled _ first_arg, Scaled _ continuation] result
+  | isTauTy first_arg
+  , FunTy { ft_af = af, ft_arg = pred_ty, ft_res = body } <- coreFullView continuation
+  , isInvisibleFunArg af
+  , Just (tc, _) <- splitTyConApp_maybe pred_ty
+  , tc `hasKey` eqTyConKey
+  = isTauTy body && eqType body result
+isNominalEqualityContinuation _ _ = False
+
+-- | Find a retained equality continuation that needs its result type.
+-- See Note [Checking a nominal equality continuation].
+tcRetainedNeedsExpected :: LHsExpr GhcRn -> TcM Bool
+tcRetainedNeedsExpected = check []
+  where
+    check args (L _ (HsApp _ fun arg)) = check (arg : args) fun
+    check args (L _ (OpApp _ lhs op rhs)) = check (lhs : rhs : args) op
+    check args (L _ (HsPar _ expr)) = check args expr
+    check args (L _ (HsPragE _ _ expr)) = check args expr
+    check args (L _ (XExpr (ExpandedThingRn (HSE { hse_exp = expr })))) = check args expr
+    check args (L _ (HsVar _ lname))
+      | [proof, _] <- args
+      , let name = unLocWithUserRdr lname
+      , not (isDataOcc (nameOccName name))
+      = do { found <- tcLookupIdMaybe name
+           ; case found of
+               Just ident
+                 | (_, _, tau) <- tcRetainedInstTelescope (idType ident)
+                 , (_, domains, result) <- splitFunTys tau
+                 , isNominalEqualityContinuation domains result
+                 -> (snd <$> tcRetainedInferableArg proof) `orM` check_args args
+               _ -> check_args args }
+    check args _ = check_args args
+
+    check_args = anyM tcRetainedNeedsExpected
 
 {- Note [Checking a nominal equality continuation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -6784,6 +6816,21 @@ Require each erased argument to have a scoped tau choice with no unfilled
 metavariables. Use NoQL and its existing argument cache. The cache supplies
 the checked first argument and its usage. The application keeps its head,
 arguments and evaluation order.
+
+With a checked result for trans a (gcastWith proof Refl), match the
+sibling's actual type to select the retained intermediate. Leave the
+continuation application out of the inference cache until its full result
+is available. Find the same continuation through nested applications so
+the outer call can supply their expected types. This test reads the known
+head's type and checks its first argument for a native anchor. A written
+expression signature supplies its own expected type. A call in inference
+mode continues to use the ordinary cache.
+
+An intermediate must come from independent argument types or the checked
+result. An unknown index stays unknown when the deferred continuation
+is checked. Its Given provides evidence only inside that continuation.
+The ordinary application path handles evidence, usage and evaluation
+order.
 -}
 
 {- Note [Matching a callback with an inferred multiplicity]
