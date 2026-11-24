@@ -7,7 +7,7 @@ module PreludeZipProof where
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
 import PreludeMapLengthProof (Count, Spine(..))
-import PreludeMapLengthSize (Nat(..), Size)
+import PreludeMapLengthSize (Nat(..))
 import PreludeZipSource (ZipPairs)
 import PreludeZipWithLengthProof (Minimum)
 

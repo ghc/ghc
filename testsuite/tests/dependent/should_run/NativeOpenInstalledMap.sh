@@ -133,7 +133,7 @@ cat >CountOne.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, TypeOperators #-}
 module CountOne where
 import Data.Type.Equality ((:~:)(Refl))
-import PreludeMapLengthSize (Size(..))
+import PreludeMapLengthSize (Nat(..))
 import PreludeMapLengthSource (Count)
 
 one :: Count '[ 'True] :~: 'Succ 'Zero

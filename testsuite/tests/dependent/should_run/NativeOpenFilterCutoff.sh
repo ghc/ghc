@@ -17,7 +17,7 @@ import Control.Exception (ErrorCall(..), evaluate, try)
 import Data.IORef (newIORef, readIORef)
 import PreludeFilterCutoff (CutoffBound(..), packCutoff, showCutoffBound)
 import PreludeFilterLengthProof (AtMost(..))
-import PreludeMapLengthSize (Size(..))
+import PreludeMapLengthSize (Nat(..), Size)
 import System.Environment (getArgs)
 
 first :: CutoffBound -> String

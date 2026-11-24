@@ -21,7 +21,7 @@ echo 'module Unrelated where; flag :: Bool; flag = True' >Unrelated.hs
 cat >NoEquation.hs <<'END'
 {-# OPTIONS_GHC -fwrite-source-equations #-}
 module NoEquation (withoutDescent) where
-import PreludeMapLengthSize (Size(..))
+import PreludeMapLengthSize (Nat(..), Size)
 
 withoutDescent :: Size -> [a] -> [a]
 withoutDescent Zero _ = []
@@ -64,7 +64,7 @@ cd interface-only
 cat >Main.hs <<'END'
 module Main where
 import HaskLib.List.Prefix (takeSize)
-import PreludeMapLengthSize (Size(..))
+import PreludeMapLengthSize (Nat(..))
 main :: IO ()
 main = print (takeSize (Succ Zero) (True : error "forced the list beyond the bound"))
 END

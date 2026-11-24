@@ -19,7 +19,7 @@ for opt in 0 2; do
 {-# OPTIONS_GHC -fwrite-source-equations #-}
 module OtherSizes (otherSize) where
 
-import PreludeMapLengthSize (Size(..))
+import PreludeMapLengthSize (Nat(..), Size)
 
 otherSize :: [a] -> Size
 otherSize [] = Succ Zero

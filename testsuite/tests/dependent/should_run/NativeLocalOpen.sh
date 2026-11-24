@@ -355,7 +355,14 @@ type Count (xs :: [Bool]) = size xs
 count :: Count '[ 'True, 'False] :~: 'Succ ('Succ 'Zero)
 count = Refl
 SOURCE
-    sed -n '/^data Size/,$p' "$src/PreludeMapLengthSize.hs" >worker
+    cat >worker <<'SOURCE'
+data Size = Zero | Succ Size
+    deriving Show
+
+size :: [a] -> Size
+size [] = Zero
+size (_ : xs) = Succ (size xs)
+SOURCE
     for order in worker-first proof-first; do
         if [[ $order == worker-first ]]; then
             cat header worker proof >DerivedCount.hs

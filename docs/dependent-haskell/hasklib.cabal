@@ -28,6 +28,7 @@ library
 
   build-depends:
     base >=4.23 && <5,
+    ghc-experimental >=10.100 && <10.101,
     ghc-internal >=10.100 && <10.101,
 
   default-language: GHC2024
