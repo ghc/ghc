@@ -344,8 +344,8 @@ indexedEncoder bindings owner rhs = do
 -- | Check the ordinary unary telescope before reading case branches.
 indexedFunction :: Id -> CoreExpr -> Maybe ([TyVar], Id, CoreExpr)
 indexedFunction owner rhs = do
+    (parameters, [input], body@Core.Case{}) <- function rhs
     guard (exprType rhs `eqType` varType owner)
-    (parameters, [input], body) <- function rhs
     let (_, tau) = splitForAllTyVars (exprType rhs)
     (_, [Scaled mult input_kind], output_kind) <- pure (splitFunTys tau)
     guard (isManyTy mult && input_kind `eqType` varType input &&
