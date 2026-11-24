@@ -2297,6 +2297,7 @@ sourceCaseTables binds = do
       , not (isBinaryListCase signature)
       , not (isTwoStructuralCase signature || isSizeListCase signature)
       = (position == 1 && (tc == listTyCon || publicCaseType env exported imported tc)) ||
+        (isPermutingConstructorCase signature && publicCaseType env exported imported tc) ||
         (nameModule_maybe (tyConName tc) == Just (tcg_semantic_mod env) &&
          publicCaseType env exported (const False) tc) ||
         (maybe False (\(_, domain, _) -> isRetainedCaseRoot domain tc)
@@ -2915,21 +2916,27 @@ pairCaseType tau = do
       | isTyVar v, varType v `eqType` liftedTypeKind = Just binder
     liftedBinder _ = Nothing
 
--- | Recognize a mapper which keeps the other ordinary lifted parameters.
+-- | Recognize a mapper or a change in parameter order for early source checking.
 sourceMapperType :: Type -> Bool
-sourceMapperType tau = isJust $ do
-    ConstructorCaseType binders root params [callback, _] 1 result <- constructorCaseType tau
-    guard (all (tcIsLiftedTypeKind . tyVarKind) (binderVars binders))
-    (input, output) <- caseArrow callback
-    a <- getTyVar_maybe input
-    b <- getTyVar_maybe output
-    vars <- traverse getTyVar_maybe params
-    guard (a `elem` vars && (a == b || b `notElem` vars))
-    guard (mkUniqSet (binderVars binders) == mkUniqSet (b : vars))
-    let mapped = [if v == a then output else mkTyVarTy v | v <- vars]
-    guard (result `eqType` mkTyConApp root mapped)
+sourceMapperType tau =
+    maybe False isPermutingConstructorCase (constructorCaseType tau) ||
+    isPairPermutationType tau || isJust mapper
 
--- | Publish the same constructor equations for a solved local mapper.
+  where
+    mapper = do
+        ConstructorCaseType binders root params [callback, _] 1 result <- constructorCaseType tau
+        guard (all (tcIsLiftedTypeKind . tyVarKind) (binderVars binders))
+        (input, output) <- caseArrow callback
+        a <- getTyVar_maybe input
+        b <- getTyVar_maybe output
+        vars <- traverse getTyVar_maybe params
+        guard (a `elem` vars && (a == b || b `notElem` vars))
+        guard (mkUniqSet (binderVars binders) == mkUniqSet (b : vars))
+        let mapped = [if v == a then output else mkTyVarTy v | v <- vars]
+        guard (result `eqType` mkTyConApp root mapped)
+
+-- | Publish constructor equations for a solved local binding.
+-- See Note [Parameter permutations in source equations].
 sourceMapperTable :: Id -> Core.CoreExpr -> TcM (Maybe (Id, TyCon))
 sourceMapperTable owner rhs = do
     env <- getGblEnv
@@ -2939,7 +2946,40 @@ sourceMapperTable owner rhs = do
         public tc = all available (tyConName tc : map dataConName (tyConDataCons tc))
     case checkedConstructorCase public (const Nothing) owner rhs of
       Just (signature, rows) -> Just . (owner,) <$> publishConstructorCase owner signature rows
-      Nothing -> pure Nothing
+      Nothing
+        | isPairPermutationType (varType owner)
+        , Just projection <- checkedPairCase owner rhs
+        -> Just . (owner,) <$> publishPairCase owner projection
+        | otherwise -> pure Nothing
+
+{- Note [Parameter permutations in source equations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A unary constructor case can change the order of the lifted parameters
+of a datatype, as in Either a b -> Either b a. The signature admits the
+case to the existing constructor-row checker. That checker still checks
+coverage, field demand, constructor visibility, and the result of
+each row. Both early and final checking use the same equations.
+
+Boxed pairs already have a checker for one strict case with lazy fields.
+Use that checker for a pair swap, including when a local proof needs
+the equation before the end of the module.
+-}
+
+-- | A boxed pair can use the pair equation checker for early publication.
+isPairPermutationType :: Type -> Bool
+isPairPermutationType ty = isJust $ do
+    (_, x, y, result) <- pairCaseType ty
+    guard (x /= y && result `eqType` mkTyConApp (tupleTyCon Boxed 2) (mkTyVarTys [y, x]))
+
+-- | An ordinary unary constructor case can permute its lifted parameters.
+isPermutingConstructorCase :: ConstructorCaseType -> Bool
+isPermutingConstructorCase (ConstructorCaseType _ root args [_] 0 result) = isJust $ do
+    (target, new_args) <- caseDatatype result
+    old <- traverse getTyVar_maybe args
+    new <- traverse getTyVar_maybe new_args
+    guard (root == target && old /= new &&
+           mkUniqSet old == mkUniqSet new && length old == length new)
+isPermutingConstructorCase _ = False
 
 -- | The number of leading invisible arguments to a checked helper family.
 helperInvisibleArity :: TyCon -> Int

@@ -2660,8 +2660,18 @@ localSourceTableBinders binds sigs =
         , isExternalName n, nameOccName n `elemOccSet` signed
         , all (constructor_row n False) rows ||
           (any matches_second rows && all (constructor_row n True) rows) ||
-          all (mapping_row n) rows ]
+          all (mapping_row n) rows ||
+          all pair_swap_row rows ]
   where
+    pair_swap_row (L _ Match{m_pats = L _ [pat], m_grhss = rhss})
+      | TuplePat _ [first, second] Boxed <- unparen pat
+      , VarPat _ (L _ x) <- unparen first
+      , VarPat _ (L _ y) <- unparen second
+      , GRHSs _ (L _ (GRHS _ [] rhs) :| []) (L _ EmptyLocalBinds{}) <- rhss
+      , ExplicitTuple _ [Present _ left, Present _ right] Boxed <- unLoc (stripParensLHsExpr rhs)
+      = variable left == Just y && variable right == Just x
+    pair_swap_row _ = False
+
     signed = mkOccSet [ rdrNameOcc n | L _ (TypeSig _ [] [L _ n] _) <- sigs ]
     constructor_row :: Name -> Bool -> LMatch GhcPs (LHsExpr GhcPs) -> Bool
     constructor_row self structural (L _ Match{m_pats = L _ (pat : rest), m_grhss = rhss})
@@ -2909,9 +2919,10 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
     -- | Read distinct named arguments and check the known local arity.
     parameter_domain :: LHsType GhcRn -> Maybe (Maybe Name, [Name])
     parameter_domain ty = do
-      (root, args) <- case list_element ty of
-        Just element -> Just (Nothing, [element])
-        Nothing -> do
+      (root, args) <- case unLoc (ignoreParens ty) of
+        HsTupleTy _ HsBoxedOrConstraintTuple [left, right] -> Just (Nothing, [left, right])
+        _ | Just element <- list_element ty -> Just (Nothing, [element])
+        _ -> do
           (name, args) <- type_application ty
           guard (not (null args))
           case lookupNameEnv early_datatypes name of
@@ -2923,6 +2934,13 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
       pure (root, params)
 
     worker_dependencies outer arg result
+      | TableInType{} <- use
+      , Just vars <- outer_vars outer
+      , Just (root, params) <- parameter_domain arg
+      , Just (target, new_params) <- parameter_domain result
+      , root == target, params /= new_params
+      , mkNameSet params == mkNameSet new_params, mkNameSet vars == mkNameSet params
+      = Just (maybe [] (\name -> [(name, Nothing)]) root)
       | TableInType{} <- use
       , Just (from, to) <- source_arrow arg
       , Just (domain, codomain) <- source_arrow result
