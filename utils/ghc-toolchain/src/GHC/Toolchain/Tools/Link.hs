@@ -62,7 +62,7 @@ findCcLink target ld progOpt userLdOverride archOs cc readelf ar ranlib = checki
   -- Use the specified linker or try using the C compiler
   rawCcLink <- findProgram "C compiler for linking" progOpt [] <|> pure (programFromOpt progOpt (prgPath $ ccProgram cc) [])
   ccLinkProgram <- if
-    -- A cc with linker was already specified, don't doubt the user's proficiency,
+    -- A cc with linker was already specified, don't question the user's proficiency,
     -- autonomy and right to segmentation faults
     | Just _ <- progOpt.poFlags -> pure rawCcLink
     -- we get a $LD; now figure out how to pass it to the $CC
@@ -71,7 +71,7 @@ findCcLink target ld progOpt userLdOverride archOs cc readelf ar ranlib = checki
     -- we are lenient and just act as if $LD wasn't set and enable-ld-override
     -- is off
     , ldPathOrFlavour /= "ld" -> do
-        flip oneOf'
+        asum
 
           [ do
             -- first check if the c compiler supports --ld-path, which goes best with $LD
@@ -81,18 +81,22 @@ findCcLink target ld progOpt userLdOverride archOs cc readelf ar ranlib = checki
             checkLink rawCcLink [ fLdPath ldPath.prgPath ]
           , -- second, check if the c compiler instead understands -fuse-ld (linker "flavour");
             -- do not try to expand the path first since absolute paths are not valid linker flavours
-            checkLink rawCcLink [ fUseLd ldPathOrFlavour] ]
+            checkLink rawCcLink [ fUseLd ldPathOrFlavour]
 
-          -- $LD was set but we couldn't figure out how to pass it to $CC. This is a hard failure,
-          -- we report it.
-          [ ldPathOrFlavour <> " is an invalid linker."
-          , "$LD can be either of an executable name that is in $PATH *or* a"
-            <> " path to an executable."
-          , "If your C compiler only supports the '-fuse-ld' flag, $LD can"
-            <> " only be one of the linker flavours supported by it."
-          , "Mind that if your C compiler supports '--ld-path', 'configure'"
-            <> " will always prefer using an absolute path to your linker as"
-            <> " that is less error-prone." ]
+          -- $LD was set but we couldn't figure out how to pass it to $CC. This happens in some cross compilation
+          -- scenarios, but we should warn about it.
+          , do
+            logInfo $ unlines
+               [ "Warning: could not tell the C compiler to use $LD (" <> ldPathOrFlavour <> ")."
+               , "$LD can be either of an executable name that is in $PATH *or* a path to an executable."
+               , "If your C compiler only supports the '-fuse-ld' flag, $LD can only be one of the linker"
+               <> " flavours supported by it."
+               , "Falling back to the C compiler's default linker for linking."
+               , "Mind that if your C compiler supports '--ld-path', 'configure'"
+               <> " will always prefer using an absolute path to your linker as"
+               <> " that is less error-prone." ]
+            checkLink rawCcLink []
+          ]
 
     -- $LD is not set or $LD=ld (see above)
     -- Try to convince @cc@ to use a more efficient linker than @bfd.ld@

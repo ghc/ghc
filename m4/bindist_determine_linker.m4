@@ -101,8 +101,10 @@ AC_DEFUN([BINDIST_DETERMINE_LINKER],[
      then linker_set_successfully=no
           try_set_linker_to "$LD"
           if test "z$linker_set_successfully" != "zyes";
-             then AC_MSG_FAILURE([ $tmp_ld is an invalid linker. If your C compiler accepts the '--ld-path' flag,
-                  \$LD can be either of an executable name that is in \$PATH *or* a path to an executable.
+             then AC_MSG_WARN([ Could not tell the C compiler to use \$LD ( $tmp_ld ), falling back to
+                  the C compiler's default linker for linking. \$LD will still be used for merging objects.
+                  If your C compiler accepts the '--ld-path' flag, \$LD can be either of an executable name 
+                  that is in \$PATH *or* a path to an executable.
                   If your C compiler only supports the '--fuse-ld' flag, \$LD can only be one of the linker flavours supported
                   by it. Mind that if your C compiler supports '--ld-path', 'configure' will always prefer using an absolute path
                   to your linker as that is less error-prone.])
