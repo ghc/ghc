@@ -81,7 +81,7 @@ import GHC.Core (CoreExpr)
 import qualified GHC.Core as Core
 import GHC.Core.Utils (exprType)
 import GHC.Data.OrdList (fromOL)
-import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCaseTables, sourceCharacterTables, sourceRetainedWitnessTables, checkLocalRetainedWitnessExports, isMonomorphicRetainedWitness,
+import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCaseTables, sourceCharacterTables, sourceRetainedWitnessTables, sourceLocalBooleanCases, checkLocalRetainedWitnessExports, isMonomorphicRetainedWitness,
                                isStructuralSourceTable, isNominalStructuralSource, sourceRuleOwners, sourceRuleOwnersAt, visibleSourceMethodRules,
                                hasSourceMethodRule, hasSourceMethodRuleAt, sourceLiteralWorkers, checkSourceMethodUses,
                                checkOptionalSourceUses, checkAndInstallSourceProofs,
@@ -1957,7 +1957,9 @@ withLocalCaseTables demands definitions@(cores, _) check = do
         cases = filterNameEnv selected cores
     tables <- sourceCharacterTables cases
     witnesses <- sourceRetainedWitnessTables cases
-    checked <- installSourceTables (tables ++ witnesses)
+    (boolean_cases, selectors) <- sourceLocalBooleanCases cases cores
+    with_selectors <- if null selectors then getGblEnv else fst <$> addTyConsToGblEnv selectors
+    checked <- setGblEnv with_selectors (installSourceTables (tables ++ witnesses ++ boolean_cases))
     setGblEnv checked (withLocalOpenDefinitions definitions check)
 
 {- Note [Checked local character cases]
