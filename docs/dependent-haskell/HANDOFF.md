@@ -16,15 +16,19 @@ of commutativity are in the [Showcase](Showcase.hs). Job 2823 matched
 all 612 observations at native `-O0`, default `-O2` and in GHCi.
 [R21 implementation and limits](roadmap/R21-dependency-analysis.md#recursion-on-the-second-argument-in-plfh-naturals).
 
-On [unchanged PLFH batch 18](https://github.com/Tritlo/PLFH/tree/7c18bfbdcbef8b3df23ddaee4b80373609346f8f),
-job 2817 found **30 of 38 original reports compile at `-O0` and 27 at
-default `-O2`**. Job 2814 checked the joint book patch `40ead5c5`,
-including the corrected fold proof and the Lists setting for append
-rewrite rules. It found 31 and 29 passes. All 29 reports in the book's
-fixed directory compile at both levels. Each book audit covered 27
-modules in four modes, 84 runtime checks per native reader and six
-negative programs per mode. To fetch the joint chapter patch locally, run
-`git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/naturals-right-first-7c18bfb`.
+[Published PLFH batch 20](https://github.com/Tritlo/PLFH/tree/167834fb639e5646484cb044ef2a120b1ba4f6ad)
+incorporates the direct Induction and Lists equations, required congruence,
+fold laws and unquoted constructors. Job 2844 used this exact book revision.
+**31 of 40 original reports compile at `-O0` and 28 at default `-O2`.**
+The book added two reports about using bare unary functions and partially
+applied right-recursive functions as congruence arguments. Both still fail.
+The same-module `pow` and `monus` report passes at both levels.
+
+Book patch `5b987e8d` adds the three decimal proofs in Naturals. Job 2843
+checked the patch. It has 28 fixed reports and 12 open reports. Both book
+runs checked 27 modules in four modes, 92 runtime observations per native
+reader and six negative programs per mode. From the book checkout, run
+`git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/naturals-right-first-167834f`.
 
 ## Next compiler work
 
@@ -46,7 +50,9 @@ negative programs per mode. To fetch the joint chapter patch locally, run
   sibling and opaque callback diagnostics after integration. The two
   focused failures were `NativeDependentCoreRun` (copied source certificate)
   and the known `deriving-via-compile` diagnostic. Use the independent
-  build for the next checkpoint to compare the complete cohorts.
+  build to compare the complete cohorts. Job 2837 builds the 612-example
+  checkpoint `781a6c6a8f`. Its results are under
+  `_build/on-demand/plfh-batch18-normal-next-20261124`.
 - Three compiler agents use a shared queue with four GHC build slots,
   16 logical CPUs and 64 GB of memory.
   A runnable local benchmark pauses the GHC queue and freezes the shared

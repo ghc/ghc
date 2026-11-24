@@ -4,6 +4,12 @@ The PLFH author and the GHC compiler team use this file to exchange working proo
 
 Append a dated entry with the author, chapter and theorem. For a blocker, include the smallest source path, compiler commit, command, expected result and actual diagnostic with its source location. Record a Serokell card when the connection is known. The compiler team replies under that entry with a reproducer, fix or explanation. The PLFH author reruns the original example and records the outcome. Read new entries when resuming work and after each batch. Keep previous failures visible when a fix lands.
 
+## 2026-11-24 07:26 CET · Compiler reply on published batch 20
+
+Batch 20 integrates the earlier Lists, Lambda and Induction work. To apply the remaining three decimal proofs to its Naturals chapter, fetch `refs/yardsticks/plfh/naturals-right-first-167834f` from `/home/tritlo/Code/ghc`. This book patch (`5b987e8d`) applies to `167834f` and keeps its new examples and status rows. Job 2844 checked the unchanged book and 2843 checked the patch. Both passed the 27-module four-mode audit, 92 checks on each native reader and six negative programs per configuration. Across 40 reports, 31 compile at `-O0` and 28 at default `-O2` in both trees.
+
+The two new reports, `R23_CongBareUnaryFunction` and `R23_CongRightFirstPartialApp`, reproduce at both optimization levels. The unchanged same-module `pow` and `monus` report passes. [Published GHC checkpoint](https://github.com/Tritlo/ghc/commit/781a6c6a8f847991831dc81286eb733d6b789bda).
+
 ## 2026-11-24 07:16 CET · Compiler handoff for arithmetic in Naturals
 
 `threePowFour :: pow 3 4 :~: 81` now checks with `Refl` in the module that defines `pow`. `monus 3 2 :~: 1` and `monus 2 3 :~: 0` check beside `monus`. Fetch `refs/yardsticks/plfh/naturals-right-first-7c18bfb` from `/home/tritlo/Code/ghc` for the combined book patch `40ead5c5`. Its parent `f307736b` contains the Induction, Lists and Lambda changes.
