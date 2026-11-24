@@ -2144,7 +2144,17 @@ sourceCaseTables binds = do
             table <- publishConstructorRows owner telescope domains result [row]
             pure (Just (finalOwner owner table, table), [])
           _ -> pure (Nothing, [])
-      let final_entries = catMaybes (map fst final)
+      let core_entries = catMaybes (map fst final)
+      right_first <- fmap catMaybes $ forM
+        [bind | (bind, owner) <- candidates, structural_candidate owner,
+                not (changed owner), not (any ((== owner) . fst) core_entries)] $ \bind ->
+          runMaybeT $ do
+            (owner, signature@(ConstructorCaseType _ root _ _ _ result), rows) <-
+              checkedStructuralSource CRight (unLoc bind)
+            guard (public root && casePublicKind public [] result)
+            table <- lift (publishConstructorCase owner signature rows)
+            pure (finalOwner owner table, table)
+      let final_entries = core_entries ++ right_first
           checked_predicates = mkNameEnv [(idName v, v) | (v, _) <- final_entries,
                                                          isFinalStructuralSource v]
           predicate callee =
@@ -2905,7 +2915,8 @@ isTwoListCaseTable table =
 -- | Two structural sizes, returning a size of that datatype or a Boolean.
 -- See Note [Checked cases on two structural sizes].
 isTwoStructuralCase :: ConstructorCaseType -> Bool
-isTwoStructuralCase (ConstructorCaseType [] root [] [left, right] 0 result) =
+isTwoStructuralCase (ConstructorCaseType [] root [] [left, right] position result) =
+    (position == 0 || position == 1) &&
     left `eqType` right && (left `eqType` result || result `eqType` boolTy) &&
     isStructuralSize root left
 isTwoStructuralCase _ = False
@@ -3258,12 +3269,22 @@ minSize returns zero if the left size is zero. It inspects the right size
 only after the left size matches its successor constructor. A predicate
 such as eqSize scrutinizes both sizes.
 
-A Boolean leaf can return a direct recursive call. The call must pass the
-same operand checks as recursion under a constructor. For eqSize, the
-leaf for two successors calls eqSize on their two predecessor fields.
-A new, swapped, or unbound operand fails the check for its column.
-The same ordered case tree keeps the second argument's demand. Bool has
-nullary constructors, so this path adds no delayed result fields.
+A case can inspect the right operand first. For example, monus m Zero
+returns m without inspecting it, and monus Zero (Succ n) returns Zero.
+Try the same check with the right operand as the root. Keep the original
+arguments in each equation and publish rows in the order of the checked
+Core cases. When the first source row has a variable on the left, the
+desugarer can introduce a DEFAULT and a match-failure join. Check the
+three solved source clauses for this shape before simplification. Treat
+those rows as provisional. Publish them only when final Core checks the
+same patterns and results. A type with an unknown right operand cannot
+select a rule for monus Zero n until it knows that operand's constructor.
+
+A leaf can return a direct recursive call. Apply the same operand checks
+as for recursion under a constructor. For example, monus and eqSize
+recurse on both predecessor fields after matching two successors.
+A new, swapped, or unbound operand fails the check for its own column.
+See PLFA v22.08, Naturals, Monus.
 
 Use the same row checker as for two list operands. Each recursive operand
 must be its original value or a field of its own pattern. At least one
@@ -4584,17 +4605,21 @@ checkedTwoListCaseWith specialized public owner rhs = do
     guard (isTwoListCase signature)
     pure (signature, rows)
 
--- | Check a structural size case that also examines its second operand.
+-- | Check a structural size case that examines both operands.
 checkedStructuralCase :: (TyCon -> Bool) -> Id -> Core.CoreExpr
                          -> Maybe (ConstructorCaseType, [ConstructorCaseRow])
 checkedStructuralCase public owner rhs = do
-    checked@(signature, rows) <-
-      checkedConstructorCase public (const Nothing) owner (stripTicksE isSourceBreakpoint rhs)
-    guard ((isTwoStructuralCase signature || isSizeListCase signature) && any checks_right rows)
+    let body = stripTicksE isSourceBreakpoint rhs
+    checked@(signature@(ConstructorCaseType _ _ _ _ position _), rows) <-
+      checkedConstructorCase public (const Nothing) owner body <|>
+      checkedConstructorCaseWith RightStructuralConstructorCase Nothing public (const Nothing) owner body
+    guard ((isTwoStructuralCase signature || isSizeListCase signature) &&
+           any (checks_other position) rows)
     pure checked
   where
-    checks_right (ConstructorCaseRow [_, CaseConstructor{}] _) = True
-    checks_right _ = False
+    checks_other 0 (ConstructorCaseRow [_, CaseConstructor{}] _) = True
+    checks_other 1 (ConstructorCaseRow [CaseConstructor{}, _] _) = True
+    checks_other _ _ = False
 
 -- | Check independent alternatives of a case on the first ordinary operand.
 -- See Note [Independent constructor equations].
@@ -4893,6 +4918,7 @@ checkedConstructorCase = checkedConstructorCaseWith CompleteConstructorCase Noth
 
 data ConstructorCaseMode
   = CompleteConstructorCase
+  | RightStructuralConstructorCase
   | IndependentConstructorCase
   | BooleanConstructorCase
   deriving Eq
@@ -4928,9 +4954,8 @@ checkedConstructorCaseWith mode specialized visible helper owner rhs = do
               [_, other] <- pure terms
               checkedSpecializedCall worker other (mkTyVarTys (binderVars telescope))
                                      patterns aliases expr)
-    let tail_recursive_predicate = isTwoStructuralCase signature && result `eqType` boolTy
     rows <- checkedConstructorRows mode (mode /= CompleteConstructorCase || multipleCaseOperands signature)
-                                  tail_recursive_predicate
+                                  (isTwoStructuralCase signature)
                                   public witness_root helper recursive kinds result
                                   (map CaseField terms) scrutinee body
     forM_ witness_root $ \con -> do
@@ -4946,9 +4971,13 @@ checkedConstructorCaseWith mode specialized visible helper owner rhs = do
     is_field CaseField{} = True
     is_field _ = False
 
-    signature_type ty
-      | mode /= CompleteConstructorCase = partialConstructorCaseType ty
-      | otherwise = constructorCaseType ty <|> (snd <$> monomorphicRetainedWitnessType ty)
+    signature_type ty = case mode of
+      CompleteConstructorCase -> constructorCaseType ty <|> (snd <$> monomorphicRetainedWitnessType ty)
+      RightStructuralConstructorCase -> do
+        signature@(ConstructorCaseType binders root args domains _ result) <- constructorCaseType ty
+        guard (isTwoStructuralCase signature)
+        pure (ConstructorCaseType binders root args domains 1 result)
+      _ -> partialConstructorCaseType ty
     checked_signature = signature_type (exprType rhs)
 
     public tc = visible tc || case checked_signature of
@@ -5695,19 +5724,33 @@ sourceMatches binding = do
 -- See Note [Local structural case equations].
 localStructuralTable :: HsBind GhcTc -> MaybeT TcM (Id, TyCon)
 localStructuralTable binding = do
+    (owner, signature, rows) <- checkedStructuralSource CLeft binding
+    family <- lift (publishConstructorCase owner signature rows)
+    pure (owner, family)
+
+-- | Check three complete source rows that split one size and then the other.
+-- See Note [Checked cases on two structural sizes].
+checkedStructuralSource :: LeftOrRight -> HsBind GhcTc
+                        -> MaybeT TcM (Id, ConstructorCaseType, [ConstructorCaseRow])
+checkedStructuralSource order binding = do
     (fun, mono, Nothing, evidence, matches) <- MaybeT (pure (sourceMatches binding))
     guard (lengthIs matches 3)
     guard =<< lift (allM emptyEvidence evidence)
     ty <- lift (liftZonkM (zonkTcType (varType fun)))
-    signature@(ConstructorCaseType _ root _ _ _ domain) <- MaybeT (pure (constructorCaseType ty))
+    signature@(ConstructorCaseType telescope root args domains _ result) <-
+      MaybeT (pure (constructorCaseType ty))
     guard (isTwoStructuralCase signature)
     let self v = v == fun || v == mono
-    rows <- traverse (read_row self root domain) matches
-    guard (complete rows)
-    let owner = setIdType fun ty
-    family <- lift (publishConstructorCase owner signature rows)
-    pure (owner, family)
+        position = pickLR order (0, 1)
+        selected = ConstructorCaseType telescope root args domains position result
+    rows <- traverse (read_row self root result) matches
+    guard (complete (map orient rows))
+    pure (setIdType fun ty, selected, rows)
   where
+    orient row@(ConstructorCaseRow [left, right] rhs) =
+      pickLR order (row, ConstructorCaseRow [right, left] rhs)
+    orient row = row
+
     complete
       [ ConstructorCaseRow [CaseConstructor z [] [], CaseField _] _
       , ConstructorCaseRow [CaseConstructor s [] [_], CaseConstructor z' [] []] _
@@ -5729,7 +5772,7 @@ localStructuralTable binding = do
                 Construct dc args | dataConTyCon dc == root
                                   , lengthIs args (dataConSourceArity dc) ->
                     CaseConstructor dc [] <$> traverse (visit True) args
-                Recur [] x | under_constructor
+                Recur [] x | under_constructor || pickLR order (False, True)
                            , CaseConstructor _ [] [CaseField x'] <- left
                            , x == x', [y] <- predecessors ->
                     Just (CaseSelf [] [CaseField x, CaseField y])
