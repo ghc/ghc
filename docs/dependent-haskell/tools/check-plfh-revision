@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+# Check one book revision with native and interface-only clients.
+set -euo pipefail
+export LC_ALL=C.UTF-8
+if [[ $# != 5 ]]; then
+    echo "Usage: check-plfh-revision BOOK_REPO REVISION COMPILER LIBDIR NEW_RESULTS_DIR" >&2
+    exit 2
+fi
+book=$(realpath "$1")
+revision=$(git -C "$book" rev-parse --verify --end-of-options "$2^{commit}")
+compiler=$(realpath "$3")
+libdir=$(realpath "$4")
+mkdir -- "$5"
+out=$(realpath "$5")
+root=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
+support=$(git -C "$root" rev-parse HEAD)
+work=$(mktemp -d "$out/work.XXXXXX")
+trap 'result=$?; rm -rf -- "$work"; if (( result )); then echo "Book check failed. See $out" >&2; fi' EXIT
+printf '%s\n' "$revision" >"$out/book.source"
+printf '%s\n' "$support" >"$out/support.source"
+sha256sum "$compiler" >"$out/compiler.sha256"
+printf '%s\n' "$libdir" >"$out/compiler.libdir"
+git -C "$book" archive "$revision" -- hs reproducers scripts/audit_ifaces.py | tar -x -C "$work"
+git -C "$root" archive "$support" -- docs/dependent-haskell/hasklib \
+    docs/dependent-haskell/examples/open-evaluation libraries/ghc-internal/include/WordSize.h | tar -x -C "$work"
+docs="$work/docs/dependent-haskell"
+printf '#!/usr/bin/env bash\nexec %q %q "$@"\n' "$compiler" "-B$libdir" >"$work/ghc"
+chmod +x "$work/ghc"
+ghc=("$work/ghc" -v0 -package-env - -i -i. -dcore-lint -dstg-lint
+     -fomit-interface-pragmas -fno-write-if-simplified-core -fdiagnostics-color=never)
+mapfile -t modules < <(find "$work/hs/PLFH" -name '*.hs' | sort)
+mapfile -t reports < <(find "$work/reproducers" -name 'R[0-9]*.hs' | sort)
+(( ${#modules[@]} && ${#reports[@]} ))
+
+for mode in native-O0 native-O2 no-code-O0 no-code-O2; do
+    opt=${mode##*-}
+    flags=("-$opt")
+    if [[ $mode == no-code-* ]]; then flags+=(-fno-code -fwrite-interface); fi
+    provider="$work/$mode/provider"
+    client="$work/$mode/client"
+    logs="$out/$mode"
+    mkdir -p "$provider" "$client" "$logs"
+    cd "$provider"
+    "${ghc[@]}" "${flags[@]}" "-i$work/hs" "-i$docs/hasklib" "-i$docs/examples/open-evaluation" \
+        --make -no-link -outputdir . "${modules[@]}" >"$logs/provider.log" 2>&1
+    for src in "${modules[@]}"; do
+        rel=${src#"$work/hs/"}
+        test -s "${rel%.hs}.hi"
+    done
+    python3 "$work/scripts/audit_ifaces.py" "$work/ghc" "$provider" >"$logs/interfaces.log" 2>&1
+    cd "$client"
+    printf '%s\n' 'module Main where' 'import qualified PLFH.RuntimeSmokeTest as Book' \
+        'main :: IO ()' 'main = Book.main' >Main.hs
+    "${ghc[@]}" "${flags[@]}" "-i$provider" -c Main.hs >"$logs/client.log" 2>&1
+    if [[ $mode == native-* ]]; then
+        mapfile -t objects < <(find "$provider" -name '*.o' | sort)
+        "${ghc[@]}" "${flags[@]}" Main.o "${objects[@]}" -o run >"$logs/link.log" 2>&1
+        ./run >"$logs/runtime.stdout"
+        grep -qF '[RUN-OK]' "$logs/runtime.stdout"
+    else
+        test -z "$(find "$provider" "$client" \( -name '*.o' -o -name '*.bc' \) -print -quit)"
+    fi
+    for src in "$work"/hs/negative/*.hs; do
+        name=$(basename "$src")
+        expected=$(awk '/^-- EXPECT-ERROR:/{print $3; exit}' "$src")
+        [[ $expected =~ ^GHC-[0-9]+$ ]]
+        cp "$src" "$name"
+        if "${ghc[@]}" "${flags[@]}" "-i$provider" -c "$name" >"$logs/$name.log" 2>&1; then
+            echo "$name unexpectedly compiled in $mode" >&2
+            exit 1
+        fi
+        grep -Fq "[$expected]" "$logs/$name.log"
+        printf '%s\t%s\t%s\n' "$mode" "$name" "$expected" >>"$out/negative.tsv"
+    done
+    printf '%s\t%s\n' "$mode" "${#modules[@]}" >>"$out/modules.tsv"
+done
+cmp "$out/native-O0/runtime.stdout" "$out/native-O2/runtime.stdout"
+
+for opt in O0 O2; do
+    provider="$work/native-$opt/provider"
+    helpers="$work/reports-$opt"
+    logs="$out/reports-$opt"
+    mkdir "$helpers" "$logs"
+    cd "$helpers"
+    "${ghc[@]}" "-$opt" "-i$provider" "-i$docs/hasklib" "-i$docs/examples/open-evaluation" \
+        --make -no-link -outputdir . "$docs/hasklib/HaskLib.hs" "$work/reproducers/ReproOps.hs" \
+        >"$logs/helpers.log" 2>&1
+    for src in "${reports[@]}"; do
+        name=$(basename "$src" .hs)
+        mkdir "$helpers/$name"
+        cd "$helpers/$name"
+        cp "$src" "$name.hs"
+        result=0
+        timeout 150 "${ghc[@]}" "-$opt" "-i$provider" "-i$helpers" -c "$name.hs" \
+            >"$logs/$name.log" 2>&1 || result=$?
+        codes=$( { grep -oE 'GHC-[0-9]+' "$logs/$name.log" || :; } | awk '!seen[$0]++' | paste -sd, -)
+        printf '%s\t%s\t%s\t%s\n' "$opt" "$name" "$result" "$codes" >>"$out/reports.tsv"
+        if [[ $result != 0 ]]; then
+            if [[ $src == */fixed/* || $result != 1 || -z $codes || $codes == *GHC-87110* || $codes == *GHC-76037* ]]; then
+                cat "$logs/$name.log" >&2
+                exit 1
+            fi
+        fi
+    done
+done
+awk -F '\t' '{ total[$1]++; passed[$1] += ($3 == 0) }
+    END { printf "Original reports: %d/%d at -O0, %d/%d at default -O2\n",
+          passed["O0"], total["O0"], passed["O2"], total["O2"] }' "$out/reports.tsv"
+date -Is >"$out/verified.pass"

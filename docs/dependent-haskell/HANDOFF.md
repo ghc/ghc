@@ -817,6 +817,23 @@ defaults and an opt-in migration warning.
 
 ## Build and verify
 
+Use [check-plfh-revision](tools/check-plfh-revision) to test a published book
+revision. Give it the local book repository, Git revision, compiler,
+library directory and a new results directory. It reads the book and
+HaskLib from Git. It keeps the diagnostic logs and runtime output and
+removes the temporary build products.
+
+```sh
+docs/dependent-haskell/tools/ghc-build-job plfh-qualification \
+    docs/dependent-haskell/tools/check-plfh-revision \
+    /home/tritlo/Code/PLFH "$book_revision" "$compiler" "$libdir" "$results"
+```
+
+Check `verified.pass`, `modules.tsv`, `negative.tsv` and `reports.tsv`.
+The original reports run once per optimization level. The chapters and
+negative clients also run with fresh no-code interfaces. A report in the
+book's `fixed/` directory must compile at both levels.
+
 The 574-line Showcase uses the normal two-stage compiler at
 `c11b29a399` in `r04-r17-r21-normal-after-572-20261123`.
 On this host the bootstrap tools are GHC 9.14.1, Cabal 3.18.1.0, Happy 2.1.7
