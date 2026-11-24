@@ -1989,6 +1989,10 @@ main = do
         (BookNaturals.threePowFour, BookNaturals.threeMonusTwo, BookNaturals.twoMonusThree)
     observe "lift equality under successor and partially applied addition"
         (BookCongruence.plusAssoc count 2 3, BookCongruence.addUnder count 2)
+    observe "lift equality under binary increment and exponentiation"
+        (BookCongruence.underInc (BookNaturals.X1 BookNaturals.Nil)
+                                 (BookNaturals.X1 BookNaturals.Nil) Refl,
+         BookCongruence.powerAddZero count 2)
     observe "commute addition by induction on the second argument"
         (BookCongruence.plusComm count 2)
     case BookLambdaUnfold.unwrapVariable of

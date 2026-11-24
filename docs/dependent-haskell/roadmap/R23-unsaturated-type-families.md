@@ -1406,6 +1406,23 @@ interface compression levels also compare ordinary interface bytes.
 [regression](../../../testsuite/tests/dependent/should_run/NativePartialSynonym.hs)
 and [references](../REFERENCES.md#passing-a-type-synonym-as-a-function).
 
+## Ordinary callbacks in PLFH congruence proofs
+
+PLFH can pass `inc` or `pow m` as the required argument to `cong`.
+In the first case the callback is an ordinary named function. In the
+second case the exponent is the argument still to come. GHC uses the
+name and kind of the checked function to apply it to both sides of
+the equality. It checks the rewrite rules when a proof reduces a
+saturated call. A required matchable callback still rejects an
+unmatchable function.
+
+On unchanged PLFH batch 21, jobs 2873 and 2881 checked all 40 original
+reports at `-O0` and default `-O2`. Only the two congruence reports
+changed from rejection to acceptance. Jobs 2863 and 2871 also checked
+a source-hidden reader, a wrong callback and an active rewrite rule.
+[Haskell proofs](../examples/open-evaluation/BookCongruence.hs)
+and [syntax and inference references](../REFERENCES.md#plfh-arithmetic-dependent-patterns-and-callback-inference).
+
 ## Completion boundary
 
 The first increments establish a shared kernel foundation for R05 and R03.

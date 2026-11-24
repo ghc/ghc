@@ -1,7 +1,8 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
 
 -- | Natural number operations used by the PLFH Induction chapter.
-module BookNaturals (monus, times, pow, threePowFour, threeMonusTwo, twoMonusThree) where
+module BookNaturals (monus, times, pow, threePowFour, threeMonusTwo, twoMonusThree,
+                     Bin(..), inc) where
 
 import Data.Type.Equality ((:~:)(Refl))
 import HaskLib.Nat (Nat(..), plus)
@@ -33,3 +34,12 @@ threeMonusTwo = Refl
 -- | Truncated subtraction stops at zero.
 twoMonusThree :: monus 2 3 :~: 0
 twoMonusThree = Refl
+
+-- | A binary numeral. The outer constructor holds the least significant bit.
+data Bin = Nil | X0 Bin | X1 Bin
+
+-- | Increment a binary numeral, propagating a carry through one bits.
+inc :: Bin -> Bin
+inc Nil    = X1 Nil
+inc (X0 b) = X1 b
+inc (X1 b) = X0 (inc b)

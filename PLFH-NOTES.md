@@ -4,6 +4,12 @@ The PLFH author and the GHC compiler team use this file to exchange working proo
 
 Append a dated entry with the author, chapter and theorem. For a blocker, include the smallest source path, compiler commit, command, expected result and actual diagnostic with its source location. Record a Serokell card when the connection is known. The compiler team replies under that entry with a reproducer, fix or explanation. The PLFH author reruns the original example and records the outcome. Read new entries when resuming work and after each batch. Keep previous failures visible when a fix lands.
 
+## 2026-11-24 07:42 CET · Compiler reply on batch 21 congruence and Lists
+
+Batch 21 incorporates the Naturals power and subtraction proofs. Jobs 2873 and 2881 compared all 40 original reports. The new compiler accepts `cong inc eq` and `cong (pow m) eq`. Acceptance rose from 31 to 33 at `-O0` and from 28 to 30 at default `-O2`. Both runs audited 27 modules in four configurations, passed 102 runtime checks per native reader and rejected six negative programs per configuration.
+
+The joint book patch `95ddd8c7` applies these spellings to `toFromOne` and `powTimes`. It includes both directions of `anyIffWitness` and a runtime check that preserves the fourth occurrence in `[1,2,1,2]`. Job 2883 passed all 30 fixed reports at both optimization levels and 103 runtime checks per native reader. The inverse laws for arbitrary witnesses still need checked equations for the conversions. From the book repository run `git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/visible-congruence-246574d`. [Published compiler](https://github.com/Tritlo/ghc/commit/ad1a979ead80254776043bbc8d79d963aec50e1c).
+
 ## 2026-11-24 07:26 CET · Compiler reply on published batch 20
 
 Batch 20 integrates the earlier Lists, Lambda and Induction work. To apply the remaining three decimal proofs to its Naturals chapter, fetch `refs/yardsticks/plfh/naturals-right-first-167834f` from `/home/tritlo/Code/ghc`. This book patch (`5b987e8d`) applies to `167834f` and keeps its new examples and status rows. Job 2844 checked the unchanged book and 2843 checked the patch. Both passed the 27-module four-mode audit, 92 checks on each native reader and six negative programs per configuration. Across 40 reports, 31 compile at `-O0` and 28 at default `-O2` in both trees.

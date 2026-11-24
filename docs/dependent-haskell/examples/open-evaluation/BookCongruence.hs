@@ -1,8 +1,9 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, Modifiers #-}
 {-# LANGUAGE PolyKinds, RequiredTypeArguments, TypeOperators #-}
 -- | Congruence with a required type argument from the PLFH Induction chapter.
-module BookCongruence (plusAssoc, plusComm, addUnder) where
+module BookCongruence (plusAssoc, plusComm, addUnder, underInc, powerAddZero) where
 
+import BookNaturals (Bin, inc, pow)
 import Data.Type.Equality ((:~:)(Refl), trans)
 import GHC.Types (Matchability)
 import HaskLib.Nat (Nat(..), plus, plusSucc, plusZero)
@@ -28,3 +29,13 @@ plusComm m (Succ k) = plusSucc m k `trans` congVis Succ (plusComm m k)
 addUnder :: foreach (m :: Nat) -> foreach (n :: Nat)
          -> plus m (plus n Zero) :~: plus m n
 addUnder m n = congVis (plus m) (plusZero n)
+
+-- | Equal binary numerals have equal successors.
+underInc :: foreach (x :: Bin) -> foreach (y :: Bin)
+         -> x :~: y -> inc x :~: inc y
+underInc _ _ eq = congVis inc eq
+
+-- | Adding zero to the exponent preserves a power.
+powerAddZero :: foreach (m :: Nat) -> foreach (n :: Nat)
+             -> pow m (plus n Zero) :~: pow m n
+powerAddZero m n = congVis (pow m) (plusZero n)

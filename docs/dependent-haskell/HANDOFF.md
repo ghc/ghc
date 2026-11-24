@@ -8,27 +8,27 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
-[Compiler `2deac8b91e`](https://github.com/Tritlo/ghc/commit/2deac8b91ead030898938358ab2f67904d819270)
-checks `threePowFour :: pow 3 4 :~: 81` in the same module as ordinary
-`pow`. The proof is `threePowFour = Refl`. The same declaration ordering
-supports truncated subtraction. All three closed examples and the proof
-of commutativity are in the [Showcase](Showcase.hs). Job 2823 matched
-all 612 observations at native `-O0`, default `-O2` and in GHCi.
-[R21 implementation and limits](roadmap/R21-dependency-analysis.md#recursion-on-the-second-argument-in-plfh-naturals).
+[Compiler `ad1a979ead`](https://github.com/Tritlo/ghc/commit/ad1a979ead80254776043bbc8d79d963aec50e1c)
+accepts `cong inc eq` and `cong (pow m) eq`. The first passes an ordinary
+unary function. The second passes a power function before its exponent
+is known. A proof that reduces the call still needs checked equations.
+Job 2880 matched all 613 Showcase outputs at native `-O0`, default
+`-O2` and in GHCi. [Haskell examples](examples/open-evaluation/BookCongruence.hs).
 
-[Published PLFH batch 20](https://github.com/Tritlo/PLFH/tree/167834fb639e5646484cb044ef2a120b1ba4f6ad)
-incorporates the direct Induction and Lists equations, required congruence,
-fold laws and unquoted constructors. Job 2844 used this exact book revision.
-**31 of 40 original reports compile at `-O0` and 28 at default `-O2`.**
-The book added two reports about using bare unary functions and partially
-applied right-recursive functions as congruence arguments. Both still fail.
-The same-module `pow` and `monus` report passes at both levels.
+[Published PLFH batch 21](https://github.com/Tritlo/PLFH/tree/246574dca2182bff387a8e20e61273216849714b)
+uses the same-module proofs of powers and truncated subtraction. On that
+unchanged book, job 2881 found **33 of 40 original reports compile at
+`-O0` and 30 at default `-O2`**. Only the two congruence reports changed
+from job 2873. Both runs checked 27 modules in four configurations, 102
+runtime observations per native reader and six negative programs per mode.
 
-Book patch `5b987e8d` adds the three decimal proofs in Naturals. Job 2843
-checked the patch. It has 28 fixed reports and 12 open reports. Both book
-runs checked 27 modules in four modes, 92 runtime observations per native
-reader and six negative programs per mode. From the book checkout, run
-`git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/naturals-right-first-167834f`.
+The joint book patch `95ddd8c7` uses visible congruence in Relations
+and Induction. Lists converts `Any` evidence to an existential witness
+and back. Job 2883 checked all 30 reports in its fixed directory and 103
+runtime observations per native reader. The extra observation preserves
+the fourth occurrence in `[1,2,1,2]`. The general inverse proofs for the
+two conversions remain open. From the book checkout, run
+`git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/visible-congruence-246574d`.
 
 ## Next compiler work
 
@@ -49,7 +49,8 @@ reader and six negative programs per mode. From the book checkout, run
   gates passed. Jobs 2817 and 2831 verified the indexed append, named
   sibling and opaque callback diagnostics after integration. The two
   focused failures were `NativeDependentCoreRun` (copied source certificate)
-  and the known `deriving-via-compile` diagnostic. Use the independent
+  and the known `deriving-via-compile` diagnostic. Job 2854 passed the
+  revised Core Lint fixture in `551528d74c`. Use the independent
   build to compare the complete cohorts. Job 2837 builds the 612-example
   checkpoint `781a6c6a8f`. Its results are under
   `_build/on-demand/plfh-batch18-normal-next-20261124`.

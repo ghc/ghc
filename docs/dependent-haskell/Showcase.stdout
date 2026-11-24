@@ -555,6 +555,7 @@ subtract a runtime natural from zero: (Zero,Refl)
 raise three to the fourth power and prove the successor equation: (True,Refl)
 check powers and truncated subtraction where they are defined: (Refl,Refl,Refl)
 lift equality under successor and partially applied addition: (Refl,Refl)
+lift equality under binary increment and exponentiation: (Refl,Refl)
 commute addition by induction on the second argument: Refl
 unfold the fixed point of the identity: True
 sum two lists with the right-fold append proof: True

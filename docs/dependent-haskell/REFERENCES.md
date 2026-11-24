@@ -102,6 +102,10 @@ a comparison implementation. External solvers remain later work.
   argument to a type. Proposal 242 supplies matchability polymorphism.
   The fork also accepts the checked partial application `congVis (plus m)`
   and infers the endpoints from the subsequent equality witness.
+  The Relations proof about binary numerals can pass the ordinary
+  increment function in the same position. The Induction proof about
+  powers can pass `pow m` while its exponent is still unknown.
+  [PLFA Relations](https://plfa.github.io/Relations/).
   [PLFA Induction](https://plfa.github.io/Induction/),
   [GHC proposal 281](https://ghc-proposals.readthedocs.io/en/latest/proposals/0281-visible-forall.html#t2t-mapping),
   [GHC proposal 242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchability-polymorphism),
