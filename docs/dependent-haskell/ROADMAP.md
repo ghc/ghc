@@ -1,5 +1,14 @@
 # Dependent Haskell program roadmap
 
+## Design authority hierarchy
+
+Every design, syntax, promotion, and typechecking decision on this fork follows a strict four-tier order of authority:
+
+1. **GHC Proposal #378 (*Design for Dependent Types*)** whenever possible. Any already-implemented fork syntax, flag, or typing rule that diverges from `#378` takes priority for alignment.
+2. **Other GHC proposals** (`#281`, `#242`, `#370`, `#402`, `#425`, `#509`, `#765`, `#23`/`#282`, etc.) for features not covered by `#378`.
+3. **Serokell Dependent Haskell roadmap** ([ghc.serokell.io/dh](https://ghc.serokell.io/dh)) for scope tracking and prerequisite structure.
+4. **Agda** (and *Programming Language Foundations in Agda*) for inspiration where GHC proposals do not specify a choice.
+
 Serokell’s roadmap has 50 cards and 67 edges. Its 2026-11-12 snapshot marks
 23 cards complete and seven proposals accepted. Twenty cards have no status
 marker. On 2026-11-22, all 50 live card IDs and status labels still

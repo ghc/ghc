@@ -6,34 +6,34 @@ test results and next action whenever a checkpoint lands or a build stops.
 The [roadmap](ROADMAP.md) tracks feature scope. The [Showcase](Showcase.hs)
 and its [expected output](Showcase.stdout) are the executable examples.
 
+## Design authority hierarchy
+
+All compiler syntax, typechecking, promotion, and ergonomics work on this fork follows a strict four-tier specification order:
+
+1. **GHC Proposal #378 (*Design for Dependent Types*)** whenever possible. Already-implemented fork features that diverge from `#378` take priority for alignment.
+2. **Other GHC proposals** (`#281`, `#242`, `#370`, `#402`, `#425`, `#509`, `#765`, `#23`/`#282`, etc.) for design areas delegated or not covered by `#378`.
+3. **Serokell Dependent Haskell roadmap** ([ghc.serokell.io/dh](https://ghc.serokell.io/dh)) for scope tracking and card dependencies.
+4. **Agda** (and *Programming Language Foundations in Agda*) for inspiration where GHC proposals are silent.
+
 ## Current checkpoint
 
-Work paused for handoff on 24 November 2026. All compiler lanes have stopped.
-Revision `944a4efa9d` adds the 623rd Showcase observation to the lookup
-compiler at `7bd39424e0`. On published PLFH batch 32, native `-O2`
-exposed a missing `CheckedClosureSourceTableId` case in the specialiser.
-Revision `844f309834` handles term-level calls to these functions and adds
-the failing case to the existing checked-closure regression. The roadmap has **27 of 50 cards complete**
+Wave 1 consolidated compiler `186670b0b9` passed full two-stage self-hosted qualification on 24 November 2026, while Wave 2 (`9a27c55688`), Wave 3, and the Proposal `#378` alignment audit are actively running. Revision `186670b0b9` (atop `69a36b132f`) integrates four verified compiler tracks and adds Showcase observations 624–627:
+
+- **R16 simultaneous substitution (`c942ad30b5`)**: Accepts `-O2` FloatOut lifted constructor helpers (`exts1`) without relaxing source helper checks, and publishes open `T:subst` alongside `T:exts` and `T:weakenLookup`, checking all 20 constructors of PLFH `Bisimulation.simSubst` with ordinary functions.
+- **R21 same-module indexed lookup (`75eea40500`)**: Stages `lookupEnv` for same-module mutual GADT variable rules in either declaration or clause order, enforcing exported constructor/owner visibility (`[GHC-70566]`), unused-table pruning across TH splices, and strict early-vs-final Core agreement (`R13_LookupEnvOpenEq.hs`).
+- **R03 closed-family refinement & proof tracking (`432b300f8f`, `186670b0b9`)**: Refines closed type families from scoped nominal retained Givens while tracking nested checked-call and reduced proof-synonym rewrite-rule dependencies (`R03_ForEachGadtEqTypeFamily.hs`, `NativeOpenEitherFmap`).
+- **R13 indexed context traversal & untyped scope closures (`eb74aedbe0`)**: Publishes checked equations for two-index GADT traversals (`plug :: UCtx m n -> UTerm m -> UTerm n`, including diagonal `CHole` siblings and binder-reordered `CAppR`) and untyped scope-indexed `substSingleU` both cross-module and same-module (`R13_PlugOpenEq.hs`, `R13_SubstSingleUOpenEq.hs`).
+
+The roadmap has **27 of 50 cards complete**
 (23 inherited, four completed on the fork), 18 partial and five unstarted.
 [Roadmap and acceptance criteria](ROADMAP.md#where-this-fork-stands)
 
-The BigStep proof now converts relational evidence into a result indexed
-by an ordinary Haskell function. Induction on the lookup derivation selects
-the same closure as `lookupEnv`. The second-variable example checks that the
-successor case skips the most recent binding. The provider and proof can live
-in separate modules. The Bisimulation chapter also proves `simRename` for
-all 20 constructors, including the case that shifts a free variable under
-two binders. [Lookup definition](examples/open-evaluation/BookEnvironment.hs)
-and [proof in the Showcase](Showcase.hs).
-
 | Verified input | Result |
 | --- | --- |
-| Retained self-hosted compiler at `844f309834`, job 3311 | Both compiler stages report this revision. The imported term-level call that previously crashed the specialiser compiles at `-O2`. All 623 Showcase observations matched at native `-O0`, default `-O2` and in GHCi. |
-| Published PLFH batch 32 at `f3643cfa5b`, job 3313 | 33 modules in each of four modes, 142 matching observations in both native runs and ten expected rejections in each mode. Original reports passed 36/42 at `-O0` and 33/42 at `-O2`. |
-| Showcase at `944a4efa9d`, job 3295 | All 623 observations matched the golden output at native `-O0`, default `-O2` and in GHCi. |
-| Combined PLFH book at `749aaf2388`, job 3294 | 33 modules in each of four modes, including native interface readers at both optimization levels. Both native runs matched 140 observations. All nine negative programs failed with their expected diagnostic in each mode. |
-| Original batch 31 reports on the lookup compiler | 36/42 compile at `-O0` and 33/42 at `-O2` with the book checker's interface flags. The book's original matchable-arrow version of abstract renaming remains open. |
-| Normal two-stage compiler at `f78c0b4592`, job 3292 | All 15 gates passed, including the 54 registered tests. All 234 compatibility cases passed. The focused suite passed 137/138. The one known failure is the upstream `MTrans` diagnostic in `deriving-via-compile`. |
+| Wave 1 normal two-stage compiler at `186670b0b9` (`_build/on-demand/wave1-two-stage`) | Both `stage0` and `stage1` report `186670b0b9`. All 15 qualification gates passed (`0`), including 55/55 registered tests and 627/627 Showcase observations at native `-O0`, default `-O2` and in GHCi. All 234/234 compatibility cases passed. The focused suite passed 137/138 (sole known upstream `MTrans` diagnostic in `deriving-via-compile`). |
+| Published PLFH batch 37 at `8756aed` (with Wave 2 Lane 1 `03b7bb9a00`), job 3549 | 34/34 modules, `.hi` audit clean, 155/155 runtime checks (`Untyped.evalNormal` constructive normal-order evaluator checked, 21/25 chapters `Checked`), 10/10 negative controls, 38/38 fixed reproducers at `-O0` and `-O2`. |
+| Published PLFH batch 35–36 at `8d868df` on `186670b0b9` (`stage1`) | 34/34 modules in all four modes (`native-O0`, `native-O2`, `readback-O0`, `readback-O2`), 10/10 negative programs per mode, and 40/50 standalone reports at `-O0` / 37/50 at `-O2` (promoting `R03_ForEachGadtEqTypeFamily`, `R13_LookupEnvOpenEq`, `R13_SubstSingleUOpenEq`, and `R13_PlugOpenEq`). |
+| Retained baseline compiler at `844f309834` (`_build/current`), job 3311 | Kept intact until Wave 2 two-stage promotion completes so `PLFH` `check_plfh.sh`'s `wave2-preview` selector remains active for Batch 37 (`R04_IndexedForEachCtorField.hs`). |
 
 The book author published batch 32 at
 [`f3643cfa5b`](https://github.com/Tritlo/PLFH/tree/f3643cfa5bc257e44742fec98a4d5a875f41efd8).
@@ -163,28 +163,13 @@ Job 2996 matched the 113 book observations at native `-O0`, default
 
 ## Next compiler work
 
-1. For PLFH Bisimulation (R16), compare the two native providers for
-   `exts`. The ordinary `simExt` reader passes at `-O0` and fails at default
-   `-O2` with GHC-68947. Recheck the changed-endpoint control before extending
-   the proof to all 20 constructors.
-2. For BigStep (R21), qualify early lookup equations for a variable rule
-   declared in the same module. The candidate handles the mutual environment
-   and closure declarations. Its remaining checks concern exported constructor
-   visibility and final equation publication.
-3. For R03, qualify closed-family refinement from a retained equality and
-   the rewrite-rule dependencies of nested checked calls. The published
-   Adequacy chapter already proves big-step adequacy by determinism.
-4. For fresh no-code providers, account for imported rewrite rules before
-   publishing substitution equations. A no-code reader can already use a
-   native provider. A fresh no-code provider still withholds the beta equation.
+1. **Wave 2 Carbon consolidation & two-stage promotion (`9a27c55688`)**: Complete Carbon review, Showcase observations 628–631, and two-stage promotion to `_build/current` for indexed GADT `foreach` constructor fields & vanilla-return `Sigma` operands (`R04_IndexedForEachCtorField.hs`), `let`/`where` composed function aliases (`R04_ComposedIsoFields.hs`), fresh `-fno-code` closure providers with `.hi` `sourceRuleHeadsField` persistence, and `-O2` Final-Core explicit-list verification (`R13_RevOpenEq.hs`) + matchability mismatch printing (`R16_AbstractRenamingInType.hs`).
+2. **Wave 3 Carbon tracks (in flight)**:
+   - Track A: R17 `%U` type-lambda capture (`R17_TypeLambdaCaptureUnmatchable.hs`) and R21/R13 same-module `plug` & `substSingle` staging (`R13_SameModulePlugOpenEq.hs`, `R21_SameModuleSubstSingleOpenEq.hs`).
+   - Track B: R03 inline GADT constructor `foreach` arguments (`R03_InlineGadtCtorForEachArg.hs`), R03 retained-call untouchable polymorphism (`R03_UntouchableRetainedCallPoly.hs`), and R06/R13 term-to-`Type` large elimination (`R13_LargeElimTermToType.hs`) + `HaskLib` `foldr` / `Matchability(..)` exports, followed by Batch 37 follow-ups (`R04_ExistentialGadtRetainedArg.hs`, `R05_NestedFinForEachCoreLint.hs`).
+3. **Wave 4 — GHC Proposal #378 Deep Alignment (prep in flight)**: Audit all differences between GHC Proposal `#378` and the fork's current syntax/semantics/pragmas, prioritizing already-implemented fork features that diverge from `#378`, followed by remaining `#378` features, delegated GHC proposals, Serokell roadmap cards, and Agda-inspired ergonomics.
 
-Beyond these three candidates, PLFH still needs the parallel diamond
-(`parDiamond`) for its proof of confluence, the equational laws of the
-substitution calculus, compositionality over `plug`, and small-step adequacy
-for contextual equivalence. The book also tracks opaque composition of
-isomorphism fields and matchability in Leibniz equality. The function-column,
-reverse and accumulator reports pass at `-O0` and fail at `-O2`.
-[Batch 32 chapter ledger and nine standalone reports](https://github.com/Tritlo/PLFH/blob/f3643cfa5bc257e44742fec98a4d5a875f41efd8/content/Status.md)
+[Batch 37 status ledger and open reports](https://github.com/Tritlo/PLFH/blob/8756aed/content/Status.md)
 
 See the [candidate revisions and examples](plfh/README.md#resume-unfinished-work).
 

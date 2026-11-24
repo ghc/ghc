@@ -6,6 +6,25 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Wave 1: simultaneous substitution, same-module lookup, context plug, and closed-family refinement
+
+Compiler `186670b0b9` (atop `69a36b132f`) consolidates four Wave 1 lanes:
+R16 accepts `-O2` FloatOut constructor helpers (`exts1`) and publishes open
+`T:subst` so all 20 constructors of PLFH `Bisimulation.simSubst` check with
+ordinary functions; R21 stages same-module `lookupEnv` with `.hi` export
+visibility (`[GHC-70566]`) and early-vs-final Core agreement; R03 refines
+closed families from nominal retained Givens while tracking nested checked-call
+and reduced proof-synonym rule dependencies; and R13 publishes two-index GADT
+traversals (`plug`) and untyped `substSingleU` open equations.
+
+Both self-hosted stages built at `186670b0b9` in `_build/on-demand/wave1-two-stage`.
+All 15 qualification gates passed (`0`), including 55/55 registered tests and
+all 627 Showcase observations at native `-O0`, default `-O2`, and in GHCi.
+All 234 compatibility registrations passed, and 137/138 focused tests passed
+(keeping only the known upstream `deriving-via-compile` `MTrans` diagnostic).
+On PLFH `8d868df`, all 34 book modules passed in all four modes (`native-O0`,
+`native-O2`, `readback-O0`, `readback-O2`) with 10/10 negative rejections per mode.
+
 ## Direct induction on the second argument
 
 Compiler `9d310102c7` checks both `plusComm m Zero = plusZero m` and
