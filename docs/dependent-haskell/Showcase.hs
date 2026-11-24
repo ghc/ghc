@@ -187,6 +187,7 @@ import qualified BookBetaReduction
 import qualified BookDeBruijn
 import qualified BookAnyWitness
 import qualified BookAnyWitnessProof
+import qualified BookParallel
 import qualified BookReverseProof
 import qualified BookNaturals
 import qualified CastedConstructorGivens as TreeProof
@@ -2023,6 +2024,17 @@ main = do
         evidence = BookAnyWitness.EvidenceBit False
     observe "keep the second occurrence when decoding a list witness"
         (BookAnyWitnessProof.decodeThere @True @True @'[True] firstMember evidence)
+    let secondMember :: BookAnyWitness.Any ((:~:) True) '[True, True]
+        secondMember = BookAnyWitness.There firstMember
+    observe "round trip the same occurrence and predicate proof"
+        (BookAnyWitnessProof.membershipRoundTrip @(BookAnyWitness.EvidenceBit False) secondMember)
+    let identity :: BookParallel.UTerm HaskLib.Zero
+        identity = BookParallel.ULam (BookParallel.UVar BookParallel.FZ)
+    application <- newIORef (BookParallel.UApp identity identity) >>= readIORef
+    observe "prove reflexivity of parallel reduction under both lambdas"
+        (case BookParallel.parRefl application of
+           BookParallel.PApp (BookParallel.PLam BookParallel.PVar) (BookParallel.PLam BookParallel.PVar) -> True
+           _ -> False)
     observe "sum two lists with the right-fold append proof"
         (HaskLib.eqSize (BookFoldProof.checkedSum [1, 2] [3, 4]) 10)
     case BookIso.sample of

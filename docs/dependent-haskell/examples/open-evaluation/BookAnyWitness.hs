@@ -4,7 +4,7 @@
 {-# OPTIONS_GHC -fwrite-source-equations -fno-omit-interface-pragmas -fobject-code #-}
 -- | The Lists chapter's existential predicate witness for a Boolean list.
 -- Adapted from PLFH under CC BY 4.0. See REFERENCES.md.
-module BookAnyWitness (Any(..), AnyWitness(..), Evidence(..), Flag(..), packHead, witnessToAny) where
+module BookAnyWitness (Any(..), AnyWitness(..), Evidence(..), Flag(..), packHead, anyToWitness, witnessToAny) where
 
 import Data.Kind (Type)
 import Data.Type.Equality ((:~:)(Refl))
@@ -35,6 +35,13 @@ data Evidence (b :: Bool) = EvidenceBit Bool
 {-# INLINE packHead #-}
 packHead :: Flag b -> Evidence b -> AnyWitness Evidence (b : [])
 packHead AtTrue proof = AnyWitness (Here Refl) proof
+
+-- | Package the selected list position with its predicate evidence.
+anyToWitness :: forall {m :: Matchability} {p :: Bool %m -> Type} {xs}.
+                Any p xs -> AnyWitness p xs
+anyToWitness (Here proof) = AnyWitness (Here Refl) proof
+anyToWitness (There r) = case anyToWitness r of
+  AnyWitness member proof -> AnyWitness (There member) proof
 
 -- | Recover predicate evidence at its original list position.
 witnessToAny :: forall {m :: Matchability} {p :: Bool %m -> Type} {xs}.

@@ -564,6 +564,8 @@ prove progress for application, successor case, recursion and a value: ["beta","
 replace two variables of the same type in de Bruijn order: Refl
 preserve an open predicate proof in a promoted existential witness: Refl
 keep the second occurrence when decoding a list witness: Refl
+round trip the same occurrence and predicate proof: Refl
+prove reflexivity of parallel reduction under both lambdas: True
 sum two lists with the right-fold append proof: True
 convert a Boolean to a bit and check both inverse laws: (Set,False,Refl,Refl)
 apply the identity isomorphism at Maybe Bool: (Just True,Nothing,Refl,Refl)
