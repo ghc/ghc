@@ -1946,7 +1946,7 @@ main = do
     observe "pass size as a callback and check the reversed list length"
         (case measureReverseLength HaskLib.size reverseInput Refl of
              (n, Refl) -> n)
-    prefixBound <- newIORef (HaskLib.Succ HaskLib.Zero) >>= readIORef
+    prefixBound <- newIORef (1 :: HaskLib.Nat) >>= readIORef
     prefixInput <- newIORef (True : error "forced the list beyond the prefix") >>= readIORef
     observe "take a runtime-bounded prefix and prove its length"
         (HaskLib.takeSize prefixBound prefixInput, HaskLib.lengthTakeSize prefixBound prefixInput)

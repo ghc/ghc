@@ -8716,3 +8716,22 @@ equality to the body using `Data.Type.Equality.gcastWith`. The body can
 return another proof or an ordinary value.
 [Agda rewrite](https://agda.readthedocs.io/en/v2.8.0/language/with-abstraction.html#rewrite)
 and [HaskLib](hasklib/HaskLib.hs).
+
+### Natural-number notation in HaskLib
+
+In Agda, a numeral has the built-in natural-number type by default.
+An instance of `Number` supplies `fromNat` for overloaded literals.
+HaskLib uses the fork's existing `FromNatural` family when a type
+expression expects its Peano `Nat`. In `plus 2 3 :~: 5`, all three
+literals have kind `Nat`. With `import HaskLib.Nat (type (+))`, the
+infix type operator forwards to that same `plus`. Induction still
+matches `Zero` and `Succ n`.
+
+In a Haskell expression, `Num Nat` supplies `fromInteger` and
+addition. A numeral that also appears in a retained result type uses
+the checked conversion of that same dictionary. The packed-vector
+experiment established the zero and successor checks. HaskLib uses
+the same conversion for its own datatype.
+[Agda literal overloading](https://agda.readthedocs.io/en/v2.8.0/language/literal-overloading.html#natural-numbers),
+[the fork's type-level conversion](../../libraries/ghc-internal/src/GHC/Internal/TypeNats.hs),
+and [HaskLib.Nat](hasklib/HaskLib/Nat.hs).
