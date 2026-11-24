@@ -42,25 +42,53 @@ an ordinary client. All three negative controls reported GHC-83865.
 Job 2236 confirmed that the 23 reports in the older book revision
 `d0e4fa73df` also reproduced on 590.
 
-The next combined compiler is `984647892b`. Job 2209 follows job 2080.
-It builds both stages and checks 594 Showcase observations, 24 selected
-test registrations, package clients, compatibility tests and upgrade tests.
-The inputs are in `_build/on-demand/r03-plfh-after-590-20261124`.
-Git retains the source at `refs/spikes/plfh-proof-sums-594`.
+Job 2209 built both compiler stages at `984647892b`. All 24 selected
+registrations and all 234 compatibility tests passed. The focused suite
+had its known `MTrans` failure. A typed splice in the 594-example Showcase caused
+GHC to demand type-level equations for three ordinary runtime functions.
+Job 2341 verified the renamer fix at `8c1a412703`. The original 594
+observations then passed at native `-O0`, default `-O2` and in GHCi.
+Job 2338 checked the new typed quote through a separately compiled client
+and rejected the wrong splice result. The old quote test still expected
+this newly supported use to fail.
 
-Job 2312 follows job 2209. It builds `c8e9df9278` from
-`refs/spikes/plfh-nat-indexed-proofs-597`. It checks the canonical Nat
-library with the indexed proof changes, 597 Showcase observations and 35
-test registrations. The inputs are in
-`_build/on-demand/plfh-nat-integrated-post594-20261124`.
+Job 2356 builds the combined compiler at `923571c2c8` from
+`refs/spikes/plfh-nat-scope-599`. It checks 599 Showcase observations
+and 38 registrations. This run supersedes the queued 597-example build.
+The inputs are in `_build/on-demand/plfh-nat-preservation-normal-20261124`.
+Its component passed all six targeted registrations in jobs 2347 and
+2354. A client read the countdown and function-domain proofs through
+compiled interfaces. Job 2358 accepted 13 of the 27 reduced examples
+from book revision `69354d2` at both levels. Three other chapters used
+the same implicit substitution binder as Lambda. The combined compiler
+reported those uses in DeBruijn, More and Untyped. Job 2364 compiled all
+27 modules of the audited book revision `89c8292` at `-O0` and `-O2`.
+Of its 28 reduced examples, 13 compiled and 15 still failed at each level.
 
-Check the exported types of the named Lambda chapter's beta constructors
-before using them for preservation. Job 2310 found that each constructor
-implicitly bound a fresh `substTerm`. An ordinary client could choose an
-incorrect target for `BetaMu` on component `09bc6546ca`. Job 2313
-checked the repair. Put the producer in a separate module and use its
-qualified name in each constructor result. The correct target then
-checked and the incorrect target failed with GHC-83865.
+The Nat edition of the book is `69354d2`. Job 2319 passed all 31
+book checks on the published compiler. The book author audited the
+exported constructor types in `89c8292`. Job 2340 passed its 27 modules,
+four negative controls, interface audit and runtime check on 590.
+The audited edition withholds the named functional reduction relation
+until a normal compiler can check the intended beta rules.
+On component `09bc6546ca`,
+job 2310 found that the named Lambda chapter's beta constructors
+implicitly bound a fresh `substTerm`. A caller could choose the wrong
+target of a reduction. The book patch moves the producer to a separate
+module and qualifies it in the three constructor results. Job 2336
+checked full substitution and one-step preservation for this relation.
+An ordinary client exercised all eight reductions at both optimization
+levels. Job 2337 also checked the proofs with `-fno-code` against native
+producer interfaces. Recover the book patch with
+`git format-patch -1 --stdout refs/yardsticks/plfh/preservation-nat`.
+
+Job 2335 checked the compiler-side name resolution on the unchanged
+Lambda chapter. The candidate rejects its same-module call with
+GHC-68947 before a caller can choose a different function. The qualified
+book patch compiles. Using the original same-module producer directly
+and building every producer with `-fno-code` are separate follow-ups.
+The private no-code compiler in job 2359 checked the 28 modules from
+the preservation patch using fresh no-code producer interfaces.
 
 Jobs 2196 and 2213 reproduced the first 21 PLFH examples on the
 published compiler at both optimization levels. They include two compiler
@@ -118,6 +146,10 @@ Job 2080 uses the current compiler as its build seed. The former 560
 and 562 build products have been retired. Their Git revisions and test
 receipts remain available. The exact 7.81 GB inventory is in
 `_build/on-demand/retirement-560-562-for-plfh-20261124`.
+
+The November 24 cleanup retired 826 completed test executables and freed
+7,733,612,544 bytes. Inputs, objects and results stayed in place. The file
+inventory is in `_build/on-demand/retirement-completed-test-executables-20261124`.
 
 The GHC queue has two slots. Local benchmark jobs take priority and freeze
 the GHC slice. The remote Colab benchmark uses the
