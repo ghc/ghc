@@ -54,6 +54,31 @@ if grep -Fq 'opaque-ordinary-constructor-case' legacy.iface; then
     exit 1
 fi
 
+# Force readback of the legacy structural tag before and after mutation.
+cd "$out/O2/provider/legacy"
+mkdir reader
+cp "$src/NativeLegacyGadtFieldsMutate.hs" .
+"${ghc[@]}" -O0 -package ghc NativeLegacyGadtFieldsMutate.hs -o mutate
+cd reader
+cp ../NativeNonuniformGadtFieldsProvider.hi .
+cat >LegacyReader.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
+module LegacyReader where
+import NativeNonuniformGadtFieldsProvider
+
+observesNext :: Swap Bool Bool -> Bool
+observesNext term = case inspectSwap term of
+    Stopped -> False
+    Advanced -> True
+HS
+"${ghc[@]}" -O2 -ddump-inlinings -c LegacyReader.hs >valid.log 2>&1
+grep -Fq 'Inlining done: NativeNonuniformGadtFieldsProvider.inspectSwap' valid.log
+../mutate "$2" ../NativeNonuniformGadtFieldsProvider.hi NativeNonuniformGadtFieldsProvider.hi
+if "${ghc[@]}" -O2 -fforce-recomp -c LegacyReader.hs >duplicate.log 2>&1; then
+    exit 1
+fi
+grep -Fq 'Missing or unsupported constructor proof in interface alternative: Next' duplicate.log
+
 cd "$out/O0/provider"
 if "${ghc[@]}" -O0 -fforce-recomp -DWRONG_NONUNIFORM -c NativeNonuniformGadtFieldsProvider.hs >negative.log 2>&1 ||
    ! grep -Fq '[GHC-83865]' negative.log ||
