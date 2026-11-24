@@ -10,7 +10,7 @@ ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint
 
 for opt in -O0 -O2; do
     provider="$work/$opt/provider"
-    mkdir -p "$provider" "$work/$opt"/{native,no-code,strict}
+    mkdir -p "$provider" "$work/$opt"/{native,no-code,withheld}
     cd "$provider"
     cp "$inputs/NativeCheckedClosureProvider.hs" .
     "${ghc[@]}" "$opt" -fwrite-source-equations -fexpose-all-unfoldings -c NativeCheckedClosureProvider.hs
@@ -32,11 +32,14 @@ for opt in -O0 -O2; do
     fi
     grep -Fq '[GHC-83865]' wrong.log
 
-    cd "$work/$opt/strict"
+    cd "$work/$opt/withheld"
     cp "$inputs/NativeCheckedClosureProvider.hs" .
-    "${ghc[@]}" "$opt" -fwrite-source-equations -fexpose-all-unfoldings -DSTRICT_CAPTURE -c NativeCheckedClosureProvider.hs
-    "${ghc[@]}" --show-iface NativeCheckedClosureProvider.hi >strict.iface
-    if grep -Fq 'CheckedClosureSourceTable T:replace' strict.iface; then
-        exit 1
-    fi
+    for variant in STRICT_CAPTURE HIDE_LOOP; do
+        "${ghc[@]}" "$opt" -fwrite-source-equations -fexpose-all-unfoldings \
+            -fforce-recomp "-D$variant" -c NativeCheckedClosureProvider.hs
+        "${ghc[@]}" --show-iface NativeCheckedClosureProvider.hi >withheld.iface
+        if grep -Eq 'CheckedClosureSourceTable T:replace|\$apply:replace' withheld.iface; then
+            exit 1
+        fi
+    done
 done

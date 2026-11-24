@@ -1,5 +1,10 @@
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, RankNTypes #-}
-module NativeCheckedClosureProvider where
+module NativeCheckedClosureProvider
+#ifdef HIDE_LOOP
+    (Sort (..), Scope (..), Slot (..), Expr (At, Bind, Call, Lit, Test),
+     extendName, renameExpr, extendExpr, walk, replace)
+#endif
+where
 
 data Sort = Nat | Arrow Sort Sort
 data Scope = Empty | Push Scope Sort
