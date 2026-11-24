@@ -1498,6 +1498,8 @@ retainedConPat (L loc (ParPat x pat))
   = L loc (ParPat x (retainedConPat pat))
 retainedConPat (L loc (ListPat _ []))
   = L loc (unLoc (nlConPatName (dataConName nilDataCon) []))
+retainedConPat (L loc (TuplePat _ [first, second] Boxed))
+  = L loc (unLoc (nlConPatName (tupleDataConName Boxed 2) [first, second]))
 retainedConPat (L loc pat@(ConPat { pat_args = InfixCon _ left right }))
   = L loc (pat { pat_args = PrefixCon noExtField [left, right] })
 retainedConPat pat = pat
@@ -1537,17 +1539,20 @@ retainedConIndex domain con fields
 -- | Resolve an index constructor and instantiate its bare runtime field types.
 -- See Note [Parameterized retained constructor patterns].
 tcRetainedCon :: Type -> LPat GhcRn -> TcM (Maybe (DataCon, [Id]))
-tcRetainedCon domain source_pat = case unLoc (retainedConPat source_pat) of
-  ParPat _ pat -> tcRetainedCon domain pat
-  ConPat { pat_con = L _ name, pat_args = PrefixCon _ pats } ->
-    do { con_like <- tcLookupConLike name
-       ; case con_like of
-           RealDataCon con
-             | Just args <- nativeIndexDataConTyArgs domain con
-             -> check_fields con args pats
-
-           _ -> return Nothing }
-  _ -> return Nothing
+tcRetainedCon domain source_pat
+  | L _ (ParPat _ pat) <- source_pat = tcRetainedCon domain pat
+  | otherwise = case unLoc (retainedConPat source_pat) of
+      ConPat { pat_con = L _ name, pat_args = PrefixCon _ pats } ->
+        do { lazy_tuple <- case unLoc source_pat of
+                 TuplePat{} -> goptM Opt_IrrefutableTuples
+                 _ -> pure False
+           ; if lazy_tuple then return Nothing else do
+           { con_like <- tcLookupConLike name
+           ; case con_like of
+               RealDataCon con | Just args <- nativeIndexDataConTyArgs domain con
+                 -> check_fields con args pats
+               _ -> return Nothing } }
+      _ -> return Nothing
   where
     check_fields con args pats
       | dataConHasPromotedRetained con
@@ -1597,7 +1602,14 @@ ordinary prefix form before checking it. Keep the original source span and
 MatchInCtxt. The ordinary pattern checker then produces ConPatTc, which can
 bind the nominal constructor proof. Nonempty list patterns have nested fields
 and remain outside this bare-field subset. Overloaded-list view expansions
-remain outside it too. Other patterns keep their existing checking path.
+remain outside it too.
+
+A boxed pair can use its ordinary prefix constructor in the same way.
+Keep each field pattern. Check bare fields before using the index proof.
+The pair match forces the outer constructor and leaves the fields lazy.
+With -firrefutable-tuples, do not use this conversion: the ordinary tuple
+pattern does not force the pair. Explicit lazy patterns also have no
+constructor proof. Other patterns keep their existing checking path.
 
 This reuses GHC's constructor instantiation and pattern checking. The D/DC and
 System DR comparisons require well-formed endpoints and nominal constructor

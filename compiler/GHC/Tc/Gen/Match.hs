@@ -1976,7 +1976,7 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
       | otherwise = Nothing
 
     simple_con :: LPat GhcRn -> Maybe (WithUserRdr Name)
-    simple_con pat = case unLoc (case_pattern pat) of
+    simple_con pat = case unLoc (retainedConPat (case_pattern pat)) of
       ConPat { pat_con = L _ name, pat_args = PrefixCon _ fields }
         | all isRetainedVarPat fields -> Just name
       _ -> Nothing
@@ -1984,6 +1984,7 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
     -- The indexed case checker reads the constructor at the pattern head.
     case_pattern :: LPat GhcRn -> LPat GhcRn
     case_pattern (L _ (ParPat _ inner)) = case_pattern inner
+    case_pattern pat@(L _ TuplePat{}) = pat
     case_pattern pat = retainedConPat pat
 
     terminal_case arg_cos match@(Match { m_pats = L pats_loc pats, m_grhss = grhss })
@@ -2267,7 +2268,8 @@ Use the first constructor proof to read the specialised second domain. Reduce
 family axioms at the usual depth limit. Require every omitted constructor to
 be impossible according to dataConCannotMatch. Move the final pattern and
 its where bindings into a checked case. The indexed case rule sees the
-actual constructor fields. Keep the source equation as the outer error context
+actual constructor fields. Preserve tuple syntax until the typed case checker
+can check -firrefutable-tuples. Keep the source equation as the outer error context
 and the written pattern's span on the generated alternative.
 
 The generated case is structurally exhaustive. Its argument keeps the

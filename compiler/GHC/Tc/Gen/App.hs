@@ -76,7 +76,7 @@ import GHC.Core.UsageEnv ( UsageEnv, popUE, singleUsageUE, zeroUE )
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom (coAxiomBranches, coAxBranchLHS, coAxBranchRHS, coAxBranchCoVars, fromBranches)
 
-import GHC.Builtin.WiredIn.Types ( charTy, integerTy, multiplicityTy, runtimeRepTy, nilDataCon, consDataCon, mkListTy, unmatchableDataConTy )
+import GHC.Builtin.WiredIn.Types ( charTy, integerTy, multiplicityTy, runtimeRepTy, nilDataCon, consDataCon, mkListTy, tupleDataCon, unmatchableDataConTy )
 import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.KnownKeys
 
@@ -2279,6 +2279,13 @@ tcRetainedDeclaredArgType view_type (L loc (HsVar _ lname))
            Nothing -> return Nothing }
 tcRetainedDeclaredArgType _ _ = return Nothing
 
+-- | Use the ordinary constructor application for a complete boxed pair.
+-- See Note [Erased parameters of a retained constructor argument].
+retainedPairApplication :: HsExpr GhcRn -> Maybe (LHsExpr GhcRn)
+retainedPairApplication (ExplicitTuple _ [Present _ first, Present _ second] Boxed)
+  = Just (nlHsApps (dataConName (tupleDataCon Boxed 2)) [first, second])
+retainedPairApplication _ = Nothing
+
 -- | Read a visible retained argument's type from its constructor fields.
 -- See Note [Erased parameters of a retained constructor argument].
 tcRetainedConstructorArgType :: LHsExpr GhcRn -> TcM (Maybe Type)
@@ -2287,6 +2294,8 @@ tcRetainedConstructorArgType = collect []
     collect args (L _ (HsPar _ fun)) = collect args fun
     collect args (L _ (HsApp _ fun arg)) = collect (arg : args) fun
     collect [] (L _ (OpApp _ lhs op rhs)) = collect [lhs, rhs] op
+    collect [] (L _ expr) | Just pair <- retainedPairApplication expr
+      = collect [] pair
     collect [] (L _ (ExplicitList _ fields))
       = fmap (fmap mkListTy) (firstJustsM (map tcRetainedConstructorArgType fields))
     collect args (L loc (HsVar _ lname))
@@ -2332,6 +2341,10 @@ parameter. For Twin x y z with fields a, a, b, the declaration of x can fix
 a. The ordinary argument checker then reports a mismatch at y. A nullary
 constructor such as False determines Bool. A polymorphic nullary constructor
 cannot supply its missing parameter. Numeric literals require a known domain.
+
+Use the same constructor application to infer and check a written boxed pair
+with both fields present. The constructor leaves both fields lazy. Tuple
+sections and unboxed tuples keep their existing checking paths.
 
 This pass reads declarations without checking occurrences. The enclosing
 selector validates the scope and kinds of the complete choice. tcRetainedArg
@@ -4972,7 +4985,10 @@ tcRetainedArgWith reify domain arg
                                       (RetainedInteractiveIndex (getName arg_id))
                                   _ -> unsupported }
                       _ -> unsupported }
-          _ -> unsupported
+          _ | Just pair <- retainedPairApplication expr -> do
+                (core, expanded) <- resolve env expected pair
+                return (core, L loc (mkExpandedLExpr expr expanded))
+            | otherwise -> unsupported
 
     -- Instantiate the erased parameters from the complete expected domain.
     constructor expected dc = case nativeIndexDataConTyArgs expected dc of

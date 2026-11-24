@@ -8,7 +8,7 @@ ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-
 
 cat >"$work/Tree.hs" <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
-module Tree (Tree(..), focus, known) where
+module Tree (Tree(..), focus, known, pairRoundTrip, swapPair) where
 
 import Data.Type.Equality ((:~:)(Refl))
 
@@ -37,8 +37,11 @@ swapPair :: (a, b) -> (b, a)
 swapPair (x, y) = (y, x)
 
 pairRoundTrip :: foreach (p :: (a, b)) -> swapPair (swapPair p) :~: p
-pairRoundTrip p = case p of
-    (,) _ _ -> Refl
+pairRoundTrip (x, y) = Refl
+
+pairRoundTripCase :: foreach (p :: (a, b)) -> swapPair (swapPair p) :~: p
+pairRoundTripCase p = case p of
+    (_, _) -> Refl
 
 -- Keep the existing open-evaluator route for a local projection.
 first :: (a, b) -> a
@@ -63,7 +66,21 @@ wrong _ = Refl
 #endif
 
 main :: IO ()
-main = case open (Arrow Empty Other) of Refl -> putStrLn "Refl"
+main = case open (Arrow Empty Other) of
+    Refl -> case pairRoundTrip (False, EQ) of
+        Refl -> putStrLn "Refl"
+HS
+cat >"$work/Mixed.hs" <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
+module Mixed where
+
+import Data.Type.Equality ((:~:)(Refl))
+import Tree (swapPair)
+
+mixed :: foreach (b :: Bool) -> foreach (p :: (Bool, Ordering))
+      -> '(b, swapPair (swapPair p)) :~: '(b, p)
+mixed False _ = error "no proof for False"
+mixed True (_, _) = Refl
 HS
 
 for opt in -O0 -O2; do
@@ -73,11 +90,17 @@ for opt in -O0 -O2; do
     "${ghc[@]}" "$opt" -fomit-interface-pragmas -fno-write-if-simplified-core -c Tree.hs
     cp Tree.{hi,o} ../reader/
     cd ../reader
-    cp "$work/Main.hs" .
+    cp "$work/Main.hs" "$work/Mixed.hs" .
     "${ghc[@]}" "$opt" -c Main.hs
     "${ghc[@]}" "$opt" Main.o Tree.o -o check
     ./check >actual
     grep -Fxq Refl actual
+    "${ghc[@]}" "$opt" -c Mixed.hs
+    if "${ghc[@]}" "$opt" -firrefutable-tuples -fforce-recomp -c Mixed.hs >lazy.log 2>&1 ||
+       ! grep -Fq 'Dependent case refinement requires one unguarded match' lazy.log; then
+        cat lazy.log >&2
+        exit 1
+    fi
     if "${ghc[@]}" "$opt" -DWRONG -fforce-recomp -c Main.hs >wrong.log 2>&1 ||
        ! grep -Fq 'error: [GHC-83865]' wrong.log; then
         cat wrong.log >&2
