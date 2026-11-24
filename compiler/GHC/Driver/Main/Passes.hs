@@ -157,7 +157,8 @@ import GHC.Types.ForeignStubs
 import GHC.Types.Id
 import GHC.Types.Id.Info (IdDetails(VanillaId))
 import GHC.Types.Var (setIdDetails)
-import GHC.Types.Name.Set (mkNameSet, elemNameSet, extendNameSetList)
+import GHC.Types.Name.Env (filterNameEnv, mapNameEnv)
+import GHC.Types.Name.Set (NameSet, mkNameSet, elemNameSet, extendNameSetList, isEmptyNameSet)
 import GHC.Types.IPE
 import GHC.Types.Name
 import GHC.Types.Name.Ppr
@@ -936,11 +937,12 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
           -- user requested. See #22008 for some discussion.
           plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
           simplified_guts <- hscSimplify' plugins desugared_guts
+          let checked_tc = validateSimpleSourceTables desugared_guts simplified_guts tc_result
           (cg_guts, _) <-
               liftIO $ hscTidy hsc_env simplified_guts
 
           (iface, _details) <- liftIO $
-            hscSimpleIface hsc_env (Just $ cg_binds cg_guts) (cg_modBreaks cg_guts) tc_result summary
+            hscSimpleIface hsc_env (Just $ cg_binds cg_guts) (cg_modBreaks cg_guts) checked_tc summary
 
           liftIO $ hscMaybeWriteIface logger dflags True iface mb_old_hash (ms_location summary)
 
@@ -951,11 +953,16 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
             else return $ HscUpdate iface
 
 
-      -- We are not generating code or writing an interface with simplified core so we can skip simplification
-      -- and generate a simple interface.
+      -- Check a provisional source equation against optimized Core even
+      -- when the interface will not contain a Core program.
       _ -> do
+        checked_tc <- case mb_desugar of
+          Just guts | not (null (finalCoreMappers (mg_binds guts))) -> do
+            optimized <- hscSimplify' [] guts
+            pure (validateSimpleSourceTables guts optimized tc_result)
+          _ -> pure tc_result
         (iface, _details) <- liftIO $
-          hscSimpleIface hsc_env Nothing Nothing tc_result summary
+          hscSimpleIface hsc_env Nothing Nothing checked_tc summary
 
         liftIO $ hscMaybeWriteIface logger dflags True iface mb_old_hash (ms_location summary)
 
@@ -970,16 +977,41 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
 -- See Note [Final Core source equations] in GHC.Tc.Gen.SourceTable.
 keepValidatedSourceMappers :: ModGuts -> ModGuts -> ModGuts
 keepValidatedSourceMappers original final
-  | null failed && null rejected_list_tables = final
+  | isEmptyNameSet owners && isEmptyNameSet families = final
   | otherwise = final { mg_binds = map clearBind (mg_binds final)
-                      , mg_tcs = filter (not . invalidFamily families) (mg_tcs final) }
+                      , mg_tcs = filter (not . invalidFamily) (mg_tcs final) }
   where
-    owners = mkNameSet (map idName failed)
+    (owners, families) = invalidSourceMappers original final
+    invalidFamily tc = tyConName tc `elemNameSet` families
+    clearOwner = clearInvalidSourceOwner owners families
+    clearBind (NonRec v rhs) = NonRec (clearOwner v) rhs
+    clearBind (Rec pairs) = Rec [(clearOwner v, rhs) | (v, rhs) <- pairs]
+
+-- | Withdraw invalid provisional equations before emitting a simple interface.
+-- See Note [Final Core source equations] in GHC.Tc.Gen.SourceTable.
+validateSimpleSourceTables :: ModGuts -> ModGuts -> TcGblEnv -> TcGblEnv
+validateSimpleSourceTables original final env
+  | null (finalCoreMappers (mg_binds original)) = env
+  | isEmptyNameSet owners && isEmptyNameSet families = env
+  | otherwise = env { tcg_tcs = filter (not . invalidName . tyConName) (tcg_tcs env)
+                    , tcg_type_env = mapNameEnv clearOwner
+                        (filterNameEnv (not . invalidName . getName) (tcg_type_env env)) }
+  where
+    (owners, families) = invalidSourceMappers original final
+    invalidName name = name `elemNameSet` families
+    clearOwner (AnId owner) = AnId (clearInvalidSourceOwner owners families owner)
+    clearOwner thing = thing
+
+-- | Collect rejected owners and families, including equations that refer to them.
+invalidSourceMappers :: ModGuts -> ModGuts -> (NameSet, NameSet)
+invalidSourceMappers original final =
+    (mkNameSet (map idName failed),
+     close (mkNameSet (map tyConName
+            (rejected_list_tables ++ concatMap finalCoreSourceFamilies failed))))
+  where
     failed = filter (not . verifyFinalCoreMapper (mg_binds final))
                     (finalCoreMappers (mg_binds original))
     rejected_list_tables = failedFinalListTables (mg_binds final) (mg_tcs final)
-    families = close (mkNameSet (map tyConName
-                   (rejected_list_tables ++ concatMap finalCoreSourceFamilies failed)))
     invalidFamily invalid tc = tyConName tc `elemNameSet` invalid
     close invalid =
       case [tyConName tc | tc <- mg_tcs final
@@ -987,13 +1019,14 @@ keepValidatedSourceMappers original final
                         , maybe False (any (invalidFamily invalid)) (sourceTableCallees tc)] of
         [] -> invalid
         callers -> close (extendNameSetList invalid callers)
-    clearOwner v
-      | idName v `elemNameSet` owners ||
-        maybe False (invalidFamily families) (sourceTableId_maybe v)
-      = setIdDetails v VanillaId
-      | otherwise = v
-    clearBind (NonRec v rhs) = NonRec (clearOwner v) rhs
-    clearBind (Rec pairs) = Rec [(clearOwner v, rhs) | (v, rhs) <- pairs]
+
+-- | Remove an Id's source certificate when its family is withdrawn.
+clearInvalidSourceOwner :: NameSet -> NameSet -> Id -> Id
+clearInvalidSourceOwner owners families owner
+  | idName owner `elemNameSet` owners ||
+    maybe False (\table -> tyConName table `elemNameSet` families) (sourceTableId_maybe owner)
+  = setIdDetails owner VanillaId
+  | otherwise = owner
 
 {- Note [Stop TcM plugins after desugaring]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

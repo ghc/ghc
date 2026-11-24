@@ -55,7 +55,8 @@ import GHC.Data.OrdList (fromOL)
 import GHC.Driver.Backend (backendGeneratesCode)
 import GHC.Driver.Config (initSimpleOpts)
 import GHC.Driver.Session (GeneralFlag(Opt_EnableRewriteRules), backend, HasDynFlags(getDynFlags))
-import GHC.Driver.Env (hsc_HUG, hsc_home_unit, hugRuleInterfacesBelow, hugRulesBelow)
+import GHC.Driver.Env (hsc_HUG, hsc_home_unit, hsc_plugins, hugRuleInterfacesBelow, hugRulesBelow)
+import GHC.Driver.Plugins (pluginsWithArgs)
 import GHC.Hs
 import {-# SOURCE #-} GHC.HsToCore.Binds (dsTopLHsBinds)
 import GHC.HsToCore.Errors.Ppr () -- Diagnostic DsMessage
@@ -2028,13 +2029,17 @@ sourceCaseTables binds = do
   char_tables <- xoptM LangExt.ExperimentalDependentTypes
   dflags <- getDynFlags
   rdr_env <- getGlobalRdrEnv
+  let generates_code = backendGeneratesCode (backend dflags)
+  no_code_structural <- if generates_code then pure False else do
+    hsc <- getTopEnv
+    added_plugins <- readTcRef (tcg_th_coreplugins env)
+    pure (null added_plugins && null (pluginsWithArgs (hsc_plugins hsc)))
   let exported = mkNameSet (concatMap availNames (tcg_exports env))
       ruled = sourceRuleOwners (tcg_rules env)
       enum_enabled = not char_tables
       imported = ordinaryImport rdr_env
       public = publicCaseType env exported imported
       eligible_case = eligibleCase env exported enum_enabled imported
-      generates_code = backendGeneratesCode (backend dflags)
       list_case_position owner
         | generates_code
         , let ty = varType owner
@@ -2048,13 +2053,14 @@ sourceCaseTables binds = do
         = publicCaseType env exported imported (dataConTyCon con)
         | otherwise = False
       structural_candidate owner
-        | generates_code
-        , isNothing (sourceTableOccurrence env owner >>= sourceTableId_maybe)
+        | isNothing (sourceTableOccurrence env owner >>= sourceTableId_maybe)
         , Just signature <- constructorCaseType (varType owner)
-        = isTwoStructuralCase signature || isSizeListCase signature
+        = ((generates_code || no_code_structural) && isTwoStructuralCase signature) ||
+          (generates_code && isSizeListCase signature)
         | otherwise = False
       partial_case_candidate owner =
-        generates_code && isNothing (sourceTableOccurrence env owner >>= sourceTableId_maybe) &&
+        (generates_code || no_code_structural) &&
+        isNothing (sourceTableOccurrence env owner >>= sourceTableId_maybe) &&
         isJust (partialConstructorCaseType (varType owner))
       final_candidate owner = isJust (list_case_position owner) || indexed_candidate owner ||
                               structural_candidate owner || partial_case_candidate owner
@@ -3099,7 +3105,16 @@ Check lazy list equations and indexed projections at final typechecking
 publication. At this point the module has checked all user declarations.
 See Note [Nullary indexed source projections].
 The new private family is available to neither user declarations nor the
-helper collector. A no-code producer does not create it.
+helper collector.
+
+A no-code module can also check equations for structural sizes and non-list
+constructor cases. The driver checks the optimized body before it writes
+those equations to the simple interface. It does this only for modules
+without plugins. This preserves the no-code path that skips Core plugin
+passes. The interface contains the checked equations and no additional Core
+program. A module that explicitly requests simplified Core keeps that
+separate driver path. See validateSimpleSourceTables in
+GHC.Driver.Main.Passes.
 
 Before Tidy the driver checks the final optimized definition of the same
 owner with the same structural test. This check covers the actual callback,
