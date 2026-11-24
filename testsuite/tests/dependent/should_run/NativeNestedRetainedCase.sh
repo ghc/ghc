@@ -33,3 +33,17 @@ for opt in -O0 -O2 -fno-code; do
         exit 1
     fi
 done
+
+cd "$out/-O2/provider"
+cat >DiagonalIface.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds, TypeOperators #-}
+module DiagonalIface where
+import Data.Type.Equality ((:~:) (Refl))
+
+{-# INLINE check #-}
+check :: forall a (x :: a). foreach (p :: x :~: x) -> p :~: 'Refl
+check p = case p of Refl -> Refl
+HS
+"${ghc[@]}" -O2 -fno-omit-interface-pragmas -c DiagonalIface.hs
+"${ghc[@]}" --show-iface DiagonalIface.hi >diagonal.iface
+grep -Fq 'indexed-diagonal-constructor-case' diagonal.iface
