@@ -7,8 +7,12 @@ trap 'rm -rf -- "$work"' EXIT
 ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-color=never)
 
 cat >"$work/Worker.hs" <<'HS'
-{-# LANGUAGE ExperimentalDependentTypes #-}
+{-# LANGUAGE CPP, ExperimentalDependentTypes #-}
+#ifdef CHECK_GUARD
+module Worker (Term(..), Label(..), decorate, matches) where
+#else
 module Worker (Term(..), Label(..), decorate) where
+#endif
 
 data Term = Empty | Atom Label | Next Term
 data Label = Here | There Label
@@ -39,6 +43,21 @@ next :: foreach (t :: Term) -> foreach (l :: Label) -> foreach (v :: Term)
      -> decorate ('Next t) l v :~: 'Next (decorate t l v)
 next _ _ _ = Refl
 
+#ifdef CHECK_GUARD
+known :: foreach (v :: Term) -> decorate ('Atom 'Here) 'Here v :~: v
+known _ = Refl
+
+given :: foreach (x :: Label) -> foreach (l :: Label) -> foreach (v :: Term)
+      -> matches x l :~: 'True -> decorate ('Atom x) l v :~: v
+given _ _ _ Refl = Refl
+
+#ifdef WRONG_GUARD
+wrongGuard :: foreach (x :: Label) -> foreach (l :: Label) -> foreach (v :: Term)
+           -> matches l x :~: 'True -> decorate ('Atom x) l v :~: v
+wrongGuard _ _ _ Refl = Refl
+#endif
+#endif
+
 #ifdef UNKNOWN
 unknown :: foreach (x :: Label) -> foreach (v :: Term) -> decorate ('Atom x) x v :~: v
 unknown _ _ = Refl
@@ -59,23 +78,37 @@ main = do
         Right _ -> error "expected the guard to fail"
 HS
 
-for opt in -O0 -O2; do
-    base="$work/${opt#-}"
+check() {
+    local opt=$1 mode=$2
+    shift 2
+    local base="$work/${opt#-}-$mode"
     mkdir -p "$base/provider" "$base/client"
     cd "$base/provider"
     cp "$work/Worker.hs" .
-    "${ghc[@]}" "$opt" -fomit-interface-pragmas -c Worker.hs
+    "${ghc[@]}" "$opt" "$@" -fomit-interface-pragmas -c Worker.hs
     cp Worker.{hi,o} ../client/
     cd ../client
     cp "$work/Main.hs" .
-    "${ghc[@]}" "$opt" -c Main.hs
+    "${ghc[@]}" "$opt" "$@" -c Main.hs
     "${ghc[@]}" "$opt" Main.o Worker.o -o check
     ./check >actual
     printf 'Refl\nstrict guard\n' | cmp - actual
 
-    if "${ghc[@]}" "$opt" -DUNKNOWN -fforce-recomp -c Main.hs >unknown.log 2>&1 ||
+    if "${ghc[@]}" "$opt" "$@" -DUNKNOWN -fforce-recomp -c Main.hs >unknown.log 2>&1 ||
        ! grep -Fq 'error: [GHC-83865]' unknown.log; then
         cat unknown.log >&2
         exit 1
     fi
+    if [[ "$mode" == guarded ]]; then
+        if "${ghc[@]}" "$opt" "$@" -DWRONG_GUARD -fforce-recomp -c Main.hs >wrong.log 2>&1 ||
+           ! grep -Fq 'error: [GHC-05617]' wrong.log; then
+            cat wrong.log >&2
+            exit 1
+        fi
+    fi
+}
+
+for opt in -O0 -O2; do
+    check "$opt" independent
+    check "$opt" guarded -DCHECK_GUARD
 done

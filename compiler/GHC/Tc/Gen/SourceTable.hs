@@ -4494,6 +4494,7 @@ isPartialConstructorCaseTable table = isJust $ do
       pure con
 
 -- | Use only the existing checked predicate on two structural operands.
+-- See Note [Checked Boolean branches].
 checkedBranchPredicate :: Id -> Maybe TyCon
 checkedBranchPredicate callee = do
     guard (isFinalStructuralSource callee)
@@ -4524,6 +4525,7 @@ booleanSelector table = do
     pure select
 
 -- | Keep a Boolean scrutinee even when both branches have the same result.
+-- See Note [Checked Boolean branches].
 publishBooleanSelector :: Id -> Type -> TcM TyCon
 publishBooleanSelector owner result = do
     let term = idName owner
@@ -4562,12 +4564,15 @@ Match the successor even when its field and the carried arguments are open.
 Keep the recursive call under the constructor, on a proper field and with
 the same carried arguments. The call stays stuck if no published equation
 matches it. Omit an alternative that forces an extra operand or whose result
-cannot be checked. In particular, a computed guard does not supply an
-equation, even if both of its branches return the same value.
+cannot be checked. A computed guard supplies no independent equation,
+even if both branches return the same value.
 
 Publish the checked subset only with the exact term owner. Check the same
 rows against the final Core and use its usual rule checks in clients.
+-}
 
+{- Note [Checked Boolean branches]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 An ordinary case on a checked Boolean call can also retain both branches.
 Use the exact saturated predicate. All three expressions must pass the
 same scope, kind and recursion checks. Return the original case pattern
