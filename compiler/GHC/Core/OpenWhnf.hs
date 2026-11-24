@@ -17,7 +17,7 @@ import Control.Monad.Trans.Except (ExceptT, runExceptT, throwE, withExceptT)
 import Control.Monad.Trans.State.Strict (StateT, evalStateT, get, mapStateT, put)
 import GHC.Builtin.WiredIn.Types
   (charDataCon, mkPromotedPairTy, pairTyCon, tupleDataCon, unboxedUnitDataCon, unboxedUnitTy, unmatchableDataConTy)
-import GHC.Core.Coercion (Coercion, coercionLKind, coercionRKind, coercionType, mkNomReflCo)
+import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionType, isReflCo, mkNomReflCo)
 import GHC.Core.FamInstEnv (emptyFamInstEnvs, reduceTyFamApp_maybe)
 import GHC.Core.Coercion.Axiom (Role(Nominal))
 import GHC.Core.Reduction (Reduction(..), isReflRedn, mkFunRedn, mkReflRedn)
@@ -33,16 +33,19 @@ import GHC.Core.Opt.Arity (etaExpand)
 import GHC.Core.Subst (Subst, extendCvSubst, extendTvSubst, mkEmptySubst, substExpr, substTy)
 import GHC.Core.TyCo.Compare (eqType)
 import GHC.Core.TyCon (closedFamilyTyConCoAxiom_maybe, isBoxedDataTyCon)
-import GHC.Core.TyCo.Rep (scaledThing)
+import GHC.Core.TyCo.Rep
+  ( Coercion(..), MCoercion(MRefl), UnivCoProvenance(SubMultProv)
+  , UnivCoDeps(NoUnivCoDeps), scaledThing )
 import GHC.Core.Type
-  ( FunTyFlag(FTF_T_T), Kind, Type, isLiftedTypeKind, isManyTy, mkAppTy, mkTyConApp, mkTyVarTy
+  ( FunTyFlag(FTF_T_T), Kind, Type, isLiftedTypeKind, isManyTy, isOneTy
+  , mkAppTy, mkTyConApp, mkTyVarTy
   , repGetTyVar_maybe, splitFunTy_maybe, splitTyConApp_maybe, substTyWith, tyCoVarsOfType, typeKind )
 import GHC.Core.Utils (exprType, findAlt)
 import GHC.Types.Basic (Boxity(Boxed), IntWithInf, intGtLimit)
 import GHC.Types.Id (dataConWrapUnfolding_maybe, isDataConWorkId_maybe)
 import GHC.Types.Literal (Literal(LitChar))
 import GHC.Types.Tickish (GenTickish(Breakpoint))
-import GHC.Types.Var (Var, isCoVar, isId, isTyVar, varType)
+import GHC.Types.Var (Var, eqForAllVis, isCoVar, isId, isTyVar, varType)
 import GHC.Types.Var.Env (VarEnv, emptyVarEnv, extendVarEnv, extendVarEnvList, lookupVarEnv,
                           mkInScopeSet)
 import GHC.Types.Var.Set (VarSet, emptyVarSet, elemVarSet, unionVarSet)
@@ -264,7 +267,8 @@ evaluate local_families indexed limit obtain local record unsolved first_type (S
               | v `elemVarSet` unsolved -> pure (Neutral (Unsolved v))
               | otherwise -> pure (Neutral (Rigid v))
     Cast body co
-      | indexed, coercionLKind co `eqType` coercionRKind co ->
+      | indexed
+      , coercionLKind co `eqType` coercionRKind co || checkedMultiplicityCast co ->
           recurHead first_type (Suspension env body)
       | local_families
       , let lhs = openFamilyReduction (coercionLKind co)
@@ -380,6 +384,20 @@ evaluate local_families indexed limit obtain local record unsolved first_type (S
 
     matches field (Suspension _ body) =
       liftedBinder field && varType field `eqType` exprType body
+
+-- | Check a compiler-generated weakening of an otherwise unchanged arrow.
+-- See Note [Observing indexed constructor cases].
+checkedMultiplicityCast :: Coercion -> Bool
+checkedMultiplicityCast (SubCo co) = checkedMultiplicityCast co
+checkedMultiplicityCast ForAllCo{ fco_tcv = tv, fco_visL = left, fco_visR = right
+                                  , fco_ma = ma, fco_kind = MRefl, fco_body = body }
+  = isTyVar tv && eqForAllVis left right && isReflCo ma && checkedMultiplicityCast body
+checkedMultiplicityCast (UnivCo SubMultProv _ lhs rhs NoUnivCoDeps)
+  | Just (FTF_T_T, ma, mult, arg, res) <- splitFunTy_maybe lhs
+  , Just (FTF_T_T, ma', mult', arg', res') <- splitFunTy_maybe rhs
+  = isOneTy mult && isManyTy mult' &&
+    ma `eqType` ma' && arg `eqType` arg' && res `eqType` res'
+checkedMultiplicityCast _ = False
 
 -- | Instantiate only the checked existential and proof arguments of a selected branch.
 -- See Note [Observing indexed constructor cases].
@@ -500,6 +518,14 @@ When a worker builds a GADT constructor through its wrapper, use the
 wrapper unfolding reconstructed from the constructor interface. It is
 an implicit binding. Check the resulting worker through the same plan
 as the worker for a promoted operand.
+
+The retained simplifier can keep a SubMultProv coercion on a constructor
+used as a callback. For example, the substitution extension passes the
+successor of a typed lookup to renaming. Accept the compiler's weakening
+from One to Many when the argument and result types agree. Reflexive
+type binders and a downgrade from nominal to representational preserve
+this condition. The adaptation changes how often the caller can use
+the function. It does not change the observed application.
 -}
 
 -- | Recognize lifted, lazy constructor fields with the ordinary representation.
