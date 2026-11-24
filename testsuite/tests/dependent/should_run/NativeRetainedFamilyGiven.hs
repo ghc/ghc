@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, RankNTypes, TypeFamilies, TypeOperators #-}
 module NativeRetainedFamilyGiven where
 
-import Data.Type.Equality ((:~:)(Refl), gcastWith)
+import Data.Type.Equality ((:~:)(Refl), gcastWith, trans)
 
 #if defined(CLOSED_GIVEN) || defined(CLOSED_WRONG)
 type family Closed (b :: Bool) :: Bool where
@@ -74,6 +74,32 @@ eliminate Refl continuation = continuation
 
 checkWithLocal :: foreach (xs :: [Bool]) -> F xs :~: G xs -> W (F xs) :~: W (G xs)
 checkWithLocal _ proof = eliminate proof Refl
+
+compose :: foreach (xs :: [Bool])
+        -> (F xs :~: W (F xs))
+#ifdef COMPOSITION_WRONG
+        -> (F xs :~: F xs)
+#else
+        -> (F xs :~: G xs)
+#endif
+        -> (W (G xs) :~: G xs)
+        -> F xs :~: G xs
+compose _ left proof right =
+    trans (trans (id left) (eliminate (id proof) Refl)) (id right)
+
+#ifdef COMPOSITION_AMBIGUOUS
+unpicked :: foreach (xs :: [Bool]) -> F xs :~: G xs -> W (F xs) :~: W (G xs)
+unpicked _ proof =
+    trans (eliminate (id proof) Refl) (eliminate (id proof) Refl)
+#endif
+
+#ifdef COMPOSITION_OUTSIDE
+consume :: foreach (xs :: [Bool]) -> F xs :~: G xs -> ()
+consume _ proof = eliminate (id proof) ()
+
+escaped :: foreach (xs :: [Bool]) -> F xs :~: G xs -> W (F xs) :~: W (G xs)
+escaped xs proof = case consume xs proof of () -> Refl
+#endif
 
 #ifdef WRONG_CONTINUATION
 wrong :: foreach (xs :: [Bool]) -> foreach (ys :: [Bool])
