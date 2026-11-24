@@ -1,5 +1,6 @@
 module GHC.Tc.Gen.OpenTypeEval
   ( OpenTypeFailure(..)
+  , DefinitionFailure(MissingTemplate)
   , openTypeFailureReason
   , observeOpenType
   , instantiateOpenTypeFunction

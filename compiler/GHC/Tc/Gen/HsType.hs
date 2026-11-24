@@ -96,7 +96,8 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
-import GHC.Tc.Gen.OpenTypeEval (OpenTypeFailure(InvalidInput), instantiateOpenMethod,
+import GHC.Tc.Gen.OpenTypeEval (OpenTypeFailure(InvalidInput, UnavailableDefinition),
+                               DefinitionFailure(MissingTemplate), instantiateOpenMethod,
                                instantiateOpenTypeFunction, observeOpenType,
                                openTypeFailureReason, readOpenMethodWorker)
 import GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableFamilyUse, sourceTableTypeUses,
@@ -3547,6 +3548,8 @@ tcIndexedOpenTypeCall mode fun (tvs, domains, result) args = do
         observed <- tcObserveOpenTypeCall local True applied kind checked_operands
         case observed of
           Left InvalidInput -> return Nothing
+          Left (UnavailableDefinition owner MissingTemplate)
+            | owner == name, Just _ <- sourceTableId_maybe fun -> return Nothing
           Left reason -> reportOpenTypeFailure name reason
           Right ty -> return (Just (ty, kind))
 
@@ -3560,9 +3563,12 @@ a binary indexed function.
 Require a known constructor and a symbolic operand. The existing
 closed path still owns fully closed calls. If this observer cannot represent
 an operand, let the ordinary call planner check the original source
-operands. Report failures after observation here, including a case blocked
-on a symbolic term. Use the same staging, readback and
-definition tracking restrictions as the other open observer paths.
+operands. Use the ordinary planner also when the checked owner has a table
+but no Core unfolding for a call outside that table's rows. A missing
+unfolding for a helper stays an observer error. Report failures after
+observation here, including a case blocked on a symbolic term. Use the
+same staging, readback and definition tracking restrictions as the other
+open observer paths.
 See Note [Observing indexed constructor cases] in GHC.Core.OpenWhnf.
 -}
 
