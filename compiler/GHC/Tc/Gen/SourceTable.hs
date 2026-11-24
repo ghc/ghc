@@ -5866,7 +5866,8 @@ sourceMatches binding = do
 -- See Note [Local structural case equations].
 localStructuralTable :: HsBind GhcTc -> MaybeT TcM (Id, TyCon)
 localStructuralTable binding = do
-    (owner, signature, rows) <- checkedStructuralSource CLeft binding
+    (owner, signature, rows) <-
+      checkedStructuralSource CLeft binding <|> checkedStructuralSource CRight binding
     family <- lift (publishConstructorCase owner signature rows)
     pure (owner, family)
 
@@ -5950,11 +5951,13 @@ table on its ordinary final-Core path in that case. See
 Note [Checked cases on two structural sizes]. If the source table is already
 installed, keep that authority through final zonking and publication.
 
-Read the left-nullary clause first. Its right pattern is a variable or a
-wildcard. The next two clauses match the left recursive constructor and
-split on the right constructor. These rows are complete and disjoint.
-Each recursive call uses the actual predecessor binder from each column.
-Require a lazy constructor around a recursive call.
+Read the nullary clause on the first scrutinized operand. Its other
+pattern is a variable or a wildcard. The next two clauses match the
+recursive constructor and split on the other operand. These rows are
+complete and disjoint. Each recursive call uses the actual predecessor
+binder from each column. A left-first table requires a lazy constructor
+around the recursive call. A right-first table can return the recursive
+call directly, as in truncated subtraction.
 
 Strict adds an implicit bang to a variable pattern. Skip this checker
 under Strict. Read only plain constructor fields, variables, and

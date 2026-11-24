@@ -2663,6 +2663,7 @@ localSourceTableBinders binds sigs =
         , all (constructor_row n False) rows ||
           (any matches_second rows && all (constructor_row n True) rows) ||
           all (right_constructor_row n) rows ||
+          right_structural_rows n rows ||
           all (mapping_row n) rows ||
           all pair_swap_row rows ]
   where
@@ -2694,6 +2695,19 @@ localSourceTableBinders binds sigs =
       , GRHSs _ (L _ (GRHS _ [] rhs) :| []) (L _ EmptyLocalBinds{}) <- rhss
       = row_result self [carried] (collectPatsBinders CollNoDictBinders fields) [] rhs
     right_constructor_row _ _ = False
+
+    -- The first row of a right-first split carries its left operand.
+    -- The remaining rows inspect both operands. See Note [Local structural
+    -- case equations] in GHC.Tc.Gen.SourceTable.
+    right_structural_rows self rows@[base, next, recur]
+      | Just [(Nothing, Just []), (Just [], Just [_]), (Just [_], Just [_])]
+          <- traverse constructor_columns rows
+      = right_constructor_row self base && all (constructor_row self True) [next, recur]
+    right_structural_rows _ _ = False
+
+    constructor_columns (L _ Match{m_pats = L _ [left, right]}) =
+      Just (constructor_fields (unparen left), constructor_fields (unparen right))
+    constructor_columns _ = Nothing
 
     mapping_row :: Name -> LMatch GhcPs (LHsExpr GhcPs) -> Bool
     mapping_row self (L _ Match{m_pats = L _ [callback, pat], m_grhss = rhss})
