@@ -45,6 +45,24 @@ candidates. The [shared notebook](../../PLFH-NOTES.md) records the original
 reports and the author's verification.
 The earlier paths and queue IDs below are historical records.
 
+### Build storage on the shared host
+
+The 24 November retirement removed 201.11 GB of old experiment paths.
+Including the retained compiler and the new recovery files, the top-level
+`_build` fell from 201.62 GB to 11.00 GB. The current compiler and test
+receipts use about 4.41 GB. The source and receipt archives use 5.88 GB.
+About 0.72 GB remains in registered worktree areas and their Git object
+providers. All 24 worktrees can report Git status. Eleven show local changes.
+
+Use `_build/retirement-20261124/README.md` to recover a local input by
+path. The archives omit old native binaries and interfaces. Use the source
+revisions in the branch to rebuild them when needed. The published book
+runner now selects `_build/current` automatically. It passed 78 checks
+with the new default in job 3314. After the old trees were removed, job
+3315 passed the registered checked-closure and vector-facade scripts and
+ran GHCi with the retained compiler.
+
+
 <details>
 <summary>Membership, parallel reduction and bytecode results through batch 29</summary>
 
