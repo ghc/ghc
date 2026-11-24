@@ -72,7 +72,7 @@ import GHC.Rename.Env ( irrefutableConLikeTc )
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCon
-import GHC.Core ( Expr(Var, App, Type), exprToNativeIndex )
+import GHC.Core ( Expr(Var, App, Type), exprToNativeIndex, isNativeIndexedGadtCon )
 import GHC.Core.TyCo.Rep ( Type(DepFunTy, ExistsTy, ForAllTy, FunTy, ft_af, TermVarTy, TyConApp) )
 import GHC.Core.Subst ( extendIdSubstWithClone )
 import qualified GHC.Core.TyCo.Subst as Subst
@@ -347,6 +347,28 @@ tcRetainedMatches :: ExpectedFunTyCtxt -> UserTypeCtxt -> HsMatchContextRn
                   -> MatchGroup GhcRn (LHsExpr GhcRn)
                   -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
 tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
+  | arity == 1
+  , DepFunTy DepFunVisible binder _ <- coreFullView ty
+  , not (isNativeIndexId binder)
+  , Just (tc, _) <- splitTyConApp_maybe (coreFullView (varType binder))
+  , let constructors = tyConDataCons tc
+  , any isNativeIndexedGadtCon constructors
+  , let names = mkNameSet (map dataConName constructors)
+  , L loc rows@(_ : _) <- mg_alts matches
+  , Just alternatives <- traverse (indexed_row names) rows
+  = do { name <- newSysName (getOccName binder)
+       ; let pat = L loc (VarPat noExtField (noLocA name))
+             scrutinee = L loc (HsVar noExtField (noLocA (noUserRdr name)))
+             outer = mkSimpleMatch (LamAlt LamSingle) (L loc [pat]) scrutinee
+             check_case _ result = do
+               index <- tcLookupId name
+               tcEmitBindingUsage (singleUsageUE index)
+               cases <- tcIndexedCaseMatches index CaseAlt (Scaled ManyTy (varType index))
+                          (matches { mg_alts = L loc alternatives }) result
+               return (L loc (HsCase CaseAlt (nlHsVar index) cases))
+       ; tcRetainedVarMatches herald ctxt ty [pat] $ \pat_tys rhs_ty _ _ ->
+           tcMatches mctxt check_case (invis_pat_tys ++ pat_tys) rhs_ty
+             (matches { mg_alts = L loc [outer] }) }
   | DepFunTy DepFunVisible callback _ <- coreFullView ty
   , isNativeIndexFunctionId callback
   , [first_source, second_source] <- constructor_columns
@@ -381,6 +403,16 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
         | otherwise -> failWithTc $
             TcRnRetainedQuantificationError RetainedConstructorCoverage
   where
+    -- See Note [Equations over an indexed retained argument].
+    indexed_row names (L loc row@Match { m_ctxt = FunRhs{}, m_pats = L pats_loc [source] })
+      | pat@(L _ ConPat { pat_con = L _ con, pat_args = PrefixCon{} }) <- unparen source
+      , unwrapUserRdr con `elemNameSet` names
+      = Just (L loc (row { m_pats = L pats_loc [pat] }))
+    indexed_row _ _ = Nothing
+
+    unparen (L _ (ParPat _ pat)) = unparen pat
+    unparen pat = pat
+
     function_pattern_error = failWithTc $ TcRnRetainedQuantificationError RetainedFunctionPatterns
 
     constructor_columns =
@@ -425,6 +457,22 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
     constructor_pat (L _ (ParPat _ pat)) = constructor_pat pat
     constructor_pat pat | ConPat{} <- unLoc (retainedConPat pat) = True
     constructor_pat _ = False
+
+{- Note [Equations over an indexed retained argument]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An equation such as checkEq (Lam _) = YesVal VLam matches a retained
+argument with an indexed GADT domain. Use one runtime variable for the
+argument and check the equations as a case on that variable. The indexed
+case checker uses each branch's actual GADT evidence and fields to refine
+the result. Keep the source equations as the context for errors.
+
+Use this path for one argument with real prefix constructors from its
+datatype. Keep the original branch order and their guards. The case
+forces the argument at the same point as the patterns in the equations.
+The outer variable pattern and the erased binders use the existing
+retained match checker. Ordinary algebraic indices and several retained
+columns use their existing match rules.
+-}
 
 {- Note [Checked retained lambdas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
