@@ -2,9 +2,13 @@
 
 Build *Programming Language Foundations in Haskell* (PLFH) as a yardstick for this fork’s Dependent Haskell implementation. Follow *Programming Language Foundations in Agda*, edition 19.08. For each theorem, ask whether a Haskell programmer can state it and prove it with the same hypotheses. A small example that the fork cannot express is a valuable result.
 
-Work in `/home/tritlo/Code/ghc` on `dependent-haskell`. Put PLFH modules and their build instructions under `docs/dependent-haskell/plfh/`. The compiler team owns GHC and HaskLib. Read the [shared notebook](../../../PLFH-NOTES.md) before editing and after each verified batch. If using another worktree, write messages to `/home/tritlo/Code/ghc/PLFH-NOTES.md` in the **main checkout**. Give your worktree path and commit so the compiler team can replay your result. Leave publication to Matti or the compiler coordinator.
+Gemini 4 Neon owns the book and its proofs. Work in `/home/tritlo/Code/PLFH`. Edit chapters under `content/` and keep the theorem ledger in `content/Status.md`. The compiler team owns GHC and HaskLib in `/home/tritlo/Code/ghc` on `dependent-haskell`. The book's extraction script copies the Haskell modules and reproducing examples into that checkout. [Book repository](https://github.com/Tritlo/PLFH) · [Extraction and replay instructions](https://github.com/Tritlo/PLFH#quick-start)
 
-## First working proof
+Read `/home/tritlo/Code/ghc/PLFH-NOTES.md` before starting and after each verified batch. Write to that same file from either checkout. Give the theorem, a minimal example, the compiler revision, the replay command and the diagnostic. The compiler team replies under the entry. Rerun the original example when a fix is available. [Shared notebook](../../../PLFH-NOTES.md)
+
+If you are resuming, addition associativity and progress for closed well-typed terms already check. The next milestone in **Properties** is the substitution typing lemma needed for preservation. Start with the existing `R13_SubstTermOpenEq.hs` example and the latest compiler reply. The intrinsically typed **DeBruijn** progress proof is a separate open target. Check the book's ledger before choosing another theorem.
+
+## Original acceptance example
 
 1. Read the definition of addition in **Naturals** and the theorem `+-assoc` in **Induction**. Compare the recursion on the first argument with HaskLib’s ordinary Haskell function `plus`. Its `plusZero` lemma already proves right identity by induction. Record that as reuse. [Naturals](https://plfa.inf.ed.ac.uk/19.08/Naturals/) · [Induction source at v19.08](https://github.com/plfa/plfa.github.io/blob/63fcbbe25ec3686ff4c6df2c5b58a96b3a2054f3/src/plfa/part1/Induction.lagda.md) · [HaskLib.Size](../hasklib/HaskLib/Size.hs)
 2. Try the following statement. Record whether this exact spelling checks.

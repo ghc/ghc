@@ -35,19 +35,53 @@ The next R17 candidate is `1a02a866e7` at
 two schema transformers before the caller supplied any rows. Job 2074
 checked the closed cell schema with `NoUndecidableInstances`. Its
 ordinary interface-only client printed `((),Right 42)` at `-O0` and
-`-O2`. Job 2080 follows job 2027 to build both stages and run all 590 Showcase observations, the fusion checks and the
-compatibility suite. Its source is in
+`-O2`. Job 2080 built both stages at `1a02a866e7`. Its remaining
+checks include all 590 Showcase observations, fusion and compatibility.
+Its source is in
 `_build/on-demand/r17-schema-transformer-post-588-20261124/source`.
 
-The next proof-inference change is `c21ecc47ff` at
-`refs/spikes/plfh-typed-congruence-591`. Job 2160 compiled the original
-PLFH addition rearrangement at both optimization levels after the checker
-used the kinds fixed by the visible callback argument. The old compiler
-rejected the same source with GHC-83865. The separate `withEquality`
-under `trans` reproducer still fails. Job 2174 checked the new HaskLib
-`cong` from its source distribution, its installed clients and the
-diagnostic for two different retained indices in an expression annotation.
-The components passed these checks. This change awaits a normal build.
+The next combined compiler is `984647892b`. Job 2209 follows job 2080.
+It builds both stages and checks 594 Showcase observations, 24 selected
+test registrations, package clients, compatibility tests and upgrade tests.
+The inputs are in `_build/on-demand/r03-plfh-after-590-20261124`.
+Git retains the source at `refs/spikes/plfh-proof-sums-594`.
+
+Jobs 2196 and 2213 reproduced the first 21 PLFH examples on the
+published compiler at both optimization levels. They include two compiler
+panics. Five examples pass on the components in job 2209. They cover
+congruence under partial addition, `withEquality` inside `trans`, direct
+substitution in the parity proof, an inline dependent sum and the
+polymorphic `lengthReverseLaw = lengthReverse` alias. Job 2206 accepted
+the unchanged alias and rejected the wrong length at `lengthReverse`.
+The [PLFH replay](../../PLFH-NOTES.md#compiler-reply--inference-and-the-revised-21-examples)
+lists the original results. Roadmap card counts stay the same.
+
+The next two component fixes are in `270196132d` at
+`refs/spikes/plfh-source-callbacks-596`. Job 2219 checked HaskLib's
+Boolean size comparison and its reflexivity proof from an ordinary client.
+Jobs 2216 and 2218 checked a same-module callback stored with its proof
+and the optimizer regression in the earlier candidate. Job 2227 combined
+the compiler modules for both changes. At both optimization levels an
+ordinary client read the two results through compiled interfaces. The
+596-example source awaits a full build.
+
+PLFH subsequently added a failed Core Lint check for the Bisimulation
+value proof and a rejected GADT-indexed environment lookup. Job 2217
+reported 21 checked modules, three rejected negative controls and 23
+compiler reproducers on the published compiler. The [edition and proof
+scope](../../PLFH-NOTES.md#compiler-reply--edition-chapter-coverage-and-the-isosize-correction)
+explains which chapters and theorems those figures cover.
+
+The combined component at `d033d0132d` includes the fix for the
+Bisimulation value proof and support for structural recursion with
+additional ordinary arguments. Job 2235 tested the 23 reports against
+fresh interfaces at `-O0` and `-O2`. All eight fixed examples passed.
+The fifteen open examples matched their recorded diagnostics. Job 2236
+replayed all 23 failures on normal 590. Job 2239 checked the general
+`simValue` declaration from the book itself and ran a separately compiled
+client. The [PLFH results](../../PLFH-NOTES.md#compiler-reply--the-bisimulation-chapters-general-value-proof)
+include the scope of the comparison. The private source and receipts
+are in `_build/on-demand/plfh-bisimulation-carry-post596-20261124`.
 
 | Area | Verified result and next step |
 | --- | --- |
