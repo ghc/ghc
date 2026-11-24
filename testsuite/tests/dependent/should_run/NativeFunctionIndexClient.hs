@@ -1,9 +1,10 @@
-{-# LANGUAGE NoExperimentalDependentTypes #-}
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}
 module Main where
 
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Data.IORef (newIORef, readIORef)
 import Data.List (isInfixOf)
+import Data.Type.Equality ((:~:)(Refl))
 import qualified FunctionFieldClient as Client
 import qualified FunctionFieldLibrary as Library
 
@@ -24,6 +25,11 @@ main = do
     print (Client.proofOnly (Library.build (const True) unread))
     demands "index function" (Client.proofOnly (Library.build throw yes))
     demands "index argument" (Client.proofOnly (Library.build invert unread))
+    case Library.checkedEndo of
+        Library.CheckedEndo f law ->
+            case law yes of
+                Refl | f yes -> pure ()
+                _ -> fail "checked callback changed its argument"
 
 demands :: String -> Bool -> IO ()
 demands marker value = do

@@ -58,7 +58,7 @@ import GHC.Core.Seq         ( seqBinds )
 import GHC.Core.Opt.Arity   ( exprArity, typeArity, exprBotStrictness_maybe )
 import GHC.Core.InstEnv
 import GHC.Core.Type
-import GHC.Core.TyCo.Rep ( Type(DepDictTy, DepFunTy) )
+import GHC.Core.TyCo.Rep ( Type(DepDictTy, DepFunTy, TyConApp) )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Tidy
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
@@ -1414,6 +1414,14 @@ localiseNativeTopIndices name_cache binds = mapM localise_bind binds
       , Var dict <- arg
       , isNativeClassDictionaryId dict
       = App <$> protect_calls fun <*> (unitVarSet dict, arg)
+      | DepFunTy _ binder _ <- coreFullView (exprType fun)
+      , isNativeIndexFunctionId binder
+      , Just index@(TyConApp family _) <- nativeIndexFunctionArgIndex arg
+      , (Var callback, args) <- collectArgs arg
+      , Just owner <- lookupVarSet top_binders callback
+      , sourceTableId_maybe owner == Just family
+      = App <$> protect_calls fun
+            <*> (tyCoVarsOfType index, mkApps (Var (globaliseId owner)) args)
       | DepFunTy{} <- coreFullView (exprType fun)
       , Just index <- retainedArgIndex arg
       = let arg' | not (isEmptyVarSet top_tables), Just{} <- nativeComputedIndex arg
@@ -1477,6 +1485,11 @@ flipBit as a first-class function or use it in a strict case with TermAppTy
 evidence. Those occurrences
 and their types still receive the local alias. See Note [Source calls in
 retained arguments] in GHC.Core.
+
+A retained function argument can pass a checked source function before its
+value argument. Protect that occurrence when its index is the checked
+source family. Later arguments can mention that family in their types.
+A local alias would give the callback a different index from those types.
 
 The top binder and its type do not change. A selected index must not escape
 through that type. Source signature and inference checks already exclude

@@ -1,7 +1,7 @@
 module Main where
 
 import Control.Exception (ErrorCall(..), evaluate, try)
-import Client (checkAppendSingleton, checkNat, checkReverse, checkZipMap, zipLaw)
+import Client (addUnder, checkAppendSingleton, checkNat, checkReverse, checkZipMap, zipLaw)
 import HaskLib
 
 -- | Use the installed list proofs from an ordinary Haskell function.
@@ -28,6 +28,7 @@ main = do
         tailBound = error "forced the bound beyond the list"
     if check not bad [True, False] [False]
         && check not bad [] (error "forced right list")
+        && (case addUnder Zero (Succ Zero) Zero of Refl -> True)
         && checkAppendSingleton [] element
         && checkAppendSingleton [element, element] element
         && checkReverse []

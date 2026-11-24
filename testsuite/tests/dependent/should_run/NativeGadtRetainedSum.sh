@@ -296,8 +296,8 @@ HS
         fi
         case $which in
             HIDDEN_KIND)
-                expected='BadScope.hs:7:46-86: error:'
-                grep -Fq 'A retained dependent sum is supported' reject.log || { cat reject.log >&2; exit 1; }
+                expected='BadScope.hs:7:46-86: error: \[GHC-83605\]'
+                grep -Fq 'GHC cannot check a retained dependent sum in this position.' reject.log || { cat reject.log >&2; exit 1; }
                 ;;
             RESULT_SCOPE) expected='BadScope.hs:13:26: error: \[GHC-76037\]' ;;
             UNMATCHED_ERASED) expected='BadScope.hs:16:[0-9]+(-[0-9]+)?: error: \[GHC-83605\]' ;;

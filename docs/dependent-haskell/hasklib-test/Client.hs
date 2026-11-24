@@ -1,7 +1,7 @@
 {-# LANGUAGE GHC2024, ExplicitNamespaces, ExperimentalDependentTypes #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 
-module Client (zipLaw, lengthAppendSingleton, checkAppendSingleton, checkReverse, zipMapLaw, checkZipMap, checkNat) where
+module Client (zipLaw, addUnder, lengthAppendSingleton, checkAppendSingleton, checkReverse, zipMapLaw, checkZipMap, checkNat) where
 
 import qualified HaskLib as H
 import HaskLib.Nat (type (+))
@@ -18,16 +18,20 @@ lengthAppendSingleton :: forall a. foreach (xs :: [a]) -> foreach (x :: a)
 lengthAppendSingleton xs x =
     H.lengthAppend xs [x]
         `H.trans` H.plusSucc (H.size xs) H.Zero
-        `H.trans` H.congSucc (H.plusZero (H.size xs))
+        `H.trans` H.cong @'H.Succ (H.plusZero (H.size xs))
 
 -- | Check the proof without inspecting any list elements.
 checkAppendSingleton :: [Bool] -> Bool -> Bool
 checkAppendSingleton xs x = case lengthAppendSingleton xs x of
     H.Refl -> True
 
+-- | Give the imported reverse law the same polymorphic signature.
+reverseLaw :: forall a. foreach (xs :: [a]) -> H.size (reverse xs) H.:~: H.size xs
+reverseLaw = H.lengthReverse
+
 -- | Check a reverse proof from an ordinary caller.
 checkReverse :: [Bool] -> Bool
-checkReverse xs = case H.lengthReverse xs of
+checkReverse xs = case reverseLaw xs of
     H.Refl -> True
 
 -- | Compose two library proofs. The map proof visits the entire left spine.
@@ -67,3 +71,9 @@ checkNat = case twoPlusThree of
     value :: N.Nat -> Int
     value N.Zero = 0
     value (N.Succ n) = 1 + value n
+
+-- | Move a successor through an inner addition under a fixed left operand.
+addUnder :: foreach (m :: H.Nat) -> foreach (n :: H.Nat) -> foreach (p :: H.Nat)
+         -> H.plus m (H.plus n ('H.Succ p)) H.:~: H.plus m ('H.Succ (H.plus n p))
+addUnder m n p =
+    H.cong @(H.plus m) (H.plusSucc n p :: H.plus n ('H.Succ p) H.:~: 'H.Succ (H.plus n p))

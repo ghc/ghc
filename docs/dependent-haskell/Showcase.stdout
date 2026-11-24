@@ -162,6 +162,7 @@ computed forall kind supports reflection: True
 function value in an algebraic index: 2
 family-exposed call uses imported proof: 1
 proof retains the stored function identity: True
+apply a stored callback with its identity proof: (False,False)
 algebraic function container stays lazy: 42
 algebraic function leaf stays lazy: 1
 generic Boolean list: [True,False]
@@ -290,6 +291,7 @@ read a supplied field when its sibling is omitted: [True]
 replace a named field at the original stored length: (1,[('x',False)])
 reset both columns at their stored length: (1,[('-',False)])
 replace the stored length and both named payloads: (0,[])
+read parameterized columns at their own stored lengths: ("x",[True,False])
 copy flags after comparing two stored lengths: (Just [('x',False)],Nothing)
 put two columns in a row indexed by the record length: ("rs",[True,False])
 project the length of a known dependent package in a type: Refl
@@ -480,6 +482,7 @@ give every field in a row the same error type: (Right 'x',Right True)
 map row cells with a lambda in a local signature: (Right 'x',Right True)
 tag a row cell with a local type lambda that infers the capture kind: True
 splice a column schema and attach a caller-supplied label: (Right 42,Left "missing flag",("column",True))
+splice the validated count from a typed expression quote: Right 42
 read two named sensors with a missing slot: (21,(),54)
 pass a row schema as a visible type argument: (Right 42,Left LT)
 splice a two-binder row schema into a visible type argument: (Right 42,Left "missing flag")
@@ -546,6 +549,10 @@ prove the checked and literal Either family branches: (Refl,Refl)
 prove that folding a mapped list composes the step: (Refl,(True,True),(True,True))
 prove that reverse preserves list length: (Refl,Succ (Succ Zero))
 pass size as a callback and check the reversed list length: Succ (Succ Zero)
+apply the same partially applied addition to equal sizes: Refl
+compare a runtime size with itself: (True,Refl)
+transport evidence for three leaves across related trees: True
+read the sum with its equality proof: Succ (Succ Zero)
 take a runtime-bounded prefix and prove its length: ([True],Refl)
 prove that map distributes over append: (Refl,[False,True,False],[False,True,False],(True,True))
 prove that two maps compose on a finite list: (Refl,[4,5],[4,5],(True,True),(True,True))

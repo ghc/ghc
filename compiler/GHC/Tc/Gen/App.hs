@@ -64,7 +64,7 @@ import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Utils ( applyTypeToArgs, exprType, isVacuousRetainedBinder )
 import GHC.Core.FVs ( exprFreeVarsList )
 import GHC.Core.InstEnv ( lookupUniqueInstEnv, instanceDFunId )
-import GHC.Core.Predicate ( classMethodInstTy )
+import GHC.Core.Predicate ( classMethodInstTy, getEqPredTys_maybe )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
@@ -102,6 +102,7 @@ import GHC.Data.FastString
 import Language.Haskell.Syntax.Text ( unpackHText )
 
 import GHC.Utils.Misc
+import GHC.Utils.Monad ( anyM, orM )
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 
@@ -1799,10 +1800,11 @@ Compute one capability for the application. Enable it when the source flag is
 set, when the zonked head or an available expected type contains native syntax,
 or when tcRetainedInferableArg finds a declared native value anchor. A record
 selector with a retained receiver is such an anchor. The renamer gives it a
-separate expression form. This selection only reads existing types. It does
-not infer arguments, instantiate a signature, record occurrences or usage, or
-expand source syntax. Read an available expected type without allocating an
-inference cell.
+separate expression form. A generated selector can quantify the datatype
+parameters before taking its retained receiver. This selection reads only
+existing types. It does not infer arguments, instantiate a signature, record
+occurrences or usage, or expand source syntax. Read an available expected type
+without allocating an inference cell.
 
 Pass the capability to the existing application helpers and evidence capture.
 Keep their Quick Look modes, complete immutable choices, scope checks, typed
@@ -1951,11 +1953,54 @@ tcRetainedKnownValuePlan declared expected sigma values
   = case coreFullView tau of
       DepFunTy DepFunInvisible binder body ->
         fmap (fmap snd) (tcInferInvisibleRetained tvs binder body values)
-      _ -> choose_erased scoped_preds tvs theta tau values (retainedDeclaredDomains (length values) tau)
+      _ -> choose_erased scoped_preds tvs theta tau (retainedDeclaredDomains (length values) tau)
   where
-    choose_erased scoped_preds tvs theta tau values (domains, result, masked)
+    choose_erased scoped_preds tvs theta tau shape@(domains, result, _)
       = do { pairs <- fmap catMaybes $ mapM (declared_arg tvs) (zip domains values)
-         ; let actuals = map snd pairs
+           ; exact <- choose pairs expected
+           ; case exact of
+               Nothing
+                 | null scoped_preds, null theta
+                 , isTauTy tau
+                 , domains `equalLength` values
+                 , Just (_, result_ty) <- result, not (isFunTy result_ty)
+                 , all (maybe False (not . fst)) domains
+                 , any (hasNativeDependentExpr . Core.Type . snd) pairs
+                 -> do { givens <- getNativeGivens
+                       ; firstJustsM (map (retry_with_given pairs) givens) }
+               _ -> return exact }
+      where
+        choose = select_erased scoped_preds tvs theta tau shape
+
+        -- See Note [Nominal branch equalities in declared argument inference].
+        retry_with_given pairs given
+          | isCoVar given
+          = do { given <- liftZonkM (zonkId given)
+               ; case getEqPredTys_maybe (varType given) of
+                   Just (Nominal, lhs@(TermVarTy from), rhs@(TermVarTy to))
+                     | from /= to, isNativeIndexId from, isNativeIndexId to
+                     , typeKind lhs `eqType` typeKind rhs
+                     , any (mentions from) (map snd pairs ++ maybeToList expected)
+                     -> do { valid <- tcRetainedInstScope [lhs, rhs]
+                           ; if not valid then return Nothing else do
+                           { name <- newSysName (mkTyVarOcc "retained_argument")
+                           ; let template = mkTyVar name (typeKind lhs)
+                                 view ty
+                                   | mentions from ty =
+                                       substTyWith [template] [rhs]
+                                         <$> abstractNativeIndices [(lhs, template)] ty
+                                   | otherwise = Just ty
+                           ; case (traverse (traverse view) pairs, traverse view expected) of
+                               (Just pairs', Just expected') -> choose pairs' expected'
+                               _ -> return Nothing } }
+                   _ -> return Nothing }
+          | otherwise = return Nothing
+
+        mentions v = anyFreeVarsOfType (== v)
+
+    select_erased scoped_preds tvs theta tau (domains, result, masked) pairs expected
+      = do
+         { let actuals = map snd pairs
                seed | length domains == length values
                     , Just (bound, result_ty) <- result
                     , Just rho <- expected
@@ -2646,6 +2691,27 @@ Use the ordinary nominal injective variable analysis and treat user type
 families as opaque. A capture under an unannotated family Hide is still
 ambiguous. This selects type applications; final subsumption and the
 ordinary field checks must still succeed.
+-}
+
+{- Note [Nominal branch equalities in declared argument inference]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In `case proof of Refl -> App lArr m`, the declarations can give
+`lArr :: Term g ('TArr a b)` and `m :: Term g a'`. The immutable selector
+matches the repeated parameter syntactically. Its ordinary fallback
+cannot assign a type metavariable to either retained index.
+
+If exact selection fails for a saturated ordinary call, try a view from a
+lexical nominal equality between two runtime indices. Replace its left
+endpoint with the right endpoint in each declared actual and the expected
+result. Use the existing scoped index abstraction. Retry with one actual
+Given at a time. Require the same complete, scoped choices and exact
+matching in that view.
+
+The view selects type applications only. The original argument types, the
+expected result and the evidence checks stay in the ordinary application
+checker. It must still prove the conversion at each use. In particular an
+unrelated Refl cannot justify the other operand, and an absent declaration
+does not acquire a type from the view. No type metavariable is filled.
 -}
 
 {- Note [Declared retained-domain choices]
@@ -3706,6 +3772,12 @@ tcInstFunWithExpected = tcInstFunWithExpectedCache Nothing
 
 {- Note [Native inference after visible type applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A visible type argument can fix the kinds of the remaining binders. In
+cong @(plus m) proof, for example, the callback fixes its domain and
+codomain to Size. Zonk the remaining telescope before selecting erased
+arguments from the proof. Apply the choices to that same telescope so
+the binder-kind check sees the assignments made by the type argument.
+
 ITYARG checks each written type argument once. After leading type arguments,
 use the substituted signature to infer native arguments before IALL
 allocates the remaining type variables. Keep the original head and checked
@@ -3865,17 +3937,19 @@ tcInstFunWithPrefix look_arg prefix_only prefix vta_cache expected_rho inst_plan
                             ; case attempted of
                                 Just _ -> return Nothing
                                 Nothing -> do
-                                  { (_, _, cache, choices) <-
+                                  { residual <- liftZonkM (zonkTcType fun_ty)
+                                  ; (_, _, cache, choices) <-
                                       tcRetainedArgInstEnabled (Just (count written_type_arg acc))
                                         do_ql expected_rho
-                                        rn_head args tc_fun fun_ty
+                                        rn_head args tc_fun residual
                                   ; writeTcRef ref (Just cache)
-                                  ; return choices } }
+                                  ; return ((, residual) <$> choices) } }
                     _ -> return Nothing
-                ; choices <- case inferred of
-                    Just _ -> return inferred
-                    Nothing -> tcRetainedPartialResultPlan do_ql expected_rho args tc_fun fun_ty
-                ; go1 choices fun_orig pos acc fun_ty args } }
+                ; case inferred of
+                    Just (choices, residual) -> go1 (Just choices) fun_orig pos acc residual args
+                    Nothing -> do
+                      { choices <- tcRetainedPartialResultPlan do_ql expected_rho args tc_fun fun_ty
+                      ; go1 choices fun_orig pos acc fun_ty args } } }
 
     is_type_arg ETypeArg{} = True
     is_type_arg _ = False
@@ -6155,7 +6229,9 @@ tcRetainedInferableArg (L _ expr)
       XExpr (HsRecSelRn (FieldOcc _ (L _ name)))
         -> do { mb_id <- tcLookupIdMaybe name
               ; return $ case mb_id of
-                  Just sel | DepFunTy DepFunVisible _ _ <- coreFullView (varType sel)
+                  Just sel
+                    | (_, body) <- tcSplitForAllInvisTyVars (varType sel)
+                    , DepFunTy DepFunVisible _ _ <- coreFullView body
                     -> (True, True)
                   _ -> (False, False) }
       HsApp _ fun arg -> application fun [arg]
@@ -6529,7 +6605,7 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
           | [first_arg, _] <- value_args
           , hasNoConcreteTyVars fun
           , maybe False isTauTy expected
-          , is_nominal_continuation domains result
+          , isNominalEqualityContinuation domains result
           = Just first_arg
           | otherwise = Nothing
         equality_continuation = isJust equality_first_arg
@@ -6673,16 +6749,6 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
                            else return (fun, sigma, cache, Nothing) }
                  _ -> return (fun, sigma, cache, Nothing) } }
   where
-    -- See Note [Checking a nominal equality continuation].
-    is_nominal_continuation [Scaled _ first_arg, Scaled _ continuation] result
-      | isTauTy first_arg
-      , FunTy { ft_af = af, ft_arg = pred_ty, ft_res = body } <- coreFullView continuation
-      , isInvisibleFunArg af
-      , Just (tc, _) <- splitTyConApp_maybe pred_ty
-      , tc `hasKey` eqTyConKey
-      = isTauTy body && eqType body result
-    is_nominal_continuation _ _ = False
-
     is_type_arg ETypeArg{} = True
     is_type_arg _ = False
 
@@ -6744,15 +6810,56 @@ tcRetainedArgInstCached after_vta NoQL expected rn_head args fun sigma
     infer_args tvs (inferable : rest) (domain : domains) pos
                (EValArg { ea_arg = arg } : args)
       = do { entry <- if inferable && any (`elemVarSet` tyCoVarsOfType (scaledThing domain)) tvs
-                      then addArgCtxt (pos + fromMaybe 0 after_vta) rn_head arg $
-                           do { (usage, (typed, actual)) <- tcCollectingUsage (tcInferRho arg)
-                              ; return [(pos, (typed, actual, usage))] }
+                      then do { defer <- case expected of
+                                   Just _  -> tcRetainedNeedsExpected arg
+                                   Nothing -> return False
+                              ; if defer then return [] else
+                                  addArgCtxt (pos + fromMaybe 0 after_vta) rn_head arg $
+                                  do { (usage, (typed, actual)) <- tcCollectingUsage (tcInferRho arg)
+                                     ; return [(pos, (typed, actual, usage))] } }
                       else return []
            ; entries <- infer_args tvs rest domains (pos+1) args
            ; return (entry ++ entries) }
     infer_args tvs inferable domains pos (_ : args)
       = infer_args tvs inferable domains pos args
 tcRetainedArgInstCached _ _ _ _ _ fun sigma = return (fun, sigma, [], Nothing)
+
+-- | Recognize a function whose result comes from a nominal equality continuation.
+isNominalEqualityContinuation :: [Scaled Type] -> Type -> Bool
+isNominalEqualityContinuation [Scaled _ first_arg, Scaled _ continuation] result
+  | isTauTy first_arg
+  , FunTy { ft_af = af, ft_arg = pred_ty, ft_res = body } <- coreFullView continuation
+  , isInvisibleFunArg af
+  , Just (tc, _) <- splitTyConApp_maybe pred_ty
+  , tc `hasKey` eqTyConKey
+  = isTauTy body && eqType body result
+isNominalEqualityContinuation _ _ = False
+
+-- | Find a retained equality continuation that needs its result type.
+-- See Note [Checking a nominal equality continuation].
+tcRetainedNeedsExpected :: LHsExpr GhcRn -> TcM Bool
+tcRetainedNeedsExpected = check []
+  where
+    check args (L _ (HsApp _ fun arg)) = check (arg : args) fun
+    check args (L _ (OpApp _ lhs op rhs)) = check (lhs : rhs : args) op
+    check args (L _ (HsPar _ expr)) = check args expr
+    check args (L _ (HsPragE _ _ expr)) = check args expr
+    check args (L _ (XExpr (ExpandedThingRn (HSE { hse_exp = expr })))) = check args expr
+    check args (L _ (HsVar _ lname))
+      | [proof, _] <- args
+      , let name = unLocWithUserRdr lname
+      , not (isDataOcc (nameOccName name))
+      = do { found <- tcLookupIdMaybe name
+           ; case found of
+               Just ident
+                 | (_, _, tau) <- tcRetainedInstTelescope (idType ident)
+                 , (_, domains, result) <- splitFunTys tau
+                 , isNominalEqualityContinuation domains result
+                 -> (snd <$> tcRetainedInferableArg proof) `orM` check_args args
+               _ -> check_args args }
+    check args _ = check_args args
+
+    check_args = anyM tcRetainedNeedsExpected
 
 {- Note [Checking a nominal equality continuation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -6773,6 +6880,21 @@ Require each erased argument to have a scoped tau choice with no unfilled
 metavariables. Use NoQL and its existing argument cache. The cache supplies
 the checked first argument and its usage. The application keeps its head,
 arguments and evaluation order.
+
+With a checked result for trans a (gcastWith proof Refl), match the
+sibling's actual type to select the retained intermediate. Leave the
+continuation application out of the inference cache until its full result
+is available. Find the same continuation through nested applications so
+the outer call can supply their expected types. This test reads the known
+head's type and checks its first argument for a native anchor. A written
+expression signature supplies its own expected type. A call in inference
+mode continues to use the ordinary cache.
+
+An intermediate must come from independent argument types or the checked
+result. An unknown index stays unknown when the deferred continuation
+is checked. Its Given provides evidence only inside that continuation.
+The ordinary application path handles evidence, usage and evaluation
+order.
 -}
 
 {- Note [Matching a callback with an inferred multiplicity]

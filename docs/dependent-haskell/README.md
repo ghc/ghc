@@ -145,6 +145,14 @@ lengthMap f = \case
     _ : xs -> congSucc (lengthMap f xs)
 ```
 
+Use `HaskLib.cong` to apply the same function to both sides of an
+equality. For instance, `cong @(plus m) (plusSucc n p)` proves that
+adding `m` to both sides of `plusSucc n p` preserves the equality.
+The same combinator accepts a constructor, as in
+`cong @'Succ (plusZero n)`.
+[Compiled package client](hasklib-test/Client.hs) and
+[congruence in Agda and Haskell](REFERENCES.md#congruence-with-a-retained-argument).
+
 Use `congFirst` to lift an equality through the first argument of a
 binary size function. In the zip-after-map proof, `@minSize` selects
 the function and `@(size ys)` fixes its second argument.

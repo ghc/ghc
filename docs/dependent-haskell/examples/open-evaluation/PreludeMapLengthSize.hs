@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeFamilies, TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fwrite-source-equations #-}
-module PreludeMapLengthSize (Nat(..), Size, plus, size, minSize) where
+module PreludeMapLengthSize (Nat(..), Size, plus, size, minSize, eqSize) where
 
 import Control.Exception (ArithException(Underflow), throw)
 import qualified GHC.TypeNats as TN
@@ -65,3 +65,10 @@ minSize :: Nat -> Nat -> Nat
 minSize Zero _ = Zero
 minSize (Succ _) Zero = Zero
 minSize (Succ m) (Succ n) = Succ (minSize m n)
+
+-- | Compare two sizes by inspecting their constructors.
+eqSize :: Nat -> Nat -> Bool
+eqSize Zero Zero = True
+eqSize Zero (Succ _) = False
+eqSize (Succ _) Zero = False
+eqSize (Succ m) (Succ n) = eqSize m n

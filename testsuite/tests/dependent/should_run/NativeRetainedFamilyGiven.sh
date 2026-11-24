@@ -38,6 +38,31 @@ for opt in -O0 -O2; do
     grep -Fq 'In the second argument of ‘gcastWith’, namely ‘Refl’' "$out/continuation.log"
 done
 
+# Use the sibling proof to choose the nominal intermediate before the continuation.
+for opt in -O0 -O2; do
+    for mode in COMPOSITION_WRONG COMPOSITION_AMBIGUOUS COMPOSITION_OUTSIDE; do
+        log="$out/$mode.log"
+        if "${compile[@]}" "$opt" "-D$mode" >"$log" 2>&1; then
+            echo "Unexpected proof in $mode" >&2
+            exit 1
+        fi
+        case "$mode" in
+            COMPOSITION_WRONG)
+                grep -E 'error: \[GHC-(05617|83865)\]' "$log" &&
+                grep -F 'In the second argument of' "$log"
+                ;;
+            COMPOSITION_AMBIGUOUS)
+                grep -F 'error: [GHC-83865]' "$log" &&
+                grep -F 'is untouchable' "$log"
+                ;;
+            COMPOSITION_OUTSIDE)
+                grep -F 'error: [GHC-83865]' "$log" &&
+                grep -F '() -> Refl' "$log"
+                ;;
+        esac > /dev/null || { cat "$log" >&2; exit 1; }
+    done
+done
+
 # Supply the boxed nominal Given when inferring a successor tail.
 for opt in -O0 -O2; do
     build="$out/tail-${opt#-}"

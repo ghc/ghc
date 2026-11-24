@@ -4,6 +4,8 @@
 -- | Store a local function inside a closed algebraic index.
 module FunctionFieldLibrary where
 
+import Data.Type.Equality ((:~:)(Refl))
+
 type BoolEndo = Bool -> Bool
 
 data Flag (b :: Bool) where
@@ -45,3 +47,23 @@ loose x b =
 -- | Reconstruct the package with its actual index identities.
 repack :: Box -> Box
 repack (Box x b proof) = Box x b proof
+
+-- | Store a checked callback with a law at every argument.
+data CheckedEndo where
+    CheckedEndo :: foreach (f :: BoolEndo)
+                -> (foreach (x :: Bool) -> f x :~: x)
+                -> CheckedEndo
+
+-- | Return the input bit.
+keepBit :: Bool -> Bool
+keepBit False = False
+keepBit True = True
+
+-- | Prove that the callback returns its input.
+keepBitLaw :: foreach (x :: Bool) -> keepBit x :~: x
+keepBitLaw False = Refl
+keepBitLaw True = Refl
+
+-- | Package a callback and its law in their defining module.
+checkedEndo :: CheckedEndo
+checkedEndo = CheckedEndo keepBit keepBitLaw

@@ -173,6 +173,15 @@ test('NativeOpenMinimum',
                    ['PreludeMapLengthSize.hs', 'PreludeZipMapRuntime.hs', 'PreludeZipRuntime.hs',
                     'ZipMinimum.hs']])],
      run_command, ['bash NativeOpenMinimum.sh "{compiler}" "{libdir}" ' + config.ghc_th_way_flags])
+test('NativeStructuralCarriedArgs',
+     [only_ways(['normal'])],
+     run_command, ['bash NativeStructuralCarriedArgs.sh "{compiler}" "{libdir}"'])
+test('NativeIndependentConstructorRows',
+     [req_host_target_ghc, only_ways(['normal'])],
+     run_command, ['bash NativeIndependentConstructorRows.sh "{compiler}" "{libdir}"'])
+test('NativeStructuralSizePredicate',
+     [only_ways(['normal'])],
+     run_command, ['bash NativeStructuralSizePredicate.sh "{compiler}" "{libdir}"'])
 test('NativeSizeListNoDescent',
      [only_ways(['normal']),
       extra_files(['NativeSizeListNoDescent.hs', 'NativeSizeListNoDescentSource.hs',
@@ -427,6 +436,9 @@ test('NativeTypeLambdaQuote',
      [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
       extra_files([open_eval_dir + 'TypeLambda.hs', open_eval_dir + 'TypeLambdaQuote.hs'])],
      run_command, ['bash NativeTypeLambdaQuote.sh "{compiler}" "{libdir}"'])
+test('NativeTypeLambdaTypedQuote',
+     [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal'])],
+     run_command, ['bash NativeTypeLambdaTypedQuote.sh "{compiler}" "{libdir}"'])
 test('NativeTypeLambdaTypeApp',
      [req_interp, req_rts_linker, req_host_target_ghc, only_ways(['normal']),
       extra_files([open_eval_dir + 'TypeLambda.hs', open_eval_dir + 'TypeLambdaArgument.hs'])],
@@ -514,7 +526,7 @@ test('NativeRetainedSiblingFields',
 test('NativeNamedRetainedSiblingFields',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/' + f
-                   for f in ['PackedVecLibrary.hs', 'NamedSiblingColumns.hs']])],
+                   for f in ['PackedVecLibrary.hs', 'NamedSiblingColumns.hs', 'ParamColumns.hs']])],
      run_command, ['bash NativeNamedRetainedSiblingFields.sh "{compiler}" "{libdir}"'])
 
 test('NativeNamedRetainedRecordReify',
@@ -669,6 +681,11 @@ test('NativeRetainedConstructorContext',
       extra_files(['retained-constructor-context'])],
      run_command, ['bash NativeRetainedConstructorContext.sh "{compiler}" "{libdir}"'])
 
+test('NativeNestedRetainedCase',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['nested-retained-case'])],
+     run_command, ['bash NativeNestedRetainedCase.sh "{compiler}" "{libdir}"'])
+
 test('NativeRetainedFunctionRules',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['../../../../docs/dependent-haskell/examples/qualified-pi/' + f for f in
@@ -732,6 +749,11 @@ test('NativeCertifiedSplit',
       extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/' + f
                    for f in ['PackedVecLibrary.hs', 'CertifiedSplit.hs', 'CertifiedSplitClient.hs']])],
      run_command, ['bash NativeCertifiedSplit.sh "{compiler}" "{libdir}"'])
+
+test('NativeAppUnderRetainedEquality',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['app-under-retained-equality'])],
+     run_command, ['bash NativeAppUnderRetainedEquality.sh "{compiler}" "{libdir}"'])
 
 test('NativeLinearRetainedPackage',
      [req_host_target_ghc, only_ways(['normal']),

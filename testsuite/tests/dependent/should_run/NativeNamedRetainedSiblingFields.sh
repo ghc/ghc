@@ -10,12 +10,13 @@ ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint
 for opt in -O0 -O2; do
     mkdir -p "$out/$opt"/{provider,client}
     cd "$out/$opt/provider"
-    cp "$src/"{PackedVecLibrary,NamedSiblingColumns}.hs .
-    "${ghc[@]}" "$opt" --make -no-link NamedSiblingColumns.hs
+    cp "$src/"{PackedVecLibrary,NamedSiblingColumns,ParamColumns}.hs .
+    "${ghc[@]}" "$opt" --make -no-link NamedSiblingColumns.hs ParamColumns.hs
     cp ./*.hi ../client/
 
     cd ../client
     test ! -e NamedSiblingColumns.hs
+    test ! -e ParamColumns.hs
     cat > Main.hs <<'HS'
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes, OverloadedRecordDot #-}
 import Control.Exception (ErrorCall, evaluate, try)
@@ -206,6 +207,61 @@ fill p = toList (replicateNative (previous (storedLength p)) '-')
 HS
     reject 'GHC-83605' -fenable-rewrite-rules -fno-ignore-interface-pragmas RuleSelectorOperand.hs
     grep -Eq 'A rewrite rule can change the result of.*previous' rejected.log
+
+    cat > ParamMain.hs <<'HS'
+{-# LANGUAGE GADTs, NoExperimentalDependentTypes, TypeApplications #-}
+module Main where
+
+import ParamColumns (Columns(..))
+import PackedVecLibrary (Nat(..), Vec(..), natToInt, replicateNative, toList, zipVec)
+
+payload :: Columns a -> [a]
+payload r = let vec = cells r in toList vec
+
+direct :: Columns a -> [a]
+direct r = toList (cells r)
+
+beside :: Columns Char -> [(Char, Char)]
+beside r = toList (zipVec (cells @Char r) (replicateNative (storedLength r) '-'))
+
+made :: Columns Char
+made = Columns {cells = VCons 'a' VNil, storedLength = S Z}
+
+main :: IO ()
+main = do
+  print (payload made, direct made, beside made)
+  print (natToInt (storedLength @Bool (Columns Z undefined)))
+HS
+    "${ghc[@]}" "$opt" -c ParamMain.hs
+    "${ghc[@]}" ParamMain.o ../provider/{PackedVecLibrary,ParamColumns}.o -o param-observe
+    timeout 15 ./param-observe > actual
+    printf '%s\n' "(\"a\",\"a\",[('a','-')])" '0' | cmp - actual
+
+    cat > Signature.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ScopedTypeVariables #-}
+module Signature where
+
+import ParamColumns (Columns(..))
+import PackedVecLibrary (Vec)
+
+payload :: forall a. foreach (r :: Columns a) -> Vec a (storedLength r)
+payload r = cells r
+HS
+    "${ghc[@]}" "$opt" -c Signature.hs
+
+    cat > WrongReceiver.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
+module WrongReceiver where
+
+import ParamColumns (Columns(..))
+import PackedVecLibrary (Vec)
+
+wrong :: foreach (p :: Columns a) (q :: Columns a) -> Vec a (storedLength p)
+wrong _ q = cells q
+HS
+    reject 'GHC-83865' WrongReceiver.hs
+    grep -Fq 'storedLength p' rejected.log
+    grep -Fq 'storedLength q' rejected.log
 
     cat > MissingPayloads.hs <<'HS'
 {-# LANGUAGE GADTs, NoExperimentalDependentTypes #-}

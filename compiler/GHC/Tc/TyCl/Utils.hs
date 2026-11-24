@@ -957,11 +957,14 @@ mkRecSelBinds tycons = concat <$> mapM make_selectors tycons
                  parent = RecSelData tc
                  selector = fst (mkOneRecordSelector cons parent first FieldSelectors)
            ; table <- publishRetainedRecordWitness con selector
-           ; record <- mkSysLocalM (fsLit "record") ManyTy (mkTyConTy tc)
+           ; record <- mkSysLocalM (fsLit "record") ManyTy (dataConOrigResTy con)
            ; let first_sel = mkRecordSelector (Just table) Nothing cons parent first FieldSelectors
-                 index = mkTyConApp table [TermVarTy record]
+                 parameters = mkTyVarTys (dataConUnivTyVars con)
+                 index = mkTyConApp table (parameters ++ [TermVarTy record])
+                 (telescope, _) = splitForAllForAllTyBinders (idType selector)
                  payload_sel fld result = mkRecordSelector Nothing
-                   (Just (mkDepFunTy record (result index))) cons parent fld FieldSelectors
+                   (Just (mkForAllTys telescope (mkDepFunTy record (result index))))
+                   cons parent fld FieldSelectors
            ; pure (first_sel : zipWithEqual payload_sel rest payloads) }
       | otherwise = pure (map (mkRecSelBind . (tc,)) (tyConFieldLabels tc))
 

@@ -67,6 +67,7 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.DynFlags
 import GHC.Driver.Env ( HscEnv(..), hsc_home_unit)
 
+import GHC.Utils.Encoding ( zEncodeString )
 import GHC.Utils.Misc   ( lengthExceeds )
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
@@ -715,6 +716,13 @@ Restrict this lifting to a body with no inner binders. Resolve source
 call heads in the declaration scope and respect lambda binders that
 shadow those names.
 
+An inline sum in a retained signature also uses these capture parameters.
+For `foreach (m :: Size) -> foreach (n :: Size) -> some (k :: Size) |
+k :~: plus m n`, pass m and n to the lifted synonym in telescope order.
+The payload family binds k in addition to those captures. Permit source
+calls in the copied domain and payload. Only the payload scopes over k.
+Use this path for domains and payloads with no further binders.
+
 Check copied runtime domains for forms whose checking differs between
 types and kinds. A bare arrow defaults to unmatchable in a retained
 domain and can default to matchable in an erased binder kind. Leave
@@ -1042,6 +1050,9 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
       | fieldSite site, copyable ty = Just ("$field-sum:", Nothing)
     liftedAnchor SignatureTypeSite _ ty@(L _ (XHsType HsTypeSome{}))
       | copyable ty = Just ("$signature-sum:", Nothing)
+    liftedAnchor RetainedTypeSite{} _ ty@(L _ (XHsType (HsTypeSome _ _ domain body)))
+      | ordinaryLambdaBody domain, ordinaryLambdaBody body, copyable ty
+      = Just ("$signature-sum:", Nothing)
     liftedAnchor site scope (L _ (XHsType (HsTypeCase _ _ scrutinee alts)))
       | lift_cases
       , caseScrutinee site scope scrutinee
@@ -1098,6 +1109,8 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
           retainedUses site scope (sourceCallHeads scrutinee)
     retainedHeadUses site@RetainedTypeSite{} scope (L _ (XHsType (HsTypeLambda _ binders body))) =
       retainedUses site scope (lambdaCallHeads binders body)
+    retainedHeadUses site@RetainedTypeSite{} scope (L _ (XHsType (HsTypeSome _ binder domain body))) =
+      retainedUses site scope (sumCallHeads binder domain body)
     retainedHeadUses _ _ _ = ([], [])
 
     retainedUses site scope calls =
@@ -1245,6 +1258,7 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
       copyable binder && case ty of
         XHsType HsTypeCase{} -> copyableRetainedKind
         XHsType HsTypeLambda{} -> copyableRetainedKind
+        XHsType HsTypeSome{} | RetainedTypeSite{} <- site -> copyableRetainedKind
         _ -> True
       where
         copyableRetainedKind = unLoc name `notElem` retainedNames site
@@ -1308,6 +1322,10 @@ lambdaCallHeads binders = walk
           , unLoc name `notElem` map unLoc binders = [name]
           | otherwise = []
 
+-- | Find source calls in the witness domain and in its scoped payload.
+sumCallHeads :: LocatedN RdrName -> LHsType GhcPs -> LHsType GhcPs -> [LocatedN RdrName]
+sumCallHeads binder domain body = lambdaCallHeads [] domain ++ lambdaCallHeads [binder] body
+
 -- | The case syntax compared within a single signature.
 data SignatureCasePart
   = CasePartName PromotionFlag RdrName
@@ -1359,7 +1377,7 @@ retainedSourceHeads sigs type_groups = do
   envs@(global, local) <- getRdrEnvs
   let signature_heads = Set.fromList
         [unLoc v | L _ (TypeSig _ _ _ sig) <- sigs
-                 , v <- caseCallHeads sig ++ retainedLambdaCallHeads False sig]
+                 , v <- caseCallHeads sig ++ retainedSignatureCallHeads False sig]
       field_heads = Set.fromList
         [unLoc v | grp <- type_groups
                  , L _ DataDecl{tcdDataDefn = HsDataDefn{dd_cons = cs}} <- group_tyclds grp
@@ -1398,15 +1416,18 @@ caseCallHeads node = here ++ concat (gmapQ caseCallHeads node)
       Just (L _ (XHsType (HsTypeCase _ _ scrutinee _))) -> sourceCallHeads scrutinee
       _ -> []
 
--- | Collect call heads in supported lambda syntax below a retained telescope.
-retainedLambdaCallHeads :: Data a => Bool -> a -> [LocatedN RdrName]
-retainedLambdaCallHeads retained node = case cast node :: Maybe (LHsType GhcPs) of
-  Just (L _ HsForEachTy{hst_body = body}) -> retainedLambdaCallHeads True body
+-- | Collect source calls in lifted types below a retained telescope.
+retainedSignatureCallHeads :: Data a => Bool -> a -> [LocatedN RdrName]
+retainedSignatureCallHeads retained node = case cast node :: Maybe (LHsType GhcPs) of
+  Just (L _ HsForEachTy{hst_body = body}) -> retainedSignatureCallHeads True body
   Just (L _ HsSpliceTy{}) -> []
   Just (L _ (XHsType (HsTypeLambda _ binders body)))
     | retained && ordinaryLambdaBody body -> lambdaCallHeads binders body
     | otherwise -> []
-  _ -> concat (gmapQ (retainedLambdaCallHeads retained) node)
+  Just (L _ (XHsType (HsTypeSome _ binder domain body)))
+    | retained, ordinaryLambdaBody domain, ordinaryLambdaBody body -> sumCallHeads binder domain body
+    | otherwise -> []
+  _ -> concat (gmapQ (retainedSignatureCallHeads retained) node)
 
 -- | The scrutinee followed by the pattern and result in each source row.
 type SignatureCaseKey = (SignatureCasePart, [(SignatureCasePart, SignatureCasePart)])
@@ -2224,6 +2245,13 @@ rnLocalSignatureLambdas sigma named_wildcards fix_env generated local_lambdas ki
   = do
       local <- getLocalRdrEnv
       ordinal <- readTcRef local_lambdas
+      level <- getThLevel
+      let site = "local-" ++ show ordinal
+      site_suffix <- case level of
+        Brack _ RnPendingTyped ->
+          zEncodeString . occNameString <$>
+            chooseUniqueOccTc (mkInstTyTcOcc ("$typed-quote-" ++ site))
+        _ -> pure site
       let formals = case outer of
               HsOuterImplicit{} -> []
               HsOuterExplicit{hso_bndrs = binders} -> mapMaybe hsLTyVarName binders
@@ -2242,7 +2270,7 @@ rnLocalSignatureLambdas sigma named_wildcards fix_env generated local_lambdas ki
           scope = LocalLambdaScope actuals unavailable
           signature = noLocA (TypeSig noAnn [] names ty)
           input = emptyRdrGroup{hs_valds = ValBinds noExtField [VbSig signature]}
-          suffix salt = "local-" ++ show ordinal ++ "-" ++ show salt
+          suffix salt = site_suffix ++ "-" ++ show salt
           (updated, anchors, aliases, _, _, _) =
             liftDeclarationTypes [] [] suffix True named_wildcards (Just (scope, map fst ambient)) input
       case (anchors, hs_valds updated) of
@@ -2250,15 +2278,24 @@ rnLocalSignatureLambdas sigma named_wildcards fix_env generated local_lambdas ki
           (late, lambdas, scopes) <- liftTypeLambdas True sigma emptyRdrGroup{hs_tyclds = anchors}
           let hidden = aliases ++ [(fam, Just owner) | (fam, owner) <- lambdas]
               declarations = hs_tyclds late
-          (envs, _) <- getLocalNonValBinders fix_env emptyRdrGroup{hs_tyclds = declarations}
-          renamed <- restoreEnvs envs $ setLocalRdrEnv emptyLocalRdrEnv $
+          -- See Note [Lifting type lambdas in typed quotations].
+          (envs, names) <- setThLevel Comp $
+            getLocalNonValBinders fix_env emptyRdrGroup{hs_tyclds = declarations}
+          let at_source :: RnM a -> RnM a
+              at_source action = restoreEnvs envs $ setThLevel level $
+                updLclCtxt (atHelperStage level names) action
+          renamed <- at_source $ setLocalRdrEnv emptyLocalRdrEnv $
             rnTyClDecls hidden scopes declarations
           updTcRef generated (renamed :)
           updTcRef local_lambdas (+ 1)
-          Just <$> restoreEnvs envs (rnHsSigWcType doc result)
+          Just <$> at_source (rnHsSigWcType doc result)
         _ -> pure Nothing
   | otherwise = pure Nothing
   where
+    atHelperStage level names ctxt =
+      ctxt{tcl_th_bndrs = extendNameEnvList (tcl_th_bndrs ctxt)
+        [(name, (TopLevel, thLevelIndex level)) | name <- nonDetEltsUniqSet names]}
+
     occurrences = extractHsTyRdrTyVars body
     no_named_hole = not named_wildcards ||
       all (not . startsWithUnderscore . rdrNameOcc . unLoc) occurrences
@@ -2267,6 +2304,26 @@ rnLocalSignatureLambdas sigma named_wildcards fix_env generated local_lambdas ki
     hasLambda node
       | Just (L _ (XHsType HsTypeLambda{})) <- cast node :: Maybe (LHsType GhcPs) = True
       | otherwise = or (gmapQ hasLambda node)
+
+{- Note [Lifting type lambdas in typed quotations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The producer checks the body of a typed quote. The typed splice runs in the
+zonker, after the consumer has checked its declaration group. It cannot add
+a lambda's helper declarations to that group. Lift the lambda in the producer
+and quote the resulting helper application. The helper is a private global
+type synonym, so a splice in another module can resolve its original Name
+from the producer's interface. Reserve its suffix in the module-wide
+occurrence supply. The ordinary local counter restarts at each declaration
+group, so it cannot distinguish helpers referenced by different quotes on
+the two sides of a declaration splice. Encode the suffix so a colon in
+it does not change the owner found by pprLiftedTypeLambdaSite.
+
+Allocate the helper's name at Comp so it is external. Rename its copied
+source at the quote's level, where the usual checks on levelled names
+apply. The helper itself is available at that level. A typed quote
+evaluated by an untyped splice during renaming cannot use this path.
+Its declaration group has yet to be typechecked.
+-}
 
 -- | Bind the visible captures in their original dependency order and name form.
 localSignatureCaptures :: (Name -> RdrName) -> LocalRdrEnv -> [RdrName] -> LocalSignatureKinds
@@ -2598,13 +2655,18 @@ localSourceTableBinders binds sigs =
     matches_second _ = False
 
     carried_binders :: Bool -> [LPat GhcPs] -> Maybe [RdrName]
-    carried_binders False [] = Just []
-    carried_binders _ [p] | VarPat _ (L _ v) <- unparen p = Just [v]
+    -- See Note [Carried arguments of a source equation] in GHC.Tc.Gen.SourceTable.
+    carried_binders False ps = traverse carried_binder ps
     carried_binders True [p]
+      | Just v <- carried_binder p = Just [v]
       | WildPat{} <- unparen p = Just []
       | Just fields <- constructor_fields (unparen p)
       , all plain_field fields = Just (collectPatsBinders CollNoDictBinders fields)
-    carried_binders _ _ = Nothing
+    carried_binders True _ = Nothing
+
+    carried_binder p
+      | VarPat _ (L _ v) <- unparen p = Just v
+      | otherwise = Nothing
 
     constructor_fields :: Pat GhcPs -> Maybe [LPat GhcPs]
     constructor_fields ConPat{pat_args = PrefixCon _ fields} = Just fields
@@ -2762,7 +2824,7 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
       HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) carried result
         | Just [] <- outer_vars outer -> do
             deps <- domain_dependencies outer carried
-            res <- type_dependencies result
+            res <- result_dependencies outer result
             pure (deps ++ res)
       _ -> type_dependencies ty
 
@@ -4543,8 +4605,13 @@ rnTyClDecl _ (DataDecl
        ; traceRn "rntycl-data" (ppr tycon <+> ppr kvs)
        ; bindHsQTyVars doc Nothing kvs tyvars $ \ tyvars' free_rhs_kvs ->
     do { let record_parent
-               | null (hsq_explicit tyvars) && null mods = Just (unLoc tycon')
+               | null mods
+               , Just parameters <- traverse required_parameter (hsq_explicit tyvars')
+               = Just (foldl' nlHsAppTy (nlHsTyVar NotPromoted (unLoc tycon'))
+                           (map (nlHsTyVar NotPromoted) parameters))
                | otherwise = Nothing
+             required_parameter binder@(L _ HsTvb{tvb_flag = HsBndrRequired{}}) = hsLTyVarName binder
+             required_parameter _ = Nothing
        ; (defn', fvs) <- rnDataDefn record_parent doc defn
        ; cusk <- data_decl_has_cusk tyvars' new_or_data (null free_rhs_kvs) kind_sig
        ; let rn_info = DataDeclRn { tcdDataCusk = cusk
@@ -4669,7 +4736,7 @@ the broader picture of UnliftedNewtypes.
 rnTySyn :: HsDocContext -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames)
 rnTySyn doc rhs = rnLHsType doc rhs
 
-rnDataDefn :: Maybe Name -> HsDocContext -> HsDataDefn GhcPs
+rnDataDefn :: Maybe (LHsType GhcRn) -> HsDocContext -> HsDataDefn GhcPs
            -> RnM (HsDataDefn GhcRn, FreeNames)
 rnDataDefn record_parent doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = condecls
                            , dd_kindSig = m_sig, dd_derivs = derivs })
@@ -5237,11 +5304,11 @@ are no data constructors we allow h98_style = True
 ***************************************************** -}
 
 -----------------
-rnConDecls :: Maybe Name -> DataDefnCons (LConDecl GhcPs)
+rnConDecls :: Maybe (LHsType GhcRn) -> DataDefnCons (LConDecl GhcPs)
             -> RnM (DataDefnCons (LConDecl GhcRn), FreeNames)
 rnConDecls parent = mapFvRn (wrapLocFstMA (rnConDecl parent))
 
-rnConDecl :: Maybe Name -> ConDecl GhcPs -> RnM (ConDecl GhcRn, FreeNames)
+rnConDecl :: Maybe (LHsType GhcRn) -> ConDecl GhcPs -> RnM (ConDecl GhcRn, FreeNames)
 rnConDecl parent decl@(ConDeclH98 { con_name = name, con_telescope = teles
                            , con_args = args
                            , con_doc = mb_doc

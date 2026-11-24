@@ -158,7 +158,7 @@ import Data.Data hiding (TyCon)
 import Data.Int
 import Data.List.NonEmpty (nonEmpty)
 import qualified Data.List.NonEmpty as NE
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, isNothing)
 import Data.Word
 
 import Control.DeepSeq
@@ -2823,7 +2823,13 @@ nativeIndexFunctionVar_maybe _ = Nothing
 -- | Reify a lexical callback and its checked nominal casts.
 -- See Note [Function-valued retained binders] in GHC.Core.Type.
 nativeLocalFunctionArgIndex :: CoreExpr -> Maybe Type
-nativeLocalFunctionArgIndex = nativeFunctionArgIndex nativeIndexFunctionVar_maybe
+nativeLocalFunctionArgIndex = nativeFunctionArgIndex $ \arg -> do
+  fun <- nativeIndexFunctionVar_maybe arg
+  -- The optimizer cannot substitute a checked source family for a call
+  -- head in existing strict case evidence. See Note [Named retained
+  -- callbacks] in GHC.Tc.Gen.App.
+  guard (isNothing (nativeSourceFunctionArgIndex arg))
+  pure fun
 
 nativeFunctionArgIndex :: (CoreExpr -> Maybe Id) -> CoreExpr -> Maybe Type
 nativeFunctionArgIndex read_var (Cast body co) = do
@@ -2841,7 +2847,18 @@ nativeFunctionArgIndex read_var arg = TermVarTy <$> read_var arg
 -- See Note [Named retained callbacks] in GHC.Tc.Gen.App.
 nativeIndexFunctionArgIndex :: CoreExpr -> Maybe Type
 nativeIndexFunctionArgIndex arg
-  | Just local <- nativeLocalFunctionArgIndex arg = Just local
+  | Just index <- nativeSourceFunctionArgIndex arg = Just index
+  | Just local <- nativeFunctionArgIndex nativeIndexFunctionVar_maybe arg = Just local
+  | Var fun <- arg
+  , isNativeNamedOpaqueFunctionId fun
+  = Just (TermVarTy fun)
+  | otherwise = Nothing
+
+-- | Reify a source function before its retained value argument.
+nativeSourceFunctionArgIndex :: CoreExpr -> Maybe Type
+nativeSourceFunctionArgIndex arg
+  -- The defining module still represents a checked source owner as a
+  -- LocalId here. Use the same index before and after interface loading.
   | (Var fun, args) <- collectArgs arg
   , isExternalName (idName fun)
   , Just family <- sourceTableId_maybe fun
@@ -2850,16 +2867,14 @@ nativeIndexFunctionArgIndex arg
   , let index = mkTyConApp family tys
   , typeKind index `eqType` body
   = Just index
-  | Var fun <- arg
-  , isNativeNamedOpaqueFunctionId fun
-  = Just (TermVarTy fun)
   | otherwise = Nothing
 
 -- | Recover an index for an existing strict case, including an opaque call.
 -- This does not admit a call as a lazy retained application argument.
 -- See Note [Opaque native call indices] in GHC.Core.TyCo.Rep.
 exprToNativeCaseIndex :: CoreExpr -> Maybe Type
-exprToNativeCaseIndex = exprToNativeCaseIndexWith nativeLocalFunctionArgIndex
+exprToNativeCaseIndex =
+    exprToNativeCaseIndexWith (nativeFunctionArgIndex nativeIndexFunctionVar_maybe)
 
 -- | Recover the right endpoint of a prepared native alias. See Note [Named
 -- heads in prepared native cases].

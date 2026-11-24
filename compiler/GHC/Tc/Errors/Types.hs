@@ -5466,6 +5466,7 @@ data RetainedQuantificationError
   | RetainedTypeOperandContext (Maybe Type)
   | RetainedSelectorReceiver
   | RetainedConstructorResult Type
+  | RetainedSumContext
 
 -- | An error in the implementation of an abstract datatype using
 -- a type synonym.

@@ -2,11 +2,11 @@
 {-# LANGUAGE DataKinds, ExplicitNamespaces, ExperimentalDependentTypes, GADTs, Modifiers, TypeOperators #-}
 
 -- | Peano naturals and their arithmetic laws.
-module HaskLib.Nat (Nat(..), plus, type (+), plusZero, plusSucc, congSucc, congFirst) where
+module HaskLib.Nat (Nat(..), eqSize, eqSizeRefl, plus, type (+), plusZero, plusSucc, congSucc, congFirst) where
 
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Exts (U)
-import PreludeMapLengthSize (Nat(..), plus)
+import PreludeMapLengthSize (Nat(..), eqSize, plus)
 
 -- | Add two naturals in a type using the ordinary definition of 'plus'.
 type (m :: Nat) + (n :: Nat) = plus m n
@@ -32,3 +32,8 @@ congSucc Refl = Refl
 congFirst :: forall (f :: Nat %U -> Nat %U -> Nat) r m n.
              m :~: n -> f m r :~: f n r
 congFirst Refl = Refl
+
+-- | Comparing a finite natural with itself yields 'True'.
+eqSizeRefl :: foreach (n :: Nat) -> eqSize n n :~: 'True
+eqSizeRefl Zero     = Refl
+eqSizeRefl (Succ n) = eqSizeRefl n

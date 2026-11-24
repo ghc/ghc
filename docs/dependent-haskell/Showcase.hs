@@ -175,6 +175,8 @@ import qualified OrdinaryFamilyBranches
 import qualified PreludeFoldrProof
 import qualified PreludeZipProof
 import qualified HaskLib
+import qualified CastedConstructorGivens as TreeProof
+import qualified SumOfSizes
 import qualified Client as HaskLibClient
 import qualified PreludeZipWithLengthProof
 import qualified PreludeZipWithProof
@@ -233,6 +235,7 @@ import qualified SiblingColumns
 import qualified SiblingColumnsClient
 import qualified NamedSiblingColumns as Named
 import qualified NamedSiblingColumnsClient
+import qualified ParamColumns
 import qualified QualifiedPiLibrary as Qualified
 import qualified QuantifiedGadtIndex as QuantifiedIndex
 import qualified ReadNatural
@@ -611,6 +614,9 @@ algebraicFunctionFields = do
         FunctionFieldClient.inspectViaCall (FunctionFields.repack (FunctionFields.build id b))
     observe "proof retains the stored function identity" $
         FunctionFieldClient.proofOnly (FunctionFields.build not b)
+    case FunctionFields.checkedEndo of
+        FunctionFields.CheckedEndo f law -> case law b of
+            Refl -> observe "apply a stored callback with its identity proof" (b, f b)
     observe "algebraic function container stays lazy" $
         FunctionFieldClient.outer (FunctionFields.loose (error "showcase-function-container") (error "showcase-function-input"))
     observe "algebraic function leaf stays lazy" $
@@ -1735,6 +1741,8 @@ main = do
         (TypeLambda.Field count (TypeLambda.Field flag TypeLambda.End),
          TypeLambda.Field label TypeLambda.End) ->
             observe "splice a column schema and attach a caller-supplied label" (count, flag, label)
+    observe "splice the validated count from a typed expression quote"
+        $$(TypeLambdaQuote.checkedCountCode)
     observe "read two named sensors with a missing slot" QuotedSensorRow.readings
     let reported :: TypeLambda.Fields '[Either Ordering Int, Either Ordering Bool]
         reported = TypeLambdaArgument.rowFor @(\cell -> Either Ordering cell) Proxy (Right 42) (Left LT)
@@ -1947,6 +1955,16 @@ main = do
         (case measureReverseLength HaskLib.size reverseInput Refl of
              (n, Refl) -> n)
     prefixBound <- newIORef (1 :: HaskLib.Nat) >>= readIORef
+    observe "apply the same partially applied addition to equal sizes"
+        (HaskLibClient.addUnder prefixBound prefixBound HaskLib.Zero)
+    observe "compare a runtime size with itself" (HaskLib.eqSize prefixBound prefixBound, HaskLib.eqSizeRefl prefixBound)
+    let treeProof = TreeProof.Both TreeProof.Here (TreeProof.Both TreeProof.Here TreeProof.Here)
+        relation = TreeProof.Branches TreeProof.Same (TreeProof.Branches TreeProof.Same TreeProof.Same)
+    case TreeProof.preserve relation treeProof of
+        TreeProof.Both TreeProof.Here (TreeProof.Both TreeProof.Here TreeProof.Here) ->
+            observe "transport evidence for three leaves across related trees" True
+    case SumOfSizes.plusExists prefixBound prefixBound of
+        Sigma.Pair k Refl -> observe "read the sum with its equality proof" k
     prefixInput <- newIORef (True : error "forced the list beyond the prefix") >>= readIORef
     observe "take a runtime-bounded prefix and prove its length"
         (HaskLib.takeSize prefixBound prefixInput, HaskLib.lengthTakeSize prefixBound prefixInput)
@@ -2529,6 +2547,13 @@ listBoundaries = do
             }
     observe "replace the stored length and both named payloads"
         (natToInt (Named.storedLength emptied), NamedSiblingColumnsClient.readPairs emptied)
+    let values :: forall a. ParamColumns.Columns a -> [a]
+        values column = toList (ParamColumns.cells column)
+        letters = ParamColumns.Columns
+            { ParamColumns.storedLength = S Z, ParamColumns.cells = VCons 'x' VNil }
+        flags = ParamColumns.Columns
+            { ParamColumns.storedLength = S (S Z), ParamColumns.cells = VCons True (VCons False VNil) }
+    observe "read parameterized columns at their own stored lengths" (values letters, values flags)
     let copyFlags q = NamedSiblingColumnsClient.readPairs
                        <$> NamedSiblingColumnsClient.copyFlagsAtSameLength named q
     observe "copy flags after comparing two stored lengths" (copyFlags defaults, copyFlags emptied)

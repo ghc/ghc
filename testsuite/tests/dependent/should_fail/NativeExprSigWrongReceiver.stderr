@@ -1,0 +1,6 @@
+NativeExprSigWrongReceiver.hs:10:11: error: [GHC-83865]
+    • Couldn't match type ‘x’ with ‘y’
+      Expected: Proxy y
+        Actual: Proxy x
+    • In the expression: witness x :: Proxy y
+      In an equation for ‘bad’: bad x y = witness x :: Proxy y

@@ -174,6 +174,9 @@ tryLiftLocalTypeLambdas doc ty = do
   lift_lambdas <- tcg_rn_local_lambdas <$> getGblEnv
   case (level, lift_lambdas) of
     (Comp, Just (scope, lift_sig)) -> lift_sig scope doc ty
+    -- See Note [Lifting type lambdas in typed quotations] in GHC.Rename.Module.
+    (Brack Comp RnPendingTyped, Just (scope, lift_sig)) -> lift_sig scope doc ty
+    (Brack (Splice Typed Comp) RnPendingTyped, Just (scope, lift_sig)) -> lift_sig scope doc ty
     _ -> pure Nothing
 
 -- | Get the optional written kinds of explicitly scoped erased binders.
@@ -1196,13 +1199,18 @@ rnHsTyKi env (XHsType (HsTypeLambda _ binders body)) = do
   enabled <- xoptM LangExt.ExperimentalDependentTypes
   unless enabled $ failWithTc TcRnTypeLambdaDisabled
   level <- getThLevel
+  let rename_lambda = do
+        checkDupRdrNames binders
+        binders' <- traverse (\binder -> L (getLoc binder) <$> newLocalBndrRn binder) binders
+        (body', fvs) <- bindLocalNamesFV (map unLoc binders') (rnLHsTyKi env body)
+        pure (XHsType (HsTypeLambdaQuoteRn binders' body'), fvs)
   case level of
     -- See Note [Quoting type lambdas] in GHC.HsToCore.Quote.
-    UntypedBrack{} -> do
-      checkDupRdrNames binders
-      binders' <- traverse (\binder -> L (getLoc binder) <$> newLocalBndrRn binder) binders
-      (body', fvs) <- bindLocalNamesFV (map unLoc binders') (rnLHsTyKi env body)
-      pure (XHsType (HsTypeLambdaQuoteRn binders' body'), fvs)
+    UntypedBrack{} -> rename_lambda
+    Brack _ RnPendingTyped -> do
+      -- If lifting failed, still report any scope errors in the callback.
+      _ <- checkNoErrs rename_lambda
+      failWithTc TcRnTypeLambdaContext
     _ -> failWithTc TcRnTypeLambdaContext
 
 -- See Note [Checking local lambda captures] in GHC.Tc.Gen.HsType.
@@ -1220,8 +1228,7 @@ rnHsTyKi env (XHsType (HsTypeLambdaCheck binders body helper)) = do
         body_fvs `plusFN` helper_fvs)
 
 rnHsTyKi _ (XHsType HsTypeSome{}) =
-  failWithTc (mkTcRnUnknownMessage (mkPlainError []
-    (text "A retained dependent sum is supported in a top-level type synonym, as the result of a type family equation, in a complete top-level value signature, or in a constructor field that captures outer type variables or earlier retained arguments.")))
+  failWithTc (TcRnRetainedQuantificationError RetainedSumContext)
 
 -- A bare case pattern prefers a data constructor, as before. Resolve it
 -- after the declaration group is in scope. If the data name is absent,
@@ -2188,9 +2195,9 @@ rnHsConDeclRecFields ctxt fls fields
 
 -- | Rename the record fields under the name of their stored witness.
 -- See Note [Named retained record fields].
-rnRetainedHsRecordFields :: Name -> HsDocContext -> [FieldLabel] -> [LHsConDeclRecField GhcPs]
+rnRetainedHsRecordFields :: LHsType GhcRn -> HsDocContext -> [FieldLabel] -> [LHsConDeclRecField GhcPs]
                          -> RnM (Maybe (LHsType GhcRn, [LHsConDeclRecField GhcRn], FreeNames))
-rnRetainedHsRecordFields owner ctxt fls
+rnRetainedHsRecordFields result ctxt fls
     (L loc (HsConDeclRecField _ fields@[L _ (FieldOcc _ name)] first_field) : rest@(_ : _))
   | all (plain_field . cdrf_spec . unLoc) rest
   , plain_field first_field
@@ -2218,7 +2225,6 @@ rnRetainedHsRecordFields owner ctxt fls
                            , cdf_doc = doc }
                          witness_field = L loc (HsConDeclRecField noExtField
                                                (map (fmap (lookupField fl_env)) fields) field)
-                         result = nlHsTyVar NotPromoted owner
                          body = foldr (nlHsFunTy . cdf_type . cdrf_spec . unLoc) result payloads
                          sig = L loc (HsForEachTy (noEpTok, Left noEpUniTok) binders body)
                    ; pure (Just (sig, witness_field : payloads, fvs)) }
@@ -2238,7 +2244,7 @@ rnRetainedHsRecordFields _ _ _ _ = pure Nothing
 
 {- Note [Named retained record fields]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-With ExperimentalDependentTypes, the first field of a closed Haskell98
+With ExperimentalDependentTypes, the first field of a Haskell98
 record can bind its stored value in later field types. Use the same
 renaming scope as foreach. The first field's type is outside that scope.
 An existing type variable takes precedence. GADT records retain their
@@ -2248,6 +2254,7 @@ the field selector, and implicit quantification also checks term names.
 
 Keep the renamed fields for the record syntax. Save a retained arrow
 telescope in the Haskell98 declaration extension for constructor checking.
+The result type applies the datatype to its ordinary type parameters.
 -}
 
 rnField :: FastStringEnv FieldLabel -> RnTyKiEnv -> LHsConDeclRecField GhcPs

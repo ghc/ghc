@@ -1,0 +1,12 @@
+Nothing
+Just (Arr Nat Nat,Nat)
+Just (Nat,Nat)
+Just (Arr Nat Nat,Nat)
+Nothing
+True
+Nothing
+Just (Arr Nat Nat,Nat)
+Just (Nat,Nat)
+Just (Arr Nat Nat,Nat)
+Nothing
+True

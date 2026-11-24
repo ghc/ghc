@@ -5408,15 +5408,20 @@ tcConDecl _ dd_info rep_tycon tc_bndrs _ tag_map
           (ConDeclH98 { con_name = lname@(L _ name), con_ext = Just sig })
   = addErrCtxt (DataConDefCtxt (NE.singleton lname)) $
     do { case dd_info of
-           DDataType | null tc_bndrs -> pure ()
+           DDataType | all (\tv -> varType tv `eqType` liftedTypeKind) (binderVars tc_bndrs)
+                     -> pure ()
            _ -> failWithTc (TcRnRetainedQuantificationError RetainedPackageDeclaration)
        ; skol_info <- mkSkolemInfo (DataConSkol name)
        ; (tclvl, wanted, (retained, full_ty)) <-
            pushLevelAndSolveEqualitiesX "tcConDecl:retained record" $
              tcCheckRetainedConType True False (tcDataConMult IsNotPrefixConGADT) sig
-       ; reportUnsolvedEqualities skol_info [] tclvl wanted
-       ; zonked <- initZonkEnv NoFlexi (zonkTcTypeToTypeX full_ty)
+       ; reportUnsolvedEqualities skol_info (binderVars tc_bndrs) tclvl wanted
+       ; (parameters, zonked) <- initZonkEnv NoFlexi $
+           runZonkBndrT (zonkTyVarBindersX tc_bndrs) $ \parameters ->
+             (parameters,) <$> zonkTcTypeToTypeX full_ty
        ; let (arg_tys, res_ty) = splitRetainedConFields retained zonked
+             univs = binderVars parameters
+             user_tvbs = tyVarSpecToBinders (tyConInvisTVBinders parameters)
              unbanged = HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict
        ; field_lbls <- lookupConstructorFields (noUserRdr name)
        ; rep_nm <- newTyConRepName name
@@ -5424,7 +5429,7 @@ tcConDecl _ dd_info rep_tycon tc_bndrs _ tag_map
        ; dflags <- getDynFlags
        ; con <- buildDataConWithTelescope (LegacyConOrder 0) retained fam_envs
                    (SrcBangOpts (initBangOpts dflags)) name False rep_nm
-                   (map (const unbanged) retained) field_lbls [] [] [] [] []
+                   (map (const unbanged) retained) field_lbls univs [] user_tvbs [] []
                    arg_tys res_ty rep_tycon tag_map
        ; pure (NE.singleton con) }
 

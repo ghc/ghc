@@ -26,6 +26,9 @@ test('T11311', normal, compile, [''])
 test('T11405', normal, compile, [''])
 test('T11241', normal, compile, [''])
 test('T11711', normal, compile, [''])
+test('CastedConstructorGivens',
+     extra_files(['../../../../docs/dependent-haskell/examples/open-evaluation/CastedConstructorGivens.hs']),
+     compile, ['-dcore-lint -dstg-lint'])
 test('RaeJobTalk', normal, compile, [''])
 test('T11635', normal, compile, [''])
 test('T11719', normal, compile, [''])

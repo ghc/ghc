@@ -1012,16 +1012,22 @@ can_eq_nc_depfun :: CtEvidence -> EqRel -> Type -> Type -> MCoercionN
 can_eq_nc_depfun ev eq_rel ty1@(DepFunTy vis1 b1 body1) ty2@(DepFunTy vis2 b2 body2) domain
   | vis1 == vis2
   , CtWanted (WantedCt { ctev_dest = dest, ctev_rewriters = rws, ctev_loc = loc }) <- ev
-  = do { binder <- wrapTcS $ TcM.newSysLocalId (fsLit "retained") ManyTy (varType b1)
+  = do { b_ty <- zonkTcType (varType b1)
+       ; lhs <- zonkTcType body1
+       ; rhs <- zonkTcType body2
+       ; domain' <- case domain of
+                     MRefl -> return MRefl
+                     MCo co -> MCo <$> zonkCo co
+       ; binder <- wrapTcS $ TcM.newSysLocalId (fsLit "retained") ManyTy b_ty
        ; let in_scope = mkInScopeSet $
                           extendVarSet (tyCoVarsOfTypes [ty1,ty2]
-                                        `unionVarSet` tyCoVarsOfMCo domain) binder
+                                        `unionVarSet` tyCoVarsOfMCo domain' `unionVarSet` tyCoVarsOfTypes [lhs,rhs,b_ty]) binder
              subst b arg = Subst.mkIdSubst in_scope (unitVarEnv b arg)
-             right_arg = case domain of
+             right_arg = case domain' of
                            MRefl -> Var binder
                            MCo delta -> Cast (Var binder) (SubCo delta)
-             left_body = Subst.substTy (subst b1 (Var binder)) body1
-             right_body = Subst.substTy (subst b2 right_arg) body2
+             left_body = Subst.substTy (subst b1 (Var binder)) lhs
+             right_body = Subst.substTy (subst b2 right_arg) rhs
        ; nested_binds <- newNoTcEvBinds
        ; (unifs, (body_co, solved)) <- reportFineGrainUnifications $
            do { (level, (body_co, wanteds)) <-
@@ -1034,7 +1040,7 @@ can_eq_nc_depfun ev eq_rel ty1@(DepFunTy vis1 b1 body1) ty2@(DepFunTy vis2 b2 bo
               ; return (body_co, isSolvedWC residual) }
        ; kickOutAfterUnification unifs
        ; if solved
-         then do { all_co <- zonkCo (mkDepFunCoWithVis vis1 vis2 binder domain body_co)
+         then do { all_co <- zonkCo (mkDepFunCoWithVis vis1 vis2 binder domain' body_co)
                  ; left <- zonkTcType ty1
                  ; right <- zonkTcType ty2
                  ; if coercionLKind all_co `tcEqType` left
@@ -1061,6 +1067,12 @@ comparing Consumer (IO Int) p r with Consumer (IO Int) p Char can
 determine r. Opening the two bodies with the same Id does not need the
 constructors of IO. The private body check still rejects an assignment
 that would let the index escape.
+Zonk the binder domain, both bodies and the domain coercion before
+opening the bodies. For an imported polymorphic alias, rewriting can
+update the binder's element type while an occurrence inside a family
+argument still carries the solved metavariable. Core substitution checks
+the occurrence's domain against the fresh binder's domain.
+
 Substitute the same fresh bare variable into both bodies. A function head must remain a Var; a reflexive
 cast around that variable is not a supported native call head.
 
@@ -1538,8 +1550,12 @@ canEqCast :: CanEqState
           -> TcType -> TcType     -- RHS (res. LHS), ty2 both normal and pretty
           -> TcS (StopOrContinue (Either IrredCt EqCt))
 canEqCast _ _ _ ev@(CtGiven (GivenCt { ctev_evar = evar })) NomEq swapped
-          ty1@(TyConApp tc tys1) co1 ty2@(TyConApp tc' tys2) _
-  | tc == tc'
+          ty1@(TyConApp tc tys1) co1 ty2 _
+  | let (rhs, rhs_cast) = case ty2 of
+          CastTy body co2 -> (body, MCo co2)
+          _ -> (ty2, MRefl)
+  , TyConApp tc' tys2 <- rhs
+  , tc == tc'
   , not (isTypeFamilyTyCon tc)
   , isInjectiveTyCon tc Nominal
   , tys1 `equalLength` tys2
@@ -1553,6 +1569,7 @@ canEqCast _ _ _ ev@(CtGiven (GivenCt { ctev_evar = evar })) NomEq swapped
                          IsSwapped  -> mkNomEqPred ty2 cast_ty1
              parent = mkGReflRightCo Nominal ty1 co1 `mkTransCo`
                         maybeSymCo swapped (mkCoVarCo (setVarType evar pred_ty))
+                        `mkTransCo` mkSymCo (mkGReflRightMCo Nominal rhs rhs_cast)
              selectors = tyConAppGivenSelectors (repeat Nominal) tys1 tys2 parent
        ; emitSelectorGivens loc selectors
        ; stopWith ev "Decomposed casted TyConApp Given" }
@@ -3349,9 +3366,13 @@ Wrinkles:
      expression within the homogeneous proof (T11711).
 
 (EIK5) A nominal Given can have the form (T as |> h) ~# T bs.
-     When T is injective, use the uncast equality as an expression
-     in its selectors. Binding that expression would create a mixed-kind
-     CoVar. A selector can also have different endpoint kinds. Bind
+     The right endpoint can also have a cast. For example, two GADT
+     matches can cast a promoted constructor application back to the
+     original scrutinee kind on each side.
+     When T is injective, compose both transports with the Given.
+     Use the uncast equality as an expression in its selectors.
+     Removing one cast first would bind mixed-kind evidence.
+     A selector can also have different endpoint kinds. Bind
      its kind equality first and transport the right endpoint, as in
      canEqCanLHSHetero. This keeps the argument Given homogeneous.
      For example, this permits decomposition of the boxed Given

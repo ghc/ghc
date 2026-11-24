@@ -5,10 +5,11 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators #-}
 
-module TypeLambdaQuote (checkedColumns, labelledColumn) where
+module TypeLambdaQuote (checkedColumns, labelledColumn, checkedCountCode) where
 
 import Data.Kind (Type)
 import Data.Type.Equality ((:~:)(Refl))
+import Language.Haskell.TH.Syntax (Code, Q)
 import TypeLambda (Fields(..), Map)
 
 $([d|
@@ -33,3 +34,7 @@ $([d|
       attach :: label -> Fields (Map (\cell -> (label, cell)) '[Bool])
       attach key = Field (key, True) End
   |])
+
+-- | Quote the count with its checked cell type for a splice in another module.
+checkedCountCode :: Code Q (Either String Int)
+checkedCountCode = [|| Right 42 :: (\err cell -> Either err cell) String Int ||]
