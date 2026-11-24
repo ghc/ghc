@@ -493,6 +493,7 @@ can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
     -- the Wanted, which survives the Given rewrite.
     expand_proof_synonym (TyConApp tc _) solve
       | NomEq <- eq_rel
+      , isReducedProofSynonym tc
       , deps@(_ : _) <- synTyConSourceProofRules tc
       , CtWanted (WantedCt { ctev_dest = HoleDest hole }) <- ev
       = do { result <- solve
@@ -3284,7 +3285,8 @@ tryRetainedFamilyEquality ev lhs rhs
       | otherwise = Nothing
 
     synonymStep (TyConApp tc _)
-      | deps@(_ : _) <- synTyConSourceProofRules tc = [(tyConName tc, deps)]
+      | isReducedProofSynonym tc
+      , deps@(_ : _) <- synTyConSourceProofRules tc = [(tyConName tc, deps)]
     synonymStep _ = []
 
     specialize seen irreds _ (Just (tc, args))

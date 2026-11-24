@@ -11,7 +11,7 @@
 module GHC.Tc.Solver.Rewrite(
    rewrite, rewriteForErrors, rewriteArgsNom, rewriteWithSourceProofs,
    rewriteType, rewriteFamilyAxioms, rewriteFamilyAxiomsWithSourceProofs,
-   rewriteTyConAppArgsNom, expandedProofSynonyms
+   rewriteTyConAppArgsNom, expandedProofSynonyms, isReducedProofSynonym
  ) where
 
 import GHC.Prelude
@@ -1363,8 +1363,8 @@ expandedProofSynonyms = go Nothing
       , and (zipWith (eq_under env) as1 as2)
       = concat (zipWith (go env) as1 as2)
     go env t1 t2
-      | Just t1' <- coreView t1 = maybeToList (checkedSynonymOrigin t1) ++ go env t1' t2
-      | Just t2' <- coreView t2 = maybeToList (checkedSynonymOrigin t2) ++ go env t1 t2'
+      | Just t1' <- coreView t1 = maybeToList (reduced_origin t1) ++ go env t1' t2
+      | Just t2' <- coreView t2 = maybeToList (reduced_origin t2) ++ go env t1 t2'
     go env (TyConApp _ as1) (TyConApp _ as2)
       = concat (zipWith (go env) as1 as2)
     go env (FunTy _ ma1 m1 a1 r1) (FunTy _ ma2 m2 a2 r2)
@@ -1391,9 +1391,29 @@ expandedProofSynonyms = go Nothing
       = go env f1 f2 ++ go env a1 a2
       | otherwise = []
 
+    reduced_origin t@(TyConApp tc _)
+      | isReducedProofSynonym tc = checkedSynonymOrigin t
+    reduced_origin _ = Nothing
+
 -- | The private family that implements a checked source method.
 isMethodSourceFamily :: TyCon -> Bool
 isMethodSourceFamily = isJust . sourceTableTermOcc . nameOccName . tyConName
+
+-- | True when a checked proof synonym's RHS already embeds a completed
+-- reduction rather than naming an unreduced source-method family application.
+isReducedProofSynonym :: TyCon -> Bool
+isReducedProofSynonym tc
+  | not (null (synTyConSourceProofRules tc))
+  , Just (_, rhs) <- synTyConDefn_maybe tc
+  = not (unreduced rhs)
+  | otherwise = False
+  where
+    unreduced (CastTy ty _) = unreduced ty
+    unreduced ty
+      | Just ty' <- coreView ty = unreduced ty'
+      | TyConApp family args <- ty
+      = isMethodSourceFamily family && lengthIs args (tyConArity family)
+      | otherwise = False
 
 -- | Report the provenance carried by a synonym, if any.
 checkedSynonymOrigin :: TcType -> Maybe (Name, [SourceProofRule])
