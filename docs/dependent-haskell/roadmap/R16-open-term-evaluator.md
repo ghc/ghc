@@ -808,6 +808,26 @@ dependencies still apply to the helper's exact Id.
 [Producer](../examples/open-evaluation/SpineWorker.hs)
 and [source gate](../../../testsuite/tests/dependent/should_run/NativeOpenConstructorHelpers.sh).
 
+## Typed substitution under a binder
+
+PLFH can state a beta step with `substSingle body argument` as its
+target, even when both terms are variables in the signature. The native
+provider must enable `-fwrite-source-equations`. The compiler checks
+the substitution and renaming functions before and after optimization.
+It records the helpers used by both and checks visible rewrite rules.
+The interface contains the equations only when the source datatypes
+and constructors used in them are visible. See
+`Note [Certifying a checked source closure]` in `GHC.Tc.Gen.SourceClosure`.
+
+An imported client can use the native interface in a fresh no-code
+build. At compiler `fb64eaff81`, a GHCi provider needs `-fobject-code`
+to publish the same equations. In the Showcase fragment, exporting the
+four traversal helpers as in the book preserves the certificate.
+Removing all four exports withholds it. This checkpoint supports the
+checked substitution pattern. General higher-order evaluation remains open.
+[Provider](../examples/open-evaluation/BookDeBruijn.hs),
+[capture proof](../examples/open-evaluation/BookBetaReduction.hs).
+
 ## M155. Reachable helper chains
 
 A checked case can now use a helper that calls another helper. The

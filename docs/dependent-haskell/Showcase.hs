@@ -183,6 +183,7 @@ import qualified BookConnectives
 import qualified BookCongruence
 import qualified BookFoldProof
 import qualified BookLambdaUnfold
+import qualified BookBetaReduction
 import qualified BookReverseProof
 import qualified BookNaturals
 import qualified CastedConstructorGivens as TreeProof
@@ -1997,6 +1998,10 @@ main = do
         (BookCongruence.plusComm count 2)
     case BookLambdaUnfold.unwrapVariable of
         BookLambdaUnfold.BetaMu -> observe "unfold the fixed point of the identity" True
+    case BookBetaReduction.captureAvoided of
+        BookBetaReduction.BetaLam _ ->
+            observe "substitute under a lambda and preserve the free variable at index two"
+                BookBetaReduction.freeIndexAfterBeta
     observe "sum two lists with the right-fold append proof"
         (HaskLib.eqSize (BookFoldProof.checkedSum [1, 2] [3, 4]) 10)
     case BookIso.sample of

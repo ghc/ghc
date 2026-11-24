@@ -1,7 +1,7 @@
 # Dependent Haskell paper reading
 
-Read on 2026-11-14 through 2026-11-20. The [manifest](manifest.json) records
-thirty-two works and thirty-eight downloaded PDF versions. It contains source URLs,
+Read on 2026-11-14 through 2026-11-24. The [manifest](manifest.json) records
+thirty-three works and thirty-nine downloaded PDF versions. It contains source URLs,
 checksums, page counts, roadmap cards and
 the exact reading scope. PDF copies and extraction files are local in
 `_build/verification/dependent-haskell-papers-2026-11-14/`. The four new
@@ -25,6 +25,15 @@ sections. No Coq development was rebuilt for this reading.
 Historical checkpoint notes below preserve the ledger counts at those dates.
 The counts above describe the current collection. A work can have several
 versions and several selective readings.
+
+**Defunctionalization at Work.** Danvy and Nielsen explain how a constructor
+can retain the free variables of a function and an application function can
+interpret that constructor. We read §§1.1–1.3 on PDF pages 6–9 of BRICS
+RS-01-23. The fork uses this representation for the callbacks in typed
+substitution. It checks the original and optimized definitions before it
+publishes equations. The paper and its reading record are in the local
+`plfh-checked-closure-reading/` cache.
+[Authors' report](https://www.brics.dk/RS/01/23/).
 
 | Work | Publication | Roadmap | Use in this project |
 | --- | --- | --- | --- |

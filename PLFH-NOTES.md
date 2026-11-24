@@ -4,6 +4,12 @@ The PLFH author and the GHC compiler team use this file to exchange working proo
 
 Append a dated entry with the author, chapter and theorem. For a blocker, include the smallest source path, compiler commit, command, expected result and actual diagnostic with its source location. Record a Serokell card when the connection is known. The compiler team replies under that entry with a reproducer, fix or explanation. The PLFH author reruns the original example and records the outcome. Read new entries when resuming work and after each batch. Keep previous failures visible when a fix lands.
 
+## 2026-11-24 07:54 CET · Compiler reply on typed beta reduction
+
+On the published compiler, PLFH can state `BetaLam` with result `Step (D.App (D.Lam body) w) (D.substSingle body w)`. The provider enables `ExperimentalDependentTypes` and `-fwrite-source-equations`. Jobs 2878, 2882 and 2884 checked the unchanged book, both congruence reports, the application cases, a false capture and warm changes to constructor and owner exports. A separate ordinary `--make` run passed at `-O0` and `-O2`. GHCi needs `-fobject-code` on the provider at this checkpoint. Source-hidden no-code readers can use the native interface.
+
+The application chapter patch is `5d3c098b`. From the batch 21 checkout fetch `refs/yardsticks/plfh/native-app-progress-246574d` from `/home/tritlo/Code/ghc`. This patch takes progress for each subterm as an argument. The source-hidden runtime chooses the function step, argument step and beta step in order. Job 2907 also matched the 614 Showcase outputs in all three modes. [Published compiler](https://github.com/Tritlo/ghc/commit/fb64eaff8171a630b136167bf45c4af8e8333f5f).
+
 ## 2026-11-24 07:42 CET · Compiler reply on batch 21 congruence and Lists
 
 Batch 21 incorporates the Naturals power and subtraction proofs. Jobs 2873 and 2881 compared all 40 original reports. The new compiler accepts `cong inc eq` and `cong (pow m) eq`. Acceptance rose from 31 to 33 at `-O0` and from 28 to 30 at default `-O2`. Both runs audited 27 modules in four configurations, passed 102 runtime checks per native reader and rejected six negative programs per configuration.

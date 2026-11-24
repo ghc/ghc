@@ -68,6 +68,24 @@ a comparison implementation. External solvers remain later work.
   the outer context. The compiler regression checks the shift on PLFH's
   typed `substSingle` and rejects the endpoint that would capture the variable.
   [Agda simultaneous substitution](https://plfa.github.io/DeBruijn/#simultaneous-substitution).
+- **Capture-avoiding beta reduction.** The example uses the typed terms,
+  renaming and substitution from the PLFH DeBruijn chapter. It omits
+  the rest of the chapter. A variable free in the argument crosses one
+  binder, so its index changes from one to two. The type of the beta
+  step names the ordinary Haskell `substSingle`. The provider is adapted
+  from PLFH under CC BY 4.0, based on PLFA by Philip Wadler, Wen Kokke
+  and Jeremy G. Siek.
+  [PLFH source](https://github.com/Tritlo/PLFH/blob/246574dca2182bff387a8e20e61273216849714b/content/part2/DeBruijn.md),
+  [license](https://creativecommons.org/licenses/by/4.0/),
+  [Agda DeBruijn](https://plfa.github.io/DeBruijn/),
+  [Haskell proof](examples/open-evaluation/BookBetaReduction.hs).
+- **Representing a checked callback.** Danvy and Nielsen describe
+  defunctionalization with constructors for captured values. The fork
+  uses private constructors for replacement, shifting, and lifting a
+  substitution under a binder. Its source and Core checks determine
+  when it can expose those equations to a Haskell client.
+  [Defunctionalization at Work, §§1.1–1.3](https://www.brics.dk/RS/01/23/),
+  [R16 implementation](roadmap/R16-open-term-evaluator.md#typed-substitution-under-a-binder).
 - **Isomorphism fields.** PLFA packages two functions with proofs of both
   round trips. The fork's GADT has four fields. Its first two fields are
   retained functions between lifted type parameters. The other two refer

@@ -8,12 +8,14 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
-[Compiler `ad1a979ead`](https://github.com/Tritlo/ghc/commit/ad1a979ead80254776043bbc8d79d963aec50e1c)
-accepts `cong inc eq` and `cong (pow m) eq`. The first passes an ordinary
-unary function. The second passes a power function before its exponent
-is known. A proof that reduces the call still needs checked equations.
-Job 2880 matched all 613 Showcase outputs at native `-O0`, default
-`-O2` and in GHCi. [Haskell examples](examples/open-evaluation/BookCongruence.hs).
+[Compiler `fb64eaff81`](https://github.com/Tritlo/ghc/commit/fb64eaff8171a630b136167bf45c4af8e8333f5f)
+checks a beta step whose target is the ordinary `substSingle body w` on
+intrinsically typed de Bruijn terms. The capture example verifies the
+free variable's new index in the type and returns `Just 2` at runtime.
+Job 2907 matched all 614 Showcase observations at native `-O0`, default
+`-O2` and in GHCi. Its provider uses `-fwrite-source-equations` and
+`-fobject-code`. [Proof](examples/open-evaluation/BookBetaReduction.hs)
+and [current producer requirements](roadmap/R16-open-term-evaluator.md#typed-substitution-under-a-binder).
 
 [Published PLFH batch 21](https://github.com/Tritlo/PLFH/tree/246574dca2182bff387a8e20e61273216849714b)
 uses the same-module proofs of powers and truncated subtraction. On that
@@ -32,17 +34,15 @@ two conversions remain open. From the book checkout, run
 
 ## Next compiler work
 
-- Complete De Bruijn progress on the book's intrinsically typed terms.
-  Its value classifier checks in case and equation form. The application
-  case introduces an existential argument index. Revision `5a7d9d7de8`
-  checks both congruence branches and the value/value branch when the
-  caller supplies recursive progress and beta. Jobs 2529 and 2533 checked
-  the three branches, two false endpoints and the compatibility controls.
-  With the full optimized interface from the published De Bruijn chapter,
-  the compiler reduces `substSingle ('Var 'Z) w` to `w` and shifts a
-  free replacement under a lambda. Job 2589 checked both proofs at
-  `-O0` and `-O2`. General beta reduction still needs
-  an equation for substitution when the function body is unknown.
+- The application case now uses the checked beta constructor when both
+  subterms are values. From the book checkout fetch
+  `refs/yardsticks/plfh/native-app-progress-246574d` from the local GHC
+  repository. The application proof takes progress for its subterms as
+  an argument. Full progress also requires the ordinary `Case` and `Mu`
+  constructors of the indexed GADT to refine their branches.
+- At this checkpoint bytecode and fresh no-code producers still withhold
+  the substitution equations. Native `--make` works at `-O0` and `-O2`.
+  An interface-only reader can use the native provider in no-code mode.
 - Job 2680 built both stages of the 607-example source `a745ffc9b8`.
   The selected tests passed 47/49, compatibility passed 231/234 and
   the focused suite passed 136/138. The package and all three Showcase
@@ -51,7 +51,7 @@ two conversions remain open. From the book checkout, run
   focused failures were `NativeDependentCoreRun` (copied source certificate)
   and the known `deriving-via-compile` diagnostic. Job 2854 passed the
   revised Core Lint fixture in `551528d74c`. Use the independent
-  build to compare the complete cohorts. Job 2837 builds the 612-example
+  build to compare the complete cohorts. Job 2837 built both stages of the 612-example
   checkpoint `781a6c6a8f`. Its results are under
   `_build/on-demand/plfh-batch18-normal-next-20261124`.
 - Three compiler agents use a shared queue with four GHC build slots,
