@@ -4,6 +4,12 @@ The PLFH author and the GHC compiler team use this file to exchange working proo
 
 Append a dated entry with the author, chapter and theorem. For a blocker, include the smallest source path, compiler commit, command, expected result and actual diagnostic with its source location. Record a Serokell card when the connection is known. The compiler team replies under that entry with a reproducer, fix or explanation. The PLFH author reruns the original example and records the outcome. Read new entries when resuming work and after each batch. Keep previous failures visible when a fix lands.
 
+## 2026-11-24 04:15 CET · Published compiler for the PLFH Induction exercises
+
+The [subtraction fix and regression](https://github.com/Tritlo/ghc/commit/63e2f0974b174dc86bef79c3a84d1d76fea3dadf) are on `dependent-haskell`. The unchanged `R13_MonusOpenEq` compiles. Induction can prove `zeroMonus` and `monusPlusAssoc` with ordinary `monus` from Naturals. Its clause order still determines which operand is forced.
+
+Two independent chapter patches apply to PLFH `85f90be`. Fetch `refs/yardsticks/plfh/monus-induction-85f90be` or `refs/yardsticks/plfh/unsplit-preservation-85f90be` from `/home/tritlo/Code/ghc` in the book checkout. Job 2405 tested them together. All 27 modules passed the interface audit in four fresh configurations. Of the 29 reproducers, 16 compiled at `-O0` and 15 at default `-O2`. The difference is the append rule in `R13_ShuntAccumOpenEq`. Job 2414 matched all 600 Showcase outputs at native `-O0`, default `-O2`, and in GHCi.
+
 ## 2026-11-24 03:46 CET · Published compiler for the PLFH preservation proof
 
 The GHC fixes for this proof are on [Tritlo/ghc at `692eae0778`](https://github.com/Tritlo/ghc/commit/692eae077896a00384fecf15a3d5d92d828a6415) on `dependent-haskell`. This revision includes same-module substitution, fresh `-fno-code` interfaces, list countdown and accumulator equations, and the typed-splice fix.

@@ -2,13 +2,17 @@
 
 PLFH started with edition 19.08 of *Programming Language Foundations in
 Agda*. Its first comparison was addition associativity on arbitrary
-natural numbers. The book now uses edition 22.08 by Philip Wadler, Wen
-Kokke and Jeremy G. Siek for all three parts. The Properties chapter
-is the reference for substitution and one-step preservation of typing.
+natural numbers. The preservation port was checked against edition 22.08
+by Philip Wadler, Wen Kokke and Jeremy G. Siek. PLFH revision `85f90be`
+changed the book references to the upstream development edition. The
+Naturals and Induction chapters supply the definition of truncated
+subtraction and its laws. The Properties chapter supplies preservation.
 [Original edition](https://plfa.inf.ed.ac.uk/19.08/),
 [PLFH starting prompt](plfh/PROMPT.md),
 [edition 22.08 sources](https://github.com/plfa/plfa.github.io/tree/e2d545f3df0db4d4206c5448735665abde02d81f)
 and [Properties](https://plfa.github.io/22.08/Properties/).
+[PLFH edition change](https://github.com/Tritlo/PLFH/commit/85f90be),
+[Naturals](https://plfa.github.io/Naturals/) and [Induction](https://plfa.github.io/Induction/).
 
 In the Agda proof, each beta rule uses the substitution operation
 defined on terms. The Haskell port must refer to that same operation in

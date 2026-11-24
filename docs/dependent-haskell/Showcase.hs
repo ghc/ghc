@@ -176,6 +176,7 @@ import qualified PreludeFoldrProof
 import qualified PreludeZipProof
 import qualified HaskLib
 import qualified BookCalculations as Book
+import qualified BookNaturals
 import qualified CastedConstructorGivens as TreeProof
 import qualified SumOfSizes
 import qualified Client as HaskLibClient
@@ -310,6 +311,11 @@ bottomValue = error
 -- | Print one finite observation with its feature label.
 observe :: (Show a) => String -> a -> IO ()
 observe label value = putStrLn (label ++ ": " ++ show value)
+
+-- | Subtracting any natural from zero gives zero.
+zeroMonus :: foreach (n :: HaskLib.Nat) -> BookNaturals.monus 'HaskLib.Zero n :~: 'HaskLib.Zero
+zeroMonus HaskLib.Zero     = Refl
+zeroMonus (HaskLib.Succ _) = Refl
 
 -- | Return the measurement and certify that reversal preserves it.
 measureReverseLength :: forall a. foreach (measure :: [a] -> HaskLib.Size)
@@ -1961,6 +1967,8 @@ main = do
     count <- newIORef (3 :: HaskLib.Nat) >>= readIORef
     observe "prove the length of a countdown"
         (Book.downFrom count, Book.lengthDownFrom count)
+    observe "subtract a runtime natural from zero"
+        (BookNaturals.monus 0 count, zeroMonus count)
     let arrow = Book.Arrow Book.Bottom (error "forced the arrow output")
     observe "take the domain of a join of function values"
         (Book.dom (Book.Join arrow Book.Bottom), Book.domJoin arrow Book.Bottom)

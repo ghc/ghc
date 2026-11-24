@@ -8,6 +8,14 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
+[Compiler `63e2f0974b`](https://github.com/Tritlo/ghc/commit/63e2f0974b174dc86bef79c3a84d1d76fea3dadf)
+checks PLFH's ordinary truncated subtraction. The Induction chapter proves
+that subtracting twice subtracts the sum of the two operands. With both
+the Induction and preservation patches on PLFH `85f90be`, job 2405 checked
+27 modules in native and no-code modes at `-O0` and `-O2`. Sixteen of the
+29 compiler reproducers compile at `-O0` and fifteen at default `-O2`.
+The [shared notebook](../../PLFH-NOTES.md) gives the chapter patch refs.
+
 The compiler changes for the PLFH preservation proof are on
 [`dependent-haskell` at `692eae0778`](https://github.com/Tritlo/ghc/commit/692eae077896a00384fecf15a3d5d92d828a6415).
 The beta rules use the ordinary substitution function from the same module.
@@ -30,15 +38,18 @@ records updates from the book author and the compiler team.
 
 ## Next compiler work
 
-- Job 2356 built both stages of the earlier `923571c2c8` revision. Job 2395
-  builds `9cc4065fab` and runs 41 registrations and the broader suites.
-- Prioritize PLFH. Job 2394 checked all 29 reports on `9cc4065fab`. Fifteen
-  compiled at `-O0` and fourteen at default `-O2`. The latter rejects the
-  append proof in `R13_ShuntAccumOpenEq` with GHC-83605.
-- Integrate the truncated subtraction fix after checking its right-operand
-  demand on the current compiler. Select the next retained GADT case from
-  an open book theorem. Defer the older R21 keyed-tree change until a PLFH
-  example needs it.
+- Job 2356 built both stages of `923571c2c8` and passed the 599-output
+  Showcase in all modes. Its registration run timed out after reporting
+  GHC-45510 on a GADT field and an independent type index both named
+  `gLength`. Job 2413 confirmed the compatibility regression. Check the
+  repair against the record and the book's false substitution target.
+- For PLFH, check ordinary exponentiation and the retained GADT case in
+  the De Bruijn progress proof. Default optimization still rejects the append
+  equation in `R13_ShuntAccumOpenEq`. Job 2395 did not run because its
+  prerequisite required the entire earlier qualification run to pass.
+- Recheck the R21 keyed-tree declaration-order patch in parallel. The three
+  GHC slots share the same 16-core and 64 GB slice. Local benchmark jobs
+  pause the GHC queue and freeze its active builds.
 
 The [roadmap](ROADMAP.md#where-this-fork-stands) counts 27 of 50 cards complete.
 The [open obligations](ROADMAP.md#remaining-work-by-roadmap-area) cover
@@ -194,7 +205,7 @@ The November 24 cleanup retired 826 completed test executables and freed
 7,733,612,544 bytes. Inputs, objects and results stayed in place. The file
 inventory is in `_build/on-demand/retirement-completed-test-executables-20261124`.
 
-The GHC queue has two slots. Local benchmark jobs take priority and freeze
+The GHC queue has three slots. Local benchmark jobs take priority and freeze
 the GHC slice. The remote Colab benchmark uses the
 `colab-inkling-graded-*` label in the `build` group and runs alongside GHC.
 Jobs 1947 and 1949 were exploratory allocation measurements.
@@ -269,7 +280,7 @@ inferred capture kind in a type lambda. A reader built from 572
 consumed the resulting row from a stripped interface at both
 optimization levels.
 
-The two GHC build slots share a 16-core, 64,000,000,000-byte slice and
+The three GHC build slots share a 16-core, 64,000,000,000-byte slice and
 yield to the benchmark queues. Use the
 [queue recovery procedure](CHECKPOINTS.md#restore-the-shared-wsl-build-queue)
 after a distribution restart.
@@ -800,7 +811,7 @@ defaults and an opt-in migration warning.
 3. Restore the [shared WSL build queue](CHECKPOINTS.md#restore-the-shared-wsl-build-queue)
    before submitting work. Use at most two subagents. The coordinator
    reviews and integrates their results. Check the live assignments and
-   queue before resuming a roadmap card. The group has two slots. All GHC jobs share
+   queue before resuming a roadmap card. The group has three slots. All GHC jobs share
    16 logical CPUs, 64,000,000,000 bytes of memory and zero swap.
    Higher-priority jobs pause the queue and freeze the GHC slice.
 

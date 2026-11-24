@@ -6,6 +6,35 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Truncated subtraction in the Induction chapter
+
+The [published compiler](https://github.com/Tritlo/ghc/commit/63e2f0974b174dc86bef79c3a84d1d76fea3dadf)
+checks the following PLFH exercises with the ordinary `monus` from Naturals.
+
+```haskell
+zeroMonus :: foreach (n :: Nat) -> monus 'Zero n :~: 'Zero
+zeroMonus Zero     = Refl
+zeroMonus (Succ _) = Refl
+
+monusPlusAssoc :: foreach (m :: Nat) -> foreach (n :: Nat) -> foreach (p :: Nat)
+               -> monus (monus m n) p :~: monus m (plus n p)
+```
+
+Job 2403 checked the original reproducer and a client that could read only
+compiled interfaces. Both optimization levels accepted successor cancellation
+and the two book proofs. They rejected two false or unjustified equalities.
+Runtime tests checked that subtraction inspects the second operand first
+and leaves unused predecessor fields lazy.
+
+Job 2405 built PLFH revision `85f90be` with the Induction and preservation
+patches together. All 27 modules passed the interface audit in native and
+no-code builds at both optimization levels. Sixteen of 29 PLFH reproducers
+compiled at `-O0` and fifteen at default `-O2`. The difference was the
+append rule in `R13_ShuntAccumOpenEq`. The source layout also matters:
+placing subtraction next to the proofs in `BookCalculations` lost its
+exported equation. A separate Naturals provider retains it. Job 2414 matched all 600 lines
+of the Showcase at native `-O0`, default `-O2`, and in GHCi.
+
 ## One-step preservation with same-module substitution
 
 The [published compiler revision](https://github.com/Tritlo/ghc/commit/692eae077896a00384fecf15a3d5d92d828a6415)
