@@ -267,3 +267,42 @@ for opt in -O0 -O2; do
     cp ../provider/CongNat.hi .
     "${ghc[@]}" "$opt" -fforce-recomp -fno-code -c RequiredCong.hs
 done
+
+# An inferred matchability binder in a promoted constructor must agree
+# with the predicate's kind. Preserve the original open proof field.
+cat >PromotedPredicate.hs <<'HS'
+{-# LANGUAGE AllowAmbiguousTypes, CPP, DataKinds, GADTs, Modifiers, PolyKinds #-}
+{-# LANGUAGE StandaloneKindSignatures, TypeApplications, TypeFamilies, TypeOperators #-}
+module PromotedPredicate where
+
+import Data.Kind (Type)
+import Data.Type.Equality ((:~:) (Refl))
+import GHC.Types (Matchability)
+
+type Evidence :: forall {m :: Matchability}. (Bool %m -> Type) -> Type
+data Evidence p where
+    Proof :: forall {m :: Matchability} (p :: Bool %m -> Type).
+             p True -> Evidence p
+
+data Checked (b :: Bool) = Checked
+
+type ReadProof :: Evidence Checked -> Checked True
+type family ReadProof proof where
+    ReadProof ('Proof field) = field
+
+preserve :: forall (p :: Checked True) (q :: Checked True).
+#ifdef WRONG
+            ReadProof ('Proof @Checked p) :~: q
+#else
+            ReadProof ('Proof @Checked p) :~: p
+#endif
+preserve = Refl
+HS
+for opt in -O0 -O2; do
+    "${ghc[@]}" "$opt" -fforce-recomp -c PromotedPredicate.hs
+    if "${ghc[@]}" "$opt" -fforce-recomp -DWRONG -c PromotedPredicate.hs >proof.log 2>&1 ||
+        ! grep -Fq '[GHC-25897]' proof.log; then
+        cat proof.log >&2
+        exit 1
+    fi
+done
