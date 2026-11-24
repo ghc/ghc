@@ -4871,6 +4871,17 @@ tcInferTyApps
     -> TcType               -- ^ Function
     -> [LHsTypeArg GhcRn]   -- ^ Args
     -> TcM (TcType, TcKind) -- ^ (f args, result kind)
+{- Note [Promoted constructor predicate kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A promoted constructor can quantify over the matchability of a
+predicate. For example, Here can take a proof of p x. In a family
+pattern for membership, the expected kind is Any ((:~:) witness) xs.
+Keep the inferred matchability of Here flexible so the predicate can
+select Matchable. The same applies when a visible type application
+specifies the predicate. Limit this inference to a promoted
+constructor binder used in a callback kind.
+-}
+
 {- Note [Implicit ordinary-arrow matchability]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 FUN has a specified invisible matchability parameter before multiplicity.
@@ -5146,6 +5157,14 @@ tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
                           Just (owner, _) ->
                             bind <$> fresh_kind_arrow (mode_tyki mode) owner
                           Nothing -> default_binder tv }
+          -- See Note [Promoted constructor predicate kinds].
+          | Inferred <- flag
+          , TypeLevel <- mode_tyki mode
+          , tyVarKind tv `tcEqType` matchabilityTy
+          , Just (tc, _) <- tcSplitTyConApp_maybe fun
+          , isPromotedDataCon tc
+          , any (curried_callback_index tv . varType . binderVar) (tyConBinders tc)
+          = fresh
           -- See Note [Omitted matchability in higher-order arguments].
           | Specified <- flag
           , TypeLevel <- mode_tyki mode
