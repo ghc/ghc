@@ -1549,9 +1549,11 @@ canEqCast :: CanEqState
           -> TcType -> Coercion   -- LHS (res. RHS), ty1 |> co1
           -> TcType -> TcType     -- RHS (res. LHS), ty2 both normal and pretty
           -> TcS (StopOrContinue (Either IrredCt EqCt))
-canEqCast _ _ _ ev@(CtGiven (GivenCt { ctev_evar = evar })) NomEq swapped
-          ty1@(TyConApp tc tys1) co1 ty2 _
-  | let (rhs, rhs_cast) = case ty2 of
+canEqCast ces rdr_env envs ev eq_rel swapped ty1 co1 ty2 ps_ty2
+  | CtGiven (GivenCt { ctev_evar = evar }) <- ev
+  , NomEq <- eq_rel
+  , TyConApp tc tys1 <- ty1
+  , let (rhs, rhs_cast) = case ty2 of
           CastTy body co2 -> (body, MCo co2)
           _ -> (ty2, MRefl)
   , TyConApp tc' tys2 <- rhs
@@ -1559,64 +1561,68 @@ canEqCast _ _ _ ev@(CtGiven (GivenCt { ctev_evar = evar })) NomEq swapped
   , not (isTypeFamilyTyCon tc)
   , isInjectiveTyCon tc Nominal
   , tys1 `equalLength` tys2
-  , coercionRKind co1 `tcEqType` typeKind ty2
-  , not (coercionLKind co1 `tcEqType` typeKind ty2)
   -- See (EIK5) in Note [Equalities with heterogeneous kinds].
-  = do { let loc = ctEvLoc ev
-             cast_ty1 = mkCastTy ty1 co1
-             pred_ty = case swapped of
-                         NotSwapped -> mkNomEqPred cast_ty1 ty2
-                         IsSwapped  -> mkNomEqPred ty2 cast_ty1
-             parent = mkGReflRightCo Nominal ty1 co1 `mkTransCo`
-                        maybeSymCo swapped (mkCoVarCo (setVarType evar pred_ty))
-                        `mkTransCo` mkSymCo (mkGReflRightMCo Nominal rhs rhs_cast)
-             selectors = tyConAppGivenSelectors (repeat Nominal) tys1 tys2 parent
-       ; emitSelectorGivens loc selectors
-       ; stopWith ev "Decomposed casted TyConApp Given" }
-canEqCast _ _ _ ev eq_rel _ ty1 co1 ty2 _
+  = do { transport <- kind_transport
+       ; case transport of
+           MRefl -> strip_cast
+           MCo _ -> do
+             { let loc = ctEvLoc ev
+                   cast_ty1 = mkCastTy ty1 co1
+                   pred_ty = case swapped of
+                               NotSwapped -> mkNomEqPred cast_ty1 ty2
+                               IsSwapped  -> mkNomEqPred ty2 cast_ty1
+                   parent = mkGReflRightCo Nominal ty1 co1 `mkTransCo`
+                              maybeSymCo swapped (mkCoVarCo (setVarType evar pred_ty))
+                              `mkTransCo` mkSymCo (mkGReflRightMCo Nominal rhs rhs_cast)
+                   selectors = tyConAppGivenSelectors (repeat Nominal) tys1 tys2 parent
+             ; emitSelectorGivens loc selectors
+             ; stopWith ev "Decomposed casted TyConApp Given" } }
   | keepOpaqueCastGiven ev eq_rel ty1 co1 ty2
   = do { emitNewGivens (mkKindEqLoc ty1 ty2 (ctEvLoc ev)) [(Nominal, co1)]
        ; let reason | typesAreApart (typeKind ty1) (typeKind ty2) = ShapeMismatchReason
                     | otherwise = IrredShapeReason
        ; finishCanWithIrred reason ev }
-canEqCast ces rdr_env envs ev eq_rel swapped ty1 co1 ty2 ps_ty2
-  = do { traceTcS "Decomposing cast" (vcat [ ppr ev
-                                           , ppr ty1 <+> text "|>" <+> ppr co1
-                                           , ppr ps_ty2 ])
-       ; rhs_cast <- cast_rhs
-       ; let rhs_redn = mkGReflRightMRedn role ps_ty2 rhs_cast
-       ; case rhs_cast of
-           MCo kind_co -> emitNewGivens (mkKindEqLoc ty1 ty2 (ctEvLoc ev)) [(Nominal, kind_co)]
-           MRefl       -> return ()
-       ; new_ev <- rewriteEqEvidence ev swapped
-                      (mkGReflLeftRedn role ty1 co1)
-                      rhs_redn
-                      emptyCoHoleSet
-       ; can_eq_nc (swapCES swapped ces) rdr_env envs new_ev eq_rel
-                   ty1 ty1 (mkCastTyMCo ty2 rhs_cast) (reductionReducedType rhs_redn) }
+  | otherwise = strip_cast
   where
     role = eqRelRole eq_rel
+    strip_cast
+      = do { traceTcS "Decomposing cast" (vcat [ ppr ev
+                                               , ppr ty1 <+> text "|>" <+> ppr co1
+                                               , ppr ps_ty2 ])
+           ; rhs_cast <- cast_rhs
+           ; let rhs_redn = mkGReflRightMRedn role ps_ty2 rhs_cast
+           ; case rhs_cast of
+               MCo kind_co -> emitNewGivens (mkKindEqLoc ty1 ty2 (ctEvLoc ev)) [(Nominal, kind_co)]
+               MRefl       -> return ()
+           ; new_ev <- rewriteEqEvidence ev swapped
+                          (mkGReflLeftRedn role ty1 co1)
+                          rhs_redn
+                          emptyCoHoleSet
+           ; can_eq_nc (swapCES swapped ces) rdr_env envs new_ev eq_rel
+                       ty1 ty1 (mkCastTyMCo ty2 rhs_cast) (reductionReducedType rhs_redn) }
     cast_rhs
       | CtGiven {} <- ev
       , NomEq <- eq_rel
       , isJust (canEqLHS_maybe ty1)
-      = do { let Pair k1 k2 = coercionKind co1
-                 rhs_kind = typeKind ty2
-           ; if k2 `tcEqType` rhs_kind
-             then return (move_cast k1 rhs_kind)
-             else do { k1' <- zonkTcType k1
-                     ; k2' <- zonkTcType k2
-                     ; rhs_kind' <- zonkTcType rhs_kind
-                     ; return $ if k2' `tcEqType` rhs_kind'
-                                then move_cast k1' rhs_kind'
-                                else MRefl } }
+      = kind_transport
       | otherwise
       = return MRefl
 
-    -- See (EIK4) in Note [Equalities with heterogeneous kinds].
-    move_cast k1 rhs_kind
-      | k1 `tcEqType` rhs_kind = MRefl
-      | otherwise             = MCo (mkSymCo co1)
+    -- See (EIK4) and (EIK5) in Note [Equalities with heterogeneous kinds].
+    kind_transport
+      | k2 `tcEqType` rhs_kind = return (move_cast k1 rhs_kind)
+      | otherwise = do { k1' <- zonkTcType k1
+                       ; k2' <- zonkTcType k2
+                       ; rhs_kind' <- zonkTcType rhs_kind
+                       ; return $ if k2' `tcEqType` rhs_kind'
+                                  then move_cast k1' rhs_kind'
+                                  else MRefl }
+      where
+        Pair k1 k2 = coercionKind co1
+        rhs_kind = typeKind ty2
+        move_cast from_kind to_kind
+          | from_kind `tcEqType` to_kind = MRefl
+          | otherwise                   = MCo (mkSymCo co1)
 
 -- | Keep a nominal Given that transports a rigid runtime index or its peer.
 -- See Note [Opaque runtime index equalities].
@@ -3372,6 +3378,9 @@ Wrinkles:
      When T is injective, compose both transports with the Given.
      Use the uncast equality as an expression in its selectors.
      Removing one cast first would bind mixed-kind evidence.
+     As in (EIK4), shallow zonking can expose a constructor on one side
+     while the cast on the other side still refers to a filled variable.
+     Zonk the kinds for this check and use the original cast in the proof.
      A selector can also have different endpoint kinds. Bind
      its kind equality first and transport the right endpoint, as in
      canEqCanLHSHetero. This keeps the argument Given homogeneous.
