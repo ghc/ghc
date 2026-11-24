@@ -1,8 +1,9 @@
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables, StandaloneKindSignatures, TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables, StandaloneKindSignatures, TypeApplications, TypeFamilies, TypeOperators #-}
 module NativeIndexedGadtFieldsProvider where
 
 import Data.Kind (Type)
+import Data.Type.Equality ((:~:) (Refl))
 import PackedVecLibrary (Nat(..), Vec(..))
 
 type Shape :: forall (n :: Nat) -> Vec Bool n -> Type
@@ -54,4 +55,30 @@ other :: foreach (xs :: Vec Bool n) -> foreach (ys :: Vec Bool n)
 other xs _ = case xs of
     VNil -> Nothing
     VCons h (t :: Vec Bool m) -> Just (ConsSeen @h @m @t, ConsSeen @h @m @t)
+#endif
+
+type family Fields (n :: Nat) :: Type where
+    Fields 'Z = Maybe Bool
+    Fields ('S n) = Either Bool (Fields n)
+
+-- | Transport payloads between retained indices under a nominal proof.
+transportFields :: foreach (from :: Nat) -> foreach (to :: Nat) ->
+                   from :~: to -> Fields from -> Fields to
+transportFields _ _ Refl payload = payload
+
+-- | Open the zero branch of Fields after inspecting the equality.
+{-# INLINE simplifyFields #-}
+simplifyFields :: foreach (n :: Nat) -> n :~: 'Z -> Maybe Bool -> Fields n
+simplifyFields _ proof payload = case proof of
+    Refl -> payload
+
+#ifdef WRONG_FAMILY_ENDPOINT
+wrongFields :: foreach (n :: Nat) -> n :~: 'Z -> Fields n
+wrongFields _ Refl = Left True
+#endif
+
+#ifdef MISSING_FAMILY_MATCH
+missingMatch :: foreach (from :: Nat) -> foreach (to :: Nat) ->
+                from :~: to -> Fields from -> Fields to
+missingMatch _ _ _ payload = payload
 #endif

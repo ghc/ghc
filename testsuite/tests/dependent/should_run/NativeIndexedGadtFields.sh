@@ -105,3 +105,11 @@ for wrong in WRONG_HEAD WRONG_SCRUTINEE; do
         exit 1
     fi
 done
+
+for wrong in WRONG_FAMILY_ENDPOINT MISSING_FAMILY_MATCH; do
+    if "${ghc[@]}" -O0 -fforce-recomp "-D$wrong" -c NativeIndexedGadtFieldsProvider.hs >negative.log 2>&1 ||
+       ! grep -Eq '\[GHC-(05617|83865|25897)\]' negative.log; then
+        cat negative.log >&2
+        exit 1
+    fi
+done

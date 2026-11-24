@@ -6,7 +6,8 @@ import Data.IORef (newIORef, readIORef)
 import Data.Type.Equality ((:~:) (Refl))
 import NativeIndexedGadtFieldsProvider
     ( Held(..), Hold(..), Shape(..)
-    , inspectAnonymous, inspectCons, inspectEquations, inspectHold, inspectKnown )
+    , inspectAnonymous, inspectCons, inspectEquations, inspectHold, inspectKnown
+    , simplifyFields, transportFields )
 import qualified NativeNonuniformGadtFieldsProvider as N
 import PackedVecLibrary (Nat(..), Vec(..))
 
@@ -70,3 +71,11 @@ main = do
            observeNonuniform lambda, observeNonuniform application,
            either (const True) (const False) (term :: Either ErrorCall Bool),
            observeLegacy swapped, observeDiagonal Refl)
+
+    proof <- try (evaluate (simplifyFields Z (error "family equality proof") Nothing))
+    case proof :: Either ErrorCall (Maybe Bool) of
+      Left _ -> pure ()
+      Right _ -> fail "the family equality proof was not forced"
+    case transportFields Z Z Refl (simplifyFields Z Refl (Just (error "family payload"))) of
+      Just _ -> pure ()
+      Nothing -> fail "the family payload changed"
