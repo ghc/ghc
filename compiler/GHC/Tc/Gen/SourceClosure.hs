@@ -3,36 +3,40 @@ module GHC.Tc.Gen.SourceClosure (publishCheckedSourceClosures) where
 import GHC.Prelude
 
 import Control.Applicative ((<|>))
-import Control.Monad (foldM, guard, zipWithM)
+import Control.Monad (foldM, guard, zipWithM, zipWithM_)
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Maybe (MaybeT(..))
 import Control.Monad.Fix (mfix)
 import Data.List (foldl', sortOn)
-import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
+import Data.Maybe (catMaybes, fromMaybe, isJust, mapMaybe)
 
 import GHC.Builtin.WiredIn.Types (manyDataConTy, unmatchableDataConTy)
 import GHC.Core (CoreBind, CoreExpr)
 import qualified GHC.Core as Core
+import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole)
 import GHC.Core.Coercion.Axiom
   ( CoAxBranch, ClosedTyFam(CTF), Role(Nominal)
   , coAxBranchLHS, coAxBranchRHS, coAxBranchTyVars )
 import qualified GHC.Core.DataCon as DC
 import GHC.Core.FamInstEnv (emptyFamInstEnvs, mkBranchedCoAxiom, mkCoAxBranch)
 import GHC.Core.FVs (exprFreeVars, exprSomeFreeVarsList)
-import GHC.Core.OpenWhnf (checkedMultiplicityCast)
+import GHC.Core.OpenWhnf (checkedMultiplicityCast, openDataConFieldTypes, openIndexedDataCon)
+import GHC.Core.Predicate (tyCoVarsOfTypesWellScoped)
 import GHC.Core.SimpleOpt (simpleOptExpr)
-import GHC.Core.Subst (extendTvSubst, mkEmptySubst, substExpr)
-import GHC.Core.TyCo.Compare (eqType)
+import GHC.Core.Subst (extendTvSubst, mkEmptySubst, mkOpenSubst, substExpr)
+import GHC.Core.TyCo.Compare (eqType, eqTypes)
 import GHC.Core.TyCo.Rep (Coercion(..), MCoercion(MRefl), Scaled(..), Type(TyVarTy), scaledThing)
 import GHC.Core.TyCon
   ( FamTyConFlav(ClosedTypeFamilyTyCon), AlgTyConFlav(VanillaAlgTyCon)
   , TyCon, TyConBinder, Injectivity(NotInjective), mkAlgTyCon
-  , mkLevPolyDataTyConRhs, mkTyConKind, mkAnonTyConBinder, mkNamedTyConBinders
+  , mkLevPolyDataTyConRhs, mkTyConKind, mkAnonTyConBinder, mkNamedTyConBinder, mkNamedTyConBinders
   , mkFamilyTyCon, mkTyConKindWithMatchability, isAlgTyCon, isPromotedDataCon
   , tyConDataCons, tyConKind, tyConName )
 import GHC.Core.Type
-  ( Kind, isLiftedTypeKind, liftedTypeKind, lookupTyVar, mkTyConApp, mkTyVarTy
-  , mkTyVarTys, splitForAllTyVars, splitFunTys, splitTyConApp_maybe, substTyUnchecked
+  ( Kind, getTyVar_maybe, isLiftedTypeKind, isManyTy, liftedTypeKind, lookupTyVar, mkTyConApp, mkTyVarTy
+  , mkTyVarTys, splitForAllForAllTyBinders, splitForAllTyVars, splitFunTys, splitTyConApp_maybe, substTyUnchecked, substTyWith
   , tyCoVarsOfTypes, typeKind )
-import GHC.Core.Unify (tcMatchTys)
+import GHC.Core.Unify (alwaysBindTv, tcMatchTys, tcUnifyTys)
 import GHC.Core.Utils (exprType, stripTicksE)
 import GHC.Driver.Config (initSimpleOpts)
 import GHC.Driver.DynFlags (HasDynFlags(getDynFlags))
@@ -45,7 +49,8 @@ import GHC.Tc.Utils.Monad (TcGblEnv(..), TcM, getGblEnv, getGlobalRdrEnv, newSys
 import GHC.Tc.Utils.TcType (isTyFamFree)
 import GHC.Types.Avail (availsToNameSet)
 import GHC.Types.Id (Id, idDetails, idName, isDataConWorkId_maybe, isDataConWrapId_maybe)
-import GHC.Types.Id.Info (IdDetails(CheckedClosureSourceTableId, VanillaId))
+import GHC.Types.Id.Info (IdDetails(CheckedClosureSourceTableId, SourceTableId, VanillaId))
+import GHC.Types.Basic (SourceTableOrigin(NominalSourceTable))
 import GHC.Types.Id.Make (DataConBangOpts(FixedBangOpts))
 import GHC.Types.Name
   ( Name, isExternalName, isWiredInName, mkDataOcc, mkInstTyCoOcc, mkSourceTableOcc, mkTcOcc
@@ -58,7 +63,7 @@ import GHC.Types.Tickish (GenTickish(Breakpoint))
 import GHC.Types.TyThing (TyThing(AnId))
 import GHC.Types.TypeEnv (TypeEnv, lookupTypeEnv)
 import GHC.Types.Var
-  ( ForAllTyFlag(Specified), TyVar, isCoVar, isId, isTyVar
+  ( ForAllTyFlag(Specified), TyVar, VarBndr(Bndr), isCoVar, isId, isTyVar
   , Var, mkTyVar, mkTyVarBinders, setIdDetails, varType )
 import GHC.Types.Var.Env (mkInScopeSet)
 import GHC.Types.Var.Set (elemVarSet, mkVarSet, subVarSet, unionVarSet)
@@ -129,28 +134,44 @@ publishCheckedSourceClosures original_binds final_binds final_types = do
           Just (AnId actual) | idName actual == name
                              , nameModule_maybe name == here -> Just actual
           _ -> Nothing
-        candidate (old, original_rhs) = do
+        lookupOwner old = do
           let owner = idName old
           guard (isExternalName owner && owner `elemNameSet` exported)
           actual <- lookupLocal owner
           VanillaId <- pure (idDetails actual)
+          pure actual
+        dependencies include old actual = do
+          let helpers = nameSetElemsStable $ mkNameSet $
+                filter (\name -> name /= idName old && include name)
+                       (reachable original old ++ reachable final actual)
+          traverse lookupLocal helpers
+        candidate (old, original_rhs) = do
+          actual <- lookupOwner old
           original_shape <- familyInputs original old original_rhs
           final_rhs <- lookup actual final
           shape@(FamilyInputs _ _ _ _ term ext index _ _ _ _) <- familyInputs final actual final_rhs
           guard (sameShapes original_shape shape)
           guard (all ((== here) . nameModule_maybe . tyConName) [term, ext, index])
-          let helpers = nameSetElemsStable $ mkNameSet $
-                filter (\name -> name /= owner && isExternalName name)
-                       (reachable original old ++ reachable final actual)
-          helper_ids <- traverse lookupLocal helpers
+          helper_ids <- dependencies isExternalName old actual
           guard (not (null helper_ids))
           pure (actual, shape, helper_ids)
-    case mapMaybe candidate original of
-      [] -> pure ([], [])
-      candidates -> do
+        indexed_candidate (old, original_rhs) = do
+          actual <- lookupOwner old
+          final_rhs <- lookup actual final
+          original_rows <- indexedSource original old original_rhs
+          final_rows <- indexedSource final actual final_rhs
+          -- The indexed certificate retains every helper identity.
+          helper_ids <- dependencies (const True) old actual
+          pure (actual, (original_rows, final_rows), helper_ids)
+    case (mapMaybe candidate original, mapMaybe indexed_candidate original) of
+      ([], []) -> pure ([], [])
+      (closures, indexed) -> do
         visible <- visibleSourceMethodRules env
-        let safe (owner, _, helpers) = all (not . hasSourceMethodRule visible) (owner:helpers)
-        accepted <- catMaybes <$> traverse (publish public) (filter safe candidates)
+        let safe :: (Id, a, [Id]) -> Bool
+            safe (owner, _, helpers) = all (not . hasSourceMethodRule visible) (owner:helpers)
+        checked_closures <- catMaybes <$> traverse (publish public) (filter safe closures)
+        checked_indexed <- catMaybes <$> traverse (publishIndexed public) (filter safe indexed)
+        let accepted = checked_closures ++ checked_indexed
         pure (map fst accepted, concatMap snd accepted)
   where
     publish public (owner, shape, helpers) = do
@@ -160,6 +181,307 @@ publishCheckedSourceClosures original_binds final_binds final_types = do
         guard (all (\tc -> tc `elem` families || public tc) (sourceEquationDatatypes families))
         let new = setIdDetails owner (CheckedClosureSourceTableId (idName owner) root (map idName helpers))
         pure (new, families)
+
+{- Note [Checked indexed reconstruction]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A unary function can open an existential package and recurse on one of
+its fields. In a recursive branch, the new package must contain a
+proper subfield of the selected field and the exact other fields.
+The recursive call must appear below a lazy result constructor.
+
+The final wrapper can pass the package's fields to a worker. Recover
+that worker only when the wrapper forwards all erased and value fields
+in order. Read its recursive call as an application of the original
+owner to the reconstructed package. Compare the complete equations
+from original and final Core before publishing.
+
+Specialize each row with the nominal equalities bound by its actual
+constructor alternatives. Check each promoted constructor at the
+resulting kind. A cast can disappear only if its specialized endpoints
+agree and its evidence comes from those alternatives. The equations
+use the original closed family mechanism. They preserve a recursive
+call whose argument is still abstract.
+-}
+
+data IndexedPattern
+  = IndexedVariable Id
+  | IndexedConstructor Type DC.DataCon [Type] [IndexedPattern]
+
+data IndexedRow = IndexedRow IndexedPattern [Var] CoreExpr
+
+-- The worker's additional type arguments are the package existentials.
+data IndexedSource = IndexedSource [TyVar] Type Type (Maybe Id) [IndexedRow]
+
+-- | Expose exhaustive case paths and one exact worker wrapper.
+indexedSource :: [(Id, CoreExpr)] -> Id -> CoreExpr -> Maybe IndexedSource
+indexedSource bindings owner rhs = do
+    guard (exprType rhs `eqType` varType owner)
+    (parameters, [input], body) <- function rhs
+    let (_, tau) = splitForAllTyVars (exprType rhs)
+    (_, [Scaled mult input_kind], output_kind) <- pure (splitFunTys tau)
+    guard (isManyTy mult && input_kind `eqType` varType input &&
+           output_kind `eqType` exprType body &&
+           all (isLiftedTypeKind . typeKind) [input_kind, output_kind])
+    [(pack, binders, nested)] <- caseOn input body
+    (_, exs@(_:_), [], [], _, _) <- pure (DC.dataConFullSig pack)
+    guard (DC.dataConTyCon pack `hasOnly` pack)
+    (outer, proofs) <- indexedAlt input pack binders
+    let (existentials, fields) = splitAt (length exs) binders
+    (worker, tree) <- unwrap (parameters ++ existentials) fields nested
+    guard (not (null (exprSomeFreeVarsList (== fromMaybe owner worker) tree)))
+    rows <- descend outer proofs tree
+    guard (length rows > 1)
+    pure (IndexedSource parameters (varType input) (exprType body) worker rows)
+  where
+    tc `hasOnly` con = tyConDataCons tc == [con]
+
+    unwrap _ _ body@Core.Case{} =
+      pure (Nothing, body)
+    unwrap tys fields body = do
+      (Core.Var worker, args) <- pure (Core.collectArgs body)
+      guard (worker /= owner && nameModule_maybe (idName worker) == nameModule_maybe (idName owner))
+      let (passed_types, passed_fields) = splitAt (length tys) args
+      supplied <- traverse indexedTypeArg passed_types
+      guard (eqTypes supplied (mkTyVarTys tys) &&
+             length passed_fields == length fields &&
+             and (zipWith isVar passed_fields fields))
+      declaration <- lookup worker bindings
+      (worker_tys, worker_fields, tree) <- function declaration
+      let binders = worker_tys ++ worker_fields
+          free = foldl' unionVarSet (exprFreeVars tree) (map exprFreeVars args)
+          expanded = substExpr (mkOpenSubst (mkInScopeSet free) (zip binders args)) tree
+      guard (length worker_tys == length tys && length worker_fields == length fields &&
+             exprType declaration `eqType` varType worker &&
+             exprType expanded `eqType` exprType body)
+      pure (Just worker, expanded)
+
+    descend pat proofs expr@(Core.Case (Core.Var scrutinee) binder result alternatives) = do
+      guard (length alternatives > 0 && varType binder `eqType` varType scrutinee &&
+             result `eqType` exprType expr &&
+             scrutinee `elem` indexedFields pat)
+      (tc, _) <- splitTyConApp_maybe (varType scrutinee)
+      alts <- traverse read_alt alternatives
+      guard (map (\(con, _, _) -> con) alts == tyConDataCons tc)
+      concat <$> traverse (branch pat proofs scrutinee) alts
+    descend pat proofs body = pure [IndexedRow pat proofs body]
+
+    branch pat proofs scrutinee (con, binders, body) = do
+      (node, equalities) <- indexedAlt scrutinee con binders
+      descend (replace scrutinee node pat) (proofs ++ equalities) body
+
+    read_alt (Core.Alt (Core.DataAlt con) fields body) = Just (con, fields, body)
+    read_alt _ = Nothing
+
+    replace v node (IndexedVariable field) | v == field = node
+    replace v node (IndexedConstructor ty con source fields) =
+      IndexedConstructor ty con source (map (replace v node) fields)
+    replace _ _ pat = pat
+
+    isVar (Core.Var actual) expected = actual == expected
+    isVar _ _ = False
+
+indexedTypeArg :: CoreExpr -> Maybe Type
+indexedTypeArg (Core.Type ty) = Just ty
+indexedTypeArg _ = Nothing
+
+indexedFields :: IndexedPattern -> [Id]
+indexedFields (IndexedVariable v) = [v]
+indexedFields (IndexedConstructor _ _ _ fields) = concatMap indexedFields fields
+
+-- | Check the ordinary alternative telescope before using its equalities.
+indexedAlt :: Id -> DC.DataCon -> [Var] -> Maybe (IndexedPattern, [Var])
+indexedAlt scrutinee con binders = do
+    let kind = varType scrutinee
+    (tc, args) <- splitTyConApp_maybe kind
+    (universals, exs, specs, [], fields, _) <- pure (DC.dataConFullSig con)
+    let (locals, remaining) = splitAt (length exs) binders
+        (proofs, values) = splitAt (length specs) remaining
+        instantiate = substTyWith (universals ++ exs) (args ++ mkTyVarTys locals)
+    guard (tc == DC.dataConTyCon con && length args == length universals &&
+           length locals == length exs && all isTyVar locals &&
+           eqTypes (map (instantiate . varType) exs) (map varType locals) &&
+           length proofs == length specs && all isCoVar proofs &&
+           all isValueVar values && eqTypes (map (instantiate . scaledThing) fields) (map varType values) &&
+           null (DC.dataConRepArgBinders con) && null (DC.dataConStupidTheta con) &&
+           all (not . DC.isBanged) (DC.dataConImplBangs con))
+    zipWithM_ (check_proof instantiate) specs proofs
+    let source = map (instantiate . mkTyVarTy) (DC.dataConUserTyVars con)
+    pure (IndexedConstructor kind con source (map IndexedVariable values), proofs)
+  where
+    check_proof instantiate spec binder = do
+      let (tv, ty) = DC.eqSpecPair spec
+          co = CoVarCo binder
+      guard (coercionRole co == Nominal &&
+             coercionLKind co `eqType` instantiate (mkTyVarTy tv) &&
+             coercionRKind co `eqType` instantiate ty)
+
+-- | Publish one closed family after both compiler stages justify its rows.
+publishIndexed :: (TyCon -> Bool) -> (Id, (IndexedSource, IndexedSource), [Id])
+               -> TcM (Maybe (Id, [TyCon]))
+publishIndexed public (owner, (original, final), helpers) = runMaybeT $ do
+    let IndexedSource parameters domain result _ _ = original
+        (flags, _) = splitForAllForAllTyBinders (varType owner)
+    guard (length flags == length parameters)
+    name <- lift (newImplicitBinder (idName owner) mkSourceTableOcc)
+    axiom <- lift (newImplicitBinder name mkInstTyCoOcc)
+    operand <- lift (freshVar "operand" domain)
+    let binders = zipWith (\(_, Bndr _ flag) -> mkNamedTyConBinder flag) flags parameters ++ [mkAnonTyConBinder operand]
+        make = mkFamily name axiom binders result
+        header = make []
+    original_rows <- indexedEquations owner header original
+    final_rows <- indexedEquations owner header final
+    guard (length original_rows == length final_rows)
+    zipWithM_ same_row (map (`applyRow` header) original_rows) (map (`applyRow` header) final_rows)
+    let table = make (map (`applyRow` table) original_rows)
+        details = case helpers of
+          [] -> SourceTableId (idName owner) table NominalSourceTable
+          ids -> CheckedClosureSourceTableId (idName owner) table (map idName ids)
+    guard (all public (sourceEquationDatatypes [table]))
+    pure (setIdDetails owner details, [table])
+  where
+    same_row left right = do
+      let old_lhs = coAxBranchLHS left
+          new_lhs = coAxBranchLHS right
+      subst <- MaybeT (pure (tcMatchTys old_lhs new_lhs))
+      renamed <- MaybeT $ pure $ traverse (\v -> lookupTyVar subst v >>= getTyVar_maybe) (coAxBranchTyVars left)
+      guard (length renamed == length (coAxBranchTyVars right) &&
+             mkVarSet renamed == mkVarSet (coAxBranchTyVars right) &&
+             substTyUnchecked subst (coAxBranchRHS left) `eqType` coAxBranchRHS right)
+
+data IndexedEquation = IndexedEquation [TyVar] [Type] (TyCon -> Type)
+
+applyRow :: IndexedEquation -> TyCon -> CoAxBranch
+applyRow (IndexedEquation vars lhs rhs) family = mkBranch vars lhs (rhs family)
+
+-- | Instantiate only the actual case equalities. Translate the resulting row.
+indexedEquations :: Id -> TyCon -> IndexedSource -> MaybeT TcM [IndexedEquation]
+indexedEquations owner header (IndexedSource parameters domain result worker rows) = traverse row rows
+  where
+    row (IndexedRow pat proofs body) = do
+      let equalities = map CoVarCo proofs
+      subst <- MaybeT $ pure $ tcUnifyTys alwaysBindTv
+          (map coercionLKind equalities) (map coercionRKind equalities)
+      let specialize = substTyUnchecked subst
+      variables <- lift $ traverse (freshVar "field" . specialize . varType) (indexedFields pat)
+      let fields = zip (indexedFields pat) (mkTyVarTys variables)
+          args = map (specialize . mkTyVarTy) parameters
+          write_pattern (IndexedVariable v) = lookup v fields
+          write_pattern (IndexedConstructor kind con source children) =
+            checkedPromoted con (specialize kind) (map specialize source) =<< traverse write_pattern children
+      packed <- MaybeT $ pure (write_pattern pat)
+      value <- MaybeT $ pure $ indexedResult owner worker parameters domain header specialize proofs pat fields body
+      let lhs = args ++ [packed]
+          vars = tyCoVarsOfTypesWellScoped lhs
+          branch = IndexedEquation vars lhs value
+      guard (all isTyVar vars && typeKind (value header) `eqType` specialize result &&
+             validBranch (applyRow branch header))
+      pure branch
+
+-- | Validate a promoted constructor and its exact erased worker layout.
+checkedPromoted :: DC.DataCon -> Type -> [Type] -> [Type] -> Maybe Type
+checkedPromoted con kind source fields = do
+    (tc, parameters) <- splitTyConApp_maybe kind
+    guard (tc == DC.dataConTyCon con)
+    let names = DC.dataConUserTyVars con
+        value = mkTyConApp (DC.promoteDataCon con) (source ++ fields)
+        vanilla = do
+          expected <- traverse (`lookup` zip (DC.dataConUnivTyVars con) parameters) names
+          guard (eqTypes expected source)
+          openDataConFieldTypes con parameters
+    expected <- vanilla <|> (\(_, _, tys) -> tys) <$> openIndexedDataCon con kind source
+    guard (eqTypes (map typeKind fields) expected && typeKind value `eqType` kind)
+    pure value
+
+-- | Read constructors, bound fields and a structurally smaller self call.
+indexedResult :: Id -> Maybe Id -> [TyVar] -> Type -> TyCon -> (Type -> Type)
+              -> [Var] -> IndexedPattern -> [(Id, Type)] -> CoreExpr -> Maybe (TyCon -> Type)
+indexedResult owner worker parameters domain header specialize proofs pat fields = result False
+  where
+    result underneath (Core.Cast body co) = do
+      guard (caseCoercion proofs co &&
+             specialize (coercionLKind co) `eqType` specialize (coercionRKind co))
+      result underneath body
+    result _ (Core.Var v) = const <$> lookup v fields
+    result underneath expr = do
+      let (fun, args) = Core.collectArgs expr
+      Core.Var callee <- pure fun
+      if callee == owner || Just callee == worker
+        then recursive underneath callee args
+        else do
+          (con, supplied, values) <- indexedConstructor specialize callee args
+          children <- traverse (result True) values
+          _ <- checkedPromoted con (specialize (exprType expr)) supplied (map ($ header) children)
+          pure (\family -> mkTyConApp (DC.promoteDataCon con) (supplied ++ map ($ family) children))
+
+    recursive underneath callee args = do
+      guard underneath
+      IndexedConstructor _ package _ original <- pure pat
+      let (prefix, suffix) = splitAt (length parameters) args
+      tys <- traverse (fmap specialize . indexedTypeArg) prefix
+      guard (length tys == length parameters)
+      let kind = substTyWith parameters tys domain
+          n_exs = length (DC.dataConExTyCoVars package)
+      (supplied, actual_fields, worker_types) <-
+        if callee == owner
+          then do
+            [operand] <- pure suffix
+            guard (specialize (exprType operand) `eqType` kind)
+            (Core.Var builder, operands) <- pure (Core.collectArgs operand)
+            (con, supplied, values) <- indexedConstructor specialize builder operands
+            guard (con == package)
+            pure (Just supplied, values, [])
+          else do
+            let (locals, values) = splitAt n_exs suffix
+            erased <- traverse (fmap specialize . indexedTypeArg) locals
+            guard (length erased == n_exs)
+            pure (Nothing, values, erased)
+      actual <- traverse get_value actual_fields
+      guard (oneSmaller original actual)
+      values <- traverse (\v -> lookup v fields) actual
+      source <- case supplied of
+        Just written -> pure written
+        Nothing -> do
+          (_, universal_args) <- splitTyConApp_maybe kind
+          let universals = DC.dataConUnivTyVars package
+              variables = universals ++ DC.dataConExTyCoVars package
+          guard (length universal_args == length universals)
+          traverse (`lookup` zip variables (universal_args ++ worker_types)) (DC.dataConUserTyVars package)
+      packed <- checkedPromoted package kind source values
+      pure (\family -> mkTyConApp family (tys ++ [packed]))
+
+    get_value (Core.Var v) = Just v
+    get_value _ = Nothing
+
+    oneSmaller original values
+      | length original == length values
+      , Just changes <- zipWithM compare_field original values
+      = length (filter id changes) == 1
+      | otherwise = False
+
+    compare_field (IndexedVariable old) new = False <$ guard (old == new)
+    compare_field tree@IndexedConstructor{} new = True <$ guard (new `elem` indexedFields tree)
+
+indexedConstructor :: (Type -> Type) -> Id -> [CoreExpr]
+                   -> Maybe (DC.DataCon, [Type], [CoreExpr])
+indexedConstructor specialize callee args = do
+    let (erased, values) = span Core.isTyCoArg args
+        (tys, proofs) = span (isJust . indexedTypeArg) erased
+    types <- traverse (fmap specialize . indexedTypeArg) tys
+    let check_proof (Core.Coercion co) = coercionRole co == Nominal &&
+              specialize (coercionLKind co) `eqType` specialize (coercionRKind co)
+        check_proof _ = False
+    (con, supplied) <- case isDataConWrapId_maybe callee of
+      Just con -> (con, types) <$ guard (null proofs)
+      Nothing -> do
+        con <- isDataConWorkId_maybe callee
+        let variables = DC.dataConUnivTyVars con ++ DC.dataConExTyCoVars con
+        (_, _, specs, [], _, _) <- pure (DC.dataConFullSig con)
+        guard (length variables == length types && length specs == length proofs &&
+               all check_proof proofs)
+        supplied <- traverse (`lookup` zip variables types) (DC.dataConUserTyVars con)
+        pure (con, supplied)
+    guard (length supplied == length (DC.dataConUserTyVars con))
+    pure (con, supplied, values)
 
 sameShapes :: FamilyInputs -> FamilyInputs -> Bool
 sameShapes (FamilyInputs _ arity g a term ext index var hit miss rows)

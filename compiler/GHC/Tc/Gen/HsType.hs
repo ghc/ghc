@@ -4879,15 +4879,17 @@ tcInferTyApps
     -> TcType               -- ^ Function
     -> [LHsTypeArg GhcRn]   -- ^ Args
     -> TcM (TcType, TcKind) -- ^ (f args, result kind)
-{- Note [Promoted constructor predicate kinds]
+{- Note [Inferred predicate kinds in source applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A promoted constructor can quantify over the matchability of a
 predicate. For example, Here can take a proof of p x. In a family
 pattern for membership, the expected kind is Any ((:~:) witness) xs.
 Keep the inferred matchability of Here flexible so the predicate can
 select Matchable. The same applies when a visible type application
-specifies the predicate. Limit this inference to a promoted
-constructor binder used in a callback kind.
+specifies the predicate. A generated source family can abstract over
+the same predicate when it checks a call on the promoted package.
+Keep its inferred matchability flexible as well. In each case, the
+binder must occur in a quantified predicate kind.
 -}
 
 {- Note [Implicit ordinary-arrow matchability]
@@ -5165,13 +5167,14 @@ tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
                           Just (owner, _) ->
                             bind <$> fresh_kind_arrow (mode_tyki mode) owner
                           Nothing -> default_binder tv }
-          -- See Note [Promoted constructor predicate kinds].
+          -- See Note [Inferred predicate kinds in source applications].
           | Inferred <- flag
           , TypeLevel <- mode_tyki mode
           , tyVarKind tv `tcEqType` matchabilityTy
           , Just (tc, _) <- tcSplitTyConApp_maybe fun
-          , isPromotedDataCon tc
-          , any (curried_callback_index tv . varType . binderVar) (tyConBinders tc)
+          , (isPromotedDataCon tc &&
+             any (curried_callback_index tv . varType . binderVar) (tyConBinders tc)) ||
+            (isSourceFamilyName (tyConName tc) && quantified_callback tv inner_ki)
           = fresh
           -- See Note [Omitted matchability in higher-order arguments].
           | Specified <- flag
@@ -5219,6 +5222,12 @@ tcInferTyApps_nosat index_level expected_kind mode orig_hs_ty fun orig_hs_args
         curried_callback_index tv domain
           | Just (arrow, _, result) <- tcSplitFunTy_maybe domain
           = getTyVar_maybe arrow == Just tv || curried_callback_index tv result
+          | otherwise = False
+
+        quantified_callback tv kind
+          | Just (_, binder, rest) <- tcSplitPiTy_maybe kind
+          , isInvisiblePiTyBinder binder
+          = curried_callback_index tv (piTyBinderType binder) || quantified_callback tv rest
           | otherwise = False
 
         supplied_args = length [() | HsValArg{} <- all_args]
