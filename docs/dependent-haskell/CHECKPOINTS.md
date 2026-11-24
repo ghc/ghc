@@ -6,6 +6,30 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Required congruence and sum over append
+
+PLFH Induction can write `congVis Succ (plusAssoc m n p)` in the
+successor case. It can also pass the partially applied `plus m` in
+the same argument position. The following equality proof determines
+the endpoints. Jobs 2722 and 2723 checked the same 38 original reports
+on PLFH batch 18 before and after compiler `35916907b9`.
+Only `R23_MatchabilityPolyCong` changed from rejection to acceptance.
+The totals rose from 25 to 26 at `-O0` and from 23 to 24 at default `-O2`.
+
+Compiler `c130ce0391` checks that summing two appended lists gives
+the sum of their separate folds. The proof calls the ordinary library
+fold. It uses the checked equations for append with rewrite rules
+disabled in the proof module. Job 2730 checked the corrected theorem
+with native and fresh no-code interfaces. The unchanged book report
+uses associativity in the opposite direction. With rules disabled, it
+now reaches that error in the cons case. A false open endpoint in a
+separate reader still fails with GHC-83865.
+
+Job 2740 matched all 609 Showcase output lines in GHCi and with native
+code at `-O0` and default `-O2`.
+[Congruence proof](examples/open-evaluation/BookCongruence.hs)
+and [fold proof](examples/open-evaluation/BookFoldProof.hs).
+
 ## Reversal and commutativity in batch 15
 
 The Lists proof shows that `shunt xs ys` equals `rev xs ++ ys` by

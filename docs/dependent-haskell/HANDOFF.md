@@ -8,25 +8,26 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
-[Compiler `1dbee32a7a`](https://github.com/Tritlo/ghc/commit/1dbee32a7a5cbff0e10a95002dd18c58bb275fa9)
-checks the ordinary list reversal function alongside its inductive proof.
-It also checks that swapping a sum or a product twice returns the input.
-The pair proof now uses `swapPairInv (_, _) = Refl`. Job 2700
-matched all **607 Showcase observations** at native `-O0`,
-default `-O2` and in GHCi. [Proofs and verification](CHECKPOINTS.md#reversal-and-commutativity-in-batch-15).
+[Compiler `c130ce0391`](https://github.com/Tritlo/ghc/commit/c130ce0391d4f9d03b6ecb5d9a07a944df255582)
+checks the additive fold law using the installed `GHC.Internal.List.foldr`.
+Its induction step applies congruence under `plus x`, then uses
+associativity in reverse. A separate theorem uses `congVis Succ` and
+`congVis (plus m)` with inferred equality endpoints. Job 2740 matched all
+**609 Showcase observations** at native `-O0`, default `-O2` and in GHCi.
+[Proofs and checks](CHECKPOINTS.md#required-congruence-and-sum-over-append).
 
-[Published PLFH batch 15](https://github.com/Tritlo/PLFH/tree/3c550c8b9879b0f9202b8a9c408df3f61dca222c)
-has 37 original reports. Job 2664 found **25 compile at `-O0` and 23
-at default `-O2`**. The two differences are `R13_RevOpenEq` and
-`R13_ShuntAccumOpenEq`. All 27 modules passed the interface audit in
-four configurations. Both native readers passed 76 runtime checks.
-Each configuration rejected the six negative programs as expected.
+[Published PLFH batch 18](https://github.com/Tritlo/PLFH/tree/7c18bfbdcbef8b3df23ddaee4b80373609346f8f)
+incorporates the earlier Lists, Isomorphism and Connectives changes. On this
+book revision, job 2754 found **26 of 38 original reports compile at `-O0`
+and 24 at default `-O2`**. All 27 modules passed in four native and no-code
+configurations. Each native reader passed 84 checks. The unchanged
+fold report contains an independent proof error. The Lists chapter patch
+uses `sym` to give associativity the required direction.
 
-The combined book patch `21c2f158` applies directly to batch 15. It
-contains the changes to Lists, Isomorphism and Connectives. From the book
-checkout, run `git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/three-chapter-laws-3c550c8`.
-Job 2702 checked the three patched chapters together in the full book
-matrix. The [notebook](../../PLFH-NOTES.md) records the handoff.
+The combined Induction and Lists patch is available from the book checkout
+with `git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/induction-lists-7c18bfb`.
+Job 2755 checked the Haskell sources and all reports in that handoff.
+The [shared notebook](../../PLFH-NOTES.md) records the compiler and book revisions.
 
 ## Next compiler work
 
@@ -45,8 +46,8 @@ matrix. The [notebook](../../PLFH-NOTES.md) records the handoff.
   All 46 selected registrations, package checks and Showcase checks passed.
   Compatibility passed 233 of 234. `NativeBinaryEnum` used the old test
   expectation corrected in `83f46cf3ce`. The focused suite passed 137
-  of 138 with the known `MTrans` diagnostic. Job 2680 builds the
-  607-example source `a745ffc9b8` with 49 selected registrations.
+  of 138 with the known `MTrans` diagnostic. Job 2680 built both stages of the
+  607-example source `a745ffc9b8`. Its qualification includes 49 selected registrations.
   Check `_build/on-demand/plfh-batch15-normal-607-20261124/build.pass`,
   `qualification/gates.tsv` and `cohorts/gates.tsv` for final results.
 - Three compiler agents use a shared queue with four GHC build slots,

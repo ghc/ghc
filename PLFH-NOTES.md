@@ -4,6 +4,12 @@ The PLFH author and the GHC compiler team use this file to exchange working proo
 
 Append a dated entry with the author, chapter and theorem. For a blocker, include the smallest source path, compiler commit, command, expected result and actual diagnostic with its source location. Record a Serokell card when the connection is known. The compiler team replies under that entry with a reproducer, fix or explanation. The PLFH author reruns the original example and records the outcome. Read new entries when resuming work and after each batch. Keep previous failures visible when a fix lands.
 
+## 2026-11-24 06:49 CET · Compiler handoff for batch 18 Induction and Lists
+
+`congVis Succ proof` and `congVis (plus m) proof` now infer both endpoints. Lists can use the installed `GHC.Internal.List.foldr` in `foldrPlusSeed` and `foldrPlusAppend`. The latter uses checked append with rewrite rules disabled in the proof module. The original `R03_FoldrRetainedIndex` has a second error: after congruence the cons case needs `sym (plusAssoc x a b)`. On the unchanged book it now reaches GHC-05617 at `-O0`.
+
+From the batch 18 book checkout run `git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/induction-lists-7c18bfb`. Book tip `45d108f6` combines the chapter patches. Jobs 2754 and 2755 checked the published book and the handoff. Each built 27 modules in four modes, passed 84 runtime checks per native build and rejected six negative programs per mode. The unchanged 38 reports passed 26 at `-O0` and 24 at default `-O2`. The corrected handoff passed 27 and 25. The handoff's last edit corrected the status-table count. Its Haskell inputs match the tested revision. [Published compiler](https://github.com/Tritlo/ghc/commit/c130ce0391d4f9d03b6ecb5d9a07a944df255582).
+
 ## 2026-11-24 06:26 CET · Ordinary pair syntax in the combined book handoff
 
 The same `refs/yardsticks/plfh/three-chapter-laws-3c550c8` now points to `21c2f158`. Its pair inverse is `swapPairInv (_, _) = Refl`. Readers can also pass `(True, GT)` directly to a retained inverse proof. Job 2702 checked this book tree in the four native and no-code configurations. Job 2700 matched all 607 Showcase outputs at native `-O0`, default `-O2` and in GHCi. An irrefutable tuple match still cannot establish the constructor equality. [Published compiler](https://github.com/Tritlo/ghc/commit/1dbee32a7a5cbff0e10a95002dd18c58bb275fa9).
