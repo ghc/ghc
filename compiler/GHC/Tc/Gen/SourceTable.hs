@@ -2336,12 +2336,13 @@ sourceRetainedWitnessTables definitions = do
 -- The generated match returns the first field of this exact constructor.
 publishRetainedRecordWitness :: DataCon -> Id -> TcM TyCon
 publishRetainedRecordWitness con owner
-  | Just (expected, signature) <- monomorphicRetainedWitnessType (varType owner)
+  | Just (expected, signature@(ConstructorCaseType _ _ args _ _ _)) <- retainedWitnessType (varType owner)
   , con == expected
   , Just witness : _ <- dataConRepArgBinders con
   , _ : payloads <- dataConOrigArgTys con
-  = do { fields <- mapM (mkSysLocalM (fsLit "field") ManyTy . scaledThing) payloads
-       ; let lhs = CaseConstructor con [] (map CaseField (witness : fields))
+  = do { let instantiate = substTyWith (dataConUnivTyVars con) args
+       ; fields <- mapM (mkSysLocalM (fsLit "field") ManyTy . instantiate . scaledThing) payloads
+       ; let lhs = CaseConstructor con args (map CaseField (witness : fields))
        ; publishConstructorCase owner signature [ConstructorCaseRow [lhs] (CaseField witness)] }
   | otherwise = pprPanic "publishRetainedRecordWitness: invalid selector" (ppr owner)
 
@@ -2353,7 +2354,7 @@ checkLocalRetainedWitnessExports env owners = do
     forM_ owners $ \owner ->
       case sourceTableId_maybe owner of
         Just table
-          | Just (con, _) <- monomorphicRetainedWitnessType (varType owner)
+          | Just (con, _) <- retainedWitnessType (varType owner)
           , let tc = dataConTyCon con
           , nameModule_maybe (tyConName tc) == Just (tcg_semantic_mod env)
           , not (publicCaseType env exported (const False) tc) -> do
@@ -2672,10 +2673,17 @@ sourceCaseVisibleArity table
             Just [con] | con == tupleDataCon Boxed 2 -> Just 1
             _ -> Nothing
         Nothing
-          | Just (expected, _) <- monomorphicRetainedWitnessType kind -> do
+          | Just (expected, ConstructorCaseType telescope _ _ _ _ _) <- retainedWitnessType kind -> do
               [branch] <- pure branches
-              (con, witness : _) <- caseBranch [] branch
-              guard (con == expected && coAxBranchRHS branch `eqType` witness)
+              (con, witness : _) <- caseBranch telescope branch
+              (patterns, _) <- branchPatterns telescope branch
+              [pattern_ty] <- pure patterns
+              (_, args) <- splitTyConApp_maybe pattern_ty
+              let arity = length telescope
+                  parameters = take arity (coAxBranchTyVars branch)
+              guard (con == expected &&
+                     eqTypes (take arity args) (mkTyVarTys parameters) &&
+                     coAxBranchRHS branch `eqType` witness)
               pure 1
           | otherwise -> case constructorCaseType kind <|> monomorphicGuardedListCaseType kind of
               Just (ConstructorCaseType telescope tc _ domains position _)
@@ -2906,13 +2914,25 @@ constructorCaseType tau = do
 -- See Note [Retained field kinds in source equations].
 monomorphicRetainedWitnessType :: Type -> Maybe (DataCon, ConstructorCaseType)
 monomorphicRetainedWitnessType ty = do
-    (domain, result) <- caseArrow ty
-    (tc, []) <- caseDatatype domain
+    result@(_, ConstructorCaseType [] _ _ _ _ _) <- retainedWitnessType ty
+    pure result
+
+-- | Check the receiver and its erased parameters for a retained witness.
+-- Only generated record witnesses may have an erased parameter telescope.
+retainedWitnessType :: Type -> Maybe (DataCon, ConstructorCaseType)
+retainedWitnessType ty = do
+    let (telescope, body) = splitForAllForAllTyBinders ty
+    binders <- traverse ordinaryCaseBinder telescope
+    (domain, result) <- caseArrow body
+    (tc, args) <- caseDatatype domain
     [con] <- pure (tyConDataCons tc)
-    guard (isRetainedCaseRoot domain tc)
+    guard (all (\tv -> varType tv `eqType` liftedTypeKind) (binderVars binders) &&
+           eqTypes args (mkTyVarTys (binderVars binders)) &&
+           (null binders || not (null (dataConFieldLabels con))) &&
+           isRetainedCaseRoot domain tc)
     witness : _ <- pure (dataConOrigArgTys con)
     guard (result `eqType` scaledThing witness)
-    pure (con, ConstructorCaseType [] tc [] [domain] 0 result)
+    pure (con, ConstructorCaseType binders tc args [domain] 0 result)
 
 -- | A type variable quantified by an ordinary inferred or specified forall.
 ordinaryCaseBinder :: (Type, ForAllTyBinder) -> Maybe ForAllTyBinder
@@ -2965,9 +2985,13 @@ The ordinary visibility, constructor coverage, and RULE checks still
 apply. Interface recognition checks the instantiated promoted argument
 kinds again before classifying the table as a constructor case.
 
-A nullary package can supply an exact projection of its witness. Keep
-this rule separate from ordinary constructor cases with no domain type
-parameters. Check that the Core case returns its first field directly.
+A retained record selector quantifies over the same erased parameters as
+its constructor. Pass those parameters to the witness family before its
+receiver. This makes the receiver determine the erased arguments and
+keeps the result of a payload selector indexed by that receiver.
+
+A nullary package can also supply a handwritten witness projection.
+Check that its Core case returns its first field directly.
 Each payload field remains a variable in the checked alternative, even
 when its type depends on the witness. Check that the sole imported
 equation also returns the first variable of this same constructor.

@@ -3154,6 +3154,7 @@ data IfaceEvidence
   | RetainedSiblingFieldsEvidence
   | ScopedLambdaEtaEvidence
   | RetainedNamedRecordEvidence
+  | RetainedRecordParametersEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]

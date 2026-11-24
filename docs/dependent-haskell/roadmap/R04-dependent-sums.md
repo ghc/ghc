@@ -387,8 +387,8 @@ ordinary missing-field warning and raises the ordinary missing-field
 exception if evaluation demands that payload.
 [Example](../examples/packed-vector/NamedSiblingColumns.hs).
 
-The declaration uses one constructor, no datatype parameters, and lazy
-fields. Each payload uses the witness as its final type argument. Named
+The declaration uses one constructor and lazy fields. Each payload
+uses the witness as its final type argument. Named
 patterns list the selected fields in declaration order. Payload selection
 uses the generated function. The `HasField` result type depends on the
 label and record type, which do not supply a record value.
@@ -438,6 +438,27 @@ changes a nonempty record to an empty one. The constructor match demands
 the old record and leaves its fields unevaluated. GHC checks each new
 vector at `Z`. If GHC cannot reuse an omitted payload, it reports
 GHC-83605 at the witness field and names the missing replacement.
+
+### Named fields with type parameters
+
+```haskell
+data Columns a = Columns {storedLength :: Nat, cells :: Vec a storedLength}
+```
+
+The type parameter is erased. The generated selector has type
+`forall a. foreach (r :: Columns a) -> Vec a (storedLength r)`.
+An ordinary importing module can write
+`payload r = toList (cells r)` at type `Columns a -> [a]`.
+The selector's receiver supplies both the erased type parameter
+and the vector index.
+The parameterized declaration supports construction and field
+selection. Dependent record update still requires a nullary datatype.
+
+Agda includes the record parameters as implicit projection arguments.
+GHC specifies ordinary Haskell98 selector type arguments in datatype
+header order.
+[Agda record types](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html)
+and [GHC selector type applications](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/field_selectors_and_type_applications.html).
 
 ## Sums in constructor fields
 

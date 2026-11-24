@@ -2196,9 +2196,9 @@ rnHsConDeclRecFields ctxt fls fields
 
 -- | Rename the record fields under the name of their stored witness.
 -- See Note [Named retained record fields].
-rnRetainedHsRecordFields :: Name -> HsDocContext -> [FieldLabel] -> [LHsConDeclRecField GhcPs]
+rnRetainedHsRecordFields :: LHsType GhcRn -> HsDocContext -> [FieldLabel] -> [LHsConDeclRecField GhcPs]
                          -> RnM (Maybe (LHsType GhcRn, [LHsConDeclRecField GhcRn], FreeNames))
-rnRetainedHsRecordFields owner ctxt fls
+rnRetainedHsRecordFields result ctxt fls
     (L loc (HsConDeclRecField _ fields@[L _ (FieldOcc _ name)] first_field) : rest@(_ : _))
   | all (plain_field . cdrf_spec . unLoc) rest
   , plain_field first_field
@@ -2226,7 +2226,6 @@ rnRetainedHsRecordFields owner ctxt fls
                            , cdf_doc = doc }
                          witness_field = L loc (HsConDeclRecField noExtField
                                                (map (fmap (lookupField fl_env)) fields) field)
-                         result = nlHsTyVar NotPromoted owner
                          body = foldr (nlHsFunTy . cdf_type . cdrf_spec . unLoc) result payloads
                          sig = L loc (HsForEachTy (noEpTok, Left noEpUniTok) binders body)
                    ; pure (Just (sig, witness_field : payloads, fvs)) }
@@ -2246,7 +2245,7 @@ rnRetainedHsRecordFields _ _ _ _ = pure Nothing
 
 {- Note [Named retained record fields]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-With ExperimentalDependentTypes, the first field of a closed Haskell98
+With ExperimentalDependentTypes, the first field of a Haskell98
 record can bind its stored value in later field types. Use the same
 renaming scope as foreach. The first field's type is outside that scope.
 An existing type variable takes precedence. GADT records retain their
@@ -2256,6 +2255,7 @@ the field selector, and implicit quantification also checks term names.
 
 Keep the renamed fields for the record syntax. Save a retained arrow
 telescope in the Haskell98 declaration extension for constructor checking.
+The result type applies the datatype to its ordinary type parameters.
 -}
 
 rnField :: FastStringEnv FieldLabel -> RnTyKiEnv -> LHsConDeclRecField GhcPs
