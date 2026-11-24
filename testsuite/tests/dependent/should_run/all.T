@@ -15,6 +15,9 @@ test('NativeOpenIdentity',
                  'RuntimeOrdering.hs', 'OrderingPayload.hs',
                  'IndexedPrefix.hs', 'IndexedPrefixClient.hs']]),
      run_command, ['bash check-source.sh "{compiler}" "{libdir}"'])
+test('NativeStructuralCountdown',
+     [req_host_target_ghc, only_ways(['normal'])],
+     run_command, ['bash NativeStructuralCountdown.sh "{compiler}" "{libdir}"'])
 test('NativeOrdinaryGadtSource',
      [req_host_target_ghc, only_ways(['normal'])],
      run_command, ['bash NativeOrdinaryGadtSource.sh "{compiler}" "{libdir}"'])

@@ -2484,7 +2484,7 @@ publishSourceCharacter owner result rows fallback = do
   var <- flip mkTyVar charTy <$> newSysName (mkTyVarOcc "c")
   let ty = mkTyVarTy var
       default_branch _ = mkCoAxBranch [var] [] [] [ty] (fallback ty) [Nominal] loc
-  table <- makeFamily (idName owner) (ClosedInput charTy []) [] result
+  table <- makeFamily (idName owner) (ClosedInput charTy []) [] (mkTyConTy result)
                       (map literal rows ++ [default_branch])
   pure (owner, table)
 
@@ -5642,8 +5642,27 @@ ordinaryArrows ty
       _ <- ordinaryDataType ty
       pure ([], ty)
 
+{- Note [Source equations returning a structural list]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A unary function can build a list from a structural size, as in PLFA's
+downFrom:
+
+    downFrom Zero     = []
+    downFrom (Succ n) = n : downFrom n
+
+Keep the solved result kind, including the list element. Check that
+the element type is the structural input type. Publish only complete
+rows. A self call still takes a proper field of the matched input.
+The list constructors leave both fields of a cons lazy.
+
+The typechecker can put a type application on each list constructor.
+Read the same element kind from the solved result when building the
+equation. The renamer follows that element's dependency when scheduling
+the definition for a local proof.
+-}
+
 -- | Check that the rows cover the domain of the solved function type.
-checkedDomains :: Bool -> Maybe TyVar -> Type -> [SourceRow] -> Maybe (SourceInput, [Type], TyCon)
+checkedDomains :: Bool -> Maybe TyVar -> Type -> [SourceRow] -> Maybe (SourceInput, [Type], Type)
 checkedDomains strict body_tv ty rows = do
     (element, tau) <- case body_tv of
       Nothing -> pure (Nothing, ty)
@@ -5663,11 +5682,14 @@ checkedDomains strict body_tv ty rows = do
     (carried, final_ty) <- ordinaryArrows res_ty
     -- See Note [Carried arguments of a source equation].
     guard (null carried || (isNothing element && not strict))
-    (result, []) <- ordinaryDataType final_ty
+    (result, result_params) <- ordinaryDataType final_ty
+    guard (null result_params ||
+           (result == listTyCon && null carried && isNothing element &&
+            eqTypes result_params [arg_ty] && isStructuralSize domain arg_ty))
     let expected = tyConDataCons domain
         actual   = [con | SourceRow _ con _ _ _ _ <- rows]
     guard (length actual == length expected && mkUniqSet actual == mkUniqSet expected)
-    pure (input, carried, result)
+    pure (input, carried, mkTyConApp result result_params)
 
 {- Note [Ordinary constructors in GADT syntax]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -5745,6 +5767,8 @@ sourceRhs self carried = go []
     go args (HsApp _ f x) = go (unLoc x : args) (unLoc f)
     go args (XExpr (ExpandedThingTc (HSE (ExprCtxt (OpApp{})) expansion))) =
       go args (unLoc expansion)
+    go args (XExpr (WrapExpr (WpTyApp _) con@(XExpr (ConLikeTc (RealDataCon dc)))))
+      | dc == nilDataCon || dc == consDataCon = go args con
     go args (XExpr (ConLikeTc (RealDataCon con))) = Construct con <$> traverse (go []) args
     go [] (HsVar _ (L _ v)) = Just (Field v)
     go args (HsVar _ (L _ f)) | self f = call [] args
@@ -5778,7 +5802,7 @@ freshInput (PolyList sk) = do
 
 -- | Check a branch before supplying the family at its recursive calls.
 sourceBranch :: (Id -> TcM (Maybe (TyCon, [Type], Type)))
-             -> SourceInput -> [Type] -> TyCon -> SourceRow -> TcM (Maybe (TyCon -> CoAxBranch))
+             -> SourceInput -> [Type] -> Type -> SourceRow -> TcM (Maybe (TyCon -> CoAxBranch))
 sourceBranch lookup_call input carried_types result (SourceRow loc con pat_args fields carried output) = do
     args <- liftZonkM (zonkTcTypes pat_args)
     carried_tys <- liftZonkM (zonkTcTypes (map varType carried))
@@ -5798,7 +5822,7 @@ sourceBranch lookup_call input carried_types result (SourceRow loc con pat_args 
             binders = quantified ++ tvs ++ carried_tvs
             carried_scope = zip (map Just carried) carried_tvs
         guard (all isTyFamFree patterns)
-        rhs <- check_rhs checked_callees domain family_args (zip fields tvs) carried_scope (mkTyConTy result) output
+        rhs <- check_rhs checked_callees domain family_args (zip fields tvs) carried_scope result output
         pure (\fam -> mkCoAxBranch binders [] [] patterns (rhs fam)
                         (map (const Nominal) binders) loc)
     else pure Nothing
@@ -5825,15 +5849,16 @@ sourceBranch lookup_call input carried_types result (SourceRow loc con pat_args 
       Recur _ v -> do
         -- See Note [Carried arguments of a source equation].
         tv <- lookup (Just v) fields_scope
-        guard (tyVarKind tv `eqType` domain && mkTyConTy result `eqType` expected)
+        guard (tyVarKind tv `eqType` domain && result `eqType` expected)
         let operands = mkTyVarTys (tv : map snd carried_scope)
         pure (\fam -> mkTyConApp fam (family_args ++ operands))
       Construct dc args -> do
-        (tc, []) <- ordinaryDataType expected
+        (tc, params) <- ordinaryDataType expected
+        guard (null params || (tc == listTyCon && expected `eqType` result))
         guard (dataConTyCon dc == tc && length args == dataConSourceArity dc)
-        let arg_tys = map scaledThing (dataConOrigArgTys dc)
+        let arg_tys = map scaledThing (dataConInstOrigArgTys dc params)
         children <- zipWithM (check_rhs callees domain family_args fields_scope carried_scope) arg_tys args
-        pure (\fam -> mkTyConApp (promoteDataCon dc) [child fam | child <- children])
+        pure (\fam -> mkTyConApp (promoteDataCon dc) (params ++ [child fam | child <- children]))
       Call fun args -> do
         (table, arg_tys, res_ty) <- lookup fun callees
         guard (length args == length arg_tys && res_ty `eqType` expected)
@@ -5841,14 +5866,14 @@ sourceBranch lookup_call input carried_types result (SourceRow loc con pat_args 
         pure (\fam -> mkTyConApp table [child fam | child <- children])
 
 -- | Give the table the representation of a closed, non-injective family.
-makeFamily :: Name -> SourceInput -> [Type] -> TyCon -> [TyCon -> CoAxBranch] -> TcM TyCon
+makeFamily :: Name -> SourceInput -> [Type] -> Type -> [TyCon -> CoAxBranch] -> TcM TyCon
 makeFamily fun input carried_types result branches = do
     (quantified, domain, _) <- freshInput input
     args <- zipWithM argVar ("x" : "y" : map (("arg" ++) . show) [3 :: Int ..])
                     (domain : carried_types)
     let binders = mkNamedTyConBinders (Invisible SpecifiedSpec) quantified ++
                   mkAnonTyConBinders args
-    makeSourceFamily fun binders (mkTyConTy result) branches
+    makeSourceFamily fun binders result branches
   where
     argVar occ ty = do { n <- newSysName (mkTyVarOcc occ); pure (mkTyVar n ty) }
 

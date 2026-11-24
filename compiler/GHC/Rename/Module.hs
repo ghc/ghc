@@ -2826,6 +2826,9 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
             deps <- domain_dependencies outer carried
             res <- result_dependencies outer result
             pure (deps ++ res)
+      -- See Note [Source equations returning a structural list] in GHC.Tc.Gen.SourceTable.
+      _ | Just [] <- outer_vars outer, Just element <- list_element ty ->
+            type_dependencies element
       _ -> type_dependencies ty
 
     list_element :: LHsType GhcRn -> Maybe (LHsType GhcRn)
