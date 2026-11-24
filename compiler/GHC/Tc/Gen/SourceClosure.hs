@@ -44,7 +44,7 @@ import GHC.Types.Name
   ( Name, isExternalName, mkDataOcc, mkInstTyCoOcc, mkSourceTableOcc, mkTcOcc
   , mkTyVarOcc, nameModule_maybe, nameStableString, occNameString )
 import GHC.Types.Name.Env (mkNameEnv)
-import GHC.Types.Name.Set (elemNameSet, mkNameSet)
+import GHC.Types.Name.Set (elemNameSet, mkNameSet, nameSetElemsStable)
 import GHC.Types.SourceText (SourceText(NoSourceText))
 import GHC.Types.SrcLoc (noSrcSpan)
 import GHC.Types.Tickish (GenTickish(Breakpoint))
@@ -72,9 +72,16 @@ original field. The call can use the original callback or a checked
 extension. Check the kind of every generated branch against the
 promoted constructor telescope. A neutral term blocks reduction.
 
-Keep the actual owner and helper Names in IdDetails. Withhold
-publication if the names are absent after Tidy or if a visible
-rule can rewrite a checked function. See Note [Checked closure dependencies] in GHC.Tc.Gen.SourceTable.
+The subtree calls descend through the original fields. Each lookup
+under a binder consumes one level of lifting. A shift can traverse
+the resulting term, but cannot reintroduce a replacement. An
+unavailable scrutinized field leaves the corresponding match stuck.
+The rebuilt fields must stay lazy in both traversals.
+
+Keep the actual owner and all reachable original and final helper
+Names in IdDetails. Withhold publication if any Name is absent after
+Tidy or if a visible rule can rewrite a checked function. See
+Note [Checked closure dependencies] in GHC.Tc.Gen.SourceTable.
 -}
 
 data FamilyInputs = FamilyInputs Id Kind Kind TyCon TyCon TyCon
@@ -85,7 +92,6 @@ data FamilyInputs = FamilyInputs Id Kind Kind TyCon TyCon TyCon
 publishCheckedSourceClosures :: [CoreBind] -> [CoreBind] -> TypeEnv -> TcM ([Id], [TyCon])
 publishCheckedSourceClosures original_binds final_binds final_types = do
     env <- getGblEnv
-    visible <- visibleSourceMethodRules env
     opts <- initSimpleOpts <$> getDynFlags
     let here = Just (tcg_mod env)
         exported = mkNameSet (concatMap availNames (tcg_exports env))
@@ -105,18 +111,24 @@ publishCheckedSourceClosures original_binds final_binds final_types = do
           shape@(FamilyInputs _ _ _ term ext index _ _ _ _) <- familyInputs final actual final_rhs
           guard (sameShapes original_shape shape)
           guard (all ((== here) . nameModule_maybe . tyConName) [term, ext, index])
-          let helpers = filter (/= owner) (reachable original old)
+          let helpers = nameSetElemsStable $ mkNameSet $
+                filter (/= owner) (reachable original old ++ reachable final actual)
           helper_ids <- traverse lookupLocal helpers
-          guard (not (null helpers) && all (not . hasSourceMethodRule visible) (actual:helper_ids))
-          pure (actual, shape, helpers)
-    accepted <- catMaybes <$> traverse publish (mapMaybe candidate original)
-    pure (map fst accepted, concatMap snd accepted)
+          guard (not (null helper_ids))
+          pure (actual, shape, helper_ids)
+    case mapMaybe candidate original of
+      [] -> pure ([], [])
+      candidates -> do
+        visible <- visibleSourceMethodRules env
+        let safe (owner, _, helpers) = all (not . hasSourceMethodRule visible) (owner:helpers)
+        accepted <- catMaybes <$> traverse publish (filter safe candidates)
+        pure (map fst accepted, concatMap snd accepted)
   where
     publish (owner, shape, helpers) = do
       generated <- allocateFamilies shape
       pure $ do
         (root, families) <- generated
-        let new = setIdDetails owner (CheckedClosureSourceTableId (idName owner) root helpers)
+        let new = setIdDetails owner (CheckedClosureSourceTableId (idName owner) root (map idName helpers))
         pure (new, families)
 
 sameShapes :: FamilyInputs -> FamilyInputs -> Bool
@@ -167,7 +179,7 @@ familyInputs bindings owner rhs = do
 checkedTraversals :: [(Id, CoreExpr)]
                   -> Id -> Id
                   -> DC.DataCon -> DC.DataCon -> DC.DataCon
-                  -> [(DC.DataCon, [Id], CoreExpr)]
+                  -> [(DC.DataCon, [Var], CoreExpr)]
                   -> Maybe [(DC.DataCon, [Bool])]
 checkedTraversals bindings subst sigma var hit miss rows = do
     let constructors = tyConDataCons (DC.dataConTyCon var)
@@ -209,7 +221,7 @@ checkedTraversals bindings subst sigma var hit miss rows = do
 -- Check every recursive call on exactly the original corresponding
 -- field. The result keeps the same head and lazy field order.
 checkedRow :: Id -> Id
-           -> (DC.DataCon, [Id], CoreExpr)
+           -> (DC.DataCon, [Var], CoreExpr)
            -> Maybe ((DC.DataCon, [Bool]), [Maybe Id])
 checkedRow traversal callback (con, binders, rhs) = do
     result <- branchBody binders rhs
@@ -265,7 +277,7 @@ lazyConstructor con =
     null (DC.dataConStupidTheta con)
 
 reachable :: [(Id, CoreExpr)] -> Id -> [Name]
-reachable bindings root = sortOn nameStableString (map idName (walk [] [root]))
+reachable bindings root = map idName (walk [] [root])
   where
     local = mkVarSet (map fst bindings)
     walk seen [] = seen
@@ -335,8 +347,8 @@ constructorCall rhs = do
 
 -- Observe only the original branch fields and proof variables.
 outcomes :: Id
-         -> (DC.DataCon, [Id], CoreExpr)
-         -> (DC.DataCon, [Id], CoreExpr)
+         -> (DC.DataCon, [Var], CoreExpr)
+         -> (DC.DataCon, [Var], CoreExpr)
          -> Maybe (DC.DataCon, DC.DataCon, DC.DataCon)
 outcomes capture (hit, hit_binders, hit_rhs) (miss, miss_binders, miss_rhs) = do
     guard (all (not . isValueVar) hit_binders)
@@ -349,7 +361,7 @@ outcomes capture (hit, hit_binders, hit_rhs) (miss, miss_binders, miss_rhs) = do
     con <- isDataConWorkId_maybe make <|> isDataConWrapId_maybe make
     pure (hit, miss, con)
 
-function :: CoreExpr -> Maybe ([Id], [Id], CoreExpr)
+function :: CoreExpr -> Maybe ([TyVar], [Id], CoreExpr)
 function expr = do
     let (binders, body) = Core.collectBinders (strip expr)
         (ty_binders, tm_binders) = span isTyVar binders
@@ -364,7 +376,7 @@ application expr = do
     pure (head_expr, map strip values)
 
 caseOn :: Id -> CoreExpr
-       -> Maybe [(DC.DataCon, [Id], CoreExpr)]
+       -> Maybe [(DC.DataCon, [Var], CoreExpr)]
 caseOn target expr = do
     Core.Case (Core.Var scrutinee) _ _ alts <- pure (strip expr)
     guard (target == scrutinee)
@@ -373,7 +385,7 @@ caseOn target expr = do
     dataAlt (Core.Alt (Core.DataAlt con) bs rhs) = Just (con, bs, rhs)
     dataAlt _ = Nothing
 
-branchBody :: [Id] -> CoreExpr -> Maybe CoreExpr
+branchBody :: [Var] -> CoreExpr -> Maybe CoreExpr
 branchBody binders expr = case strip expr of
     Core.Cast body co
       | caseCoercion (filter isCoVar binders) co -> branchBody binders body
