@@ -83,10 +83,23 @@ underBinder = Refl
 #endif
 HS
 
-for opt in 0 2; do
-    mkdir -p "$work/$opt/"{provider,reader}
-    cd "$work/$opt/provider"
-    cp "$work/Syntax.hs" .
+# A retained declaration uses the native pipeline, which can keep a
+# multiplicity cast on the constructor callback in the optimized interface.
+for variant in 0 2 2-retained; do
+    opt=${variant%%-*}
+    mkdir -p "$work/$variant/"{provider,reader}
+    cd "$work/$variant/provider"
+    cp "$work/Syntax.hs" Plain.hs
+    if [[ $variant == 2-retained ]]; then
+        sed -i '1i{-# LANGUAGE ExperimentalDependentTypes #-}' Plain.hs
+        cat >>Plain.hs <<'HS'
+
+retained :: foreach (x :: Term 'Empty 'Num) -> x :~: x
+retained _ = Refl
+HS
+        sed -i '/^module Syntax where$/a import Data.Type.Equality ((:~:) (Refl))' Plain.hs
+    fi
+    cp Plain.hs Syntax.hs
     provider=(-O"$opt" -fno-omit-interface-pragmas -fexpose-all-unfoldings)
     "${hc[@]}" "${provider[@]}" -c Syntax.hs
     cp Syntax.hi ../reader/
@@ -110,7 +123,7 @@ for opt in 0 2; do
     reject GHC-83605 -DRULE -fenable-rewrite-rules
 
     cd ../provider
-    sed 's/= substTerm (/= value `seq` substTerm (/' "$work/Syntax.hs" >Syntax.hs
+    sed 's/= substTerm (/= value `seq` substTerm (/' Plain.hs >Syntax.hs
     "${hc[@]}" "${provider[@]}" -fforce-recomp -c Syntax.hs
     cp Syntax.hi ../reader/
     cd ../reader
