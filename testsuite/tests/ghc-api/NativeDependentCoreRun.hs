@@ -6425,8 +6425,15 @@ runSourceCallIndexChecks = do
             (Let (NonRec plain rhs) (mkApps ignoreBox [field, reflexive]))
         reject "uncertified source binding" "different equations at its binding"
             (expression plain rhs bound operand)
-        reject "copied source certificate" "Unsupported retained runtime argument"
-            (expression renamed rhs renamed operand)
+        -- The renamed call can supply an opaque lexical index. Supply the
+        -- equality argument so the local index stays inside the let.
+        let lexicalIndex = TermAppTy renamed (TermVarTy operand)
+            proveCall at = Let (NonRec renamed rhs) $ Lam operand $
+                mkApps keep [call renamed operand, mkCoreConApps eqDataCon
+                    [Type boolTy, Type at, Type at, Coercion (mkNomReflCo at)]]
+        lintNative flags "renamed source call as a lexical index" (proveCall lexicalIndex)
+        reject "copied source certificate" "Application error in expression"
+            (proveCall expected)
         reject "source-call family domain mismatch" "Unsupported retained runtime argument"
             (expression wrongDomain wrongRhs wrongDomain listOperand)
         let checkNamed label owner ownerRhs callback inputType = do
