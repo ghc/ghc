@@ -750,6 +750,11 @@ test('NativeCertifiedSplit',
                    for f in ['PackedVecLibrary.hs', 'CertifiedSplit.hs', 'CertifiedSplitClient.hs']])],
      run_command, ['bash NativeCertifiedSplit.sh "{compiler}" "{libdir}"'])
 
+test('NativeAppUnderRetainedEquality',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['app-under-retained-equality'])],
+     run_command, ['bash NativeAppUnderRetainedEquality.sh "{compiler}" "{libdir}"'])
+
 test('NativeLinearRetainedPackage',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['NativeLinearRetainedPackage' + suffix for suffix in
