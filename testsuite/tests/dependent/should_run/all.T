@@ -176,6 +176,9 @@ test('NativeOpenMinimum',
 test('NativeStructuralCarriedArgs',
      [only_ways(['normal'])],
      run_command, ['bash NativeStructuralCarriedArgs.sh "{compiler}" "{libdir}"'])
+test('NativeIndependentConstructorRows',
+     [req_host_target_ghc, only_ways(['normal'])],
+     run_command, ['bash NativeIndependentConstructorRows.sh "{compiler}" "{libdir}"'])
 test('NativeStructuralSizePredicate',
      [only_ways(['normal'])],
      run_command, ['bash NativeStructuralSizePredicate.sh "{compiler}" "{libdir}"'])
