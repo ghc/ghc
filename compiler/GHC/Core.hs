@@ -119,7 +119,7 @@ import GHC.Platform
 
 import GHC.Core.Type
 import GHC.Core.TyCo.Compare ( eqType )
-import GHC.Core.TyCo.Rep ( Type(TermVarTy, TermAppTy, ClassAppTy, TyConApp, CastTy), Coercion(SubCo, SymCo, AppCo, AxiomCo), Scaled(..) )
+import GHC.Core.TyCo.Rep ( Type(TermVarTy, ClassAppTy, TyConApp, CastTy), Coercion(SubCo, SymCo, AppCo, AxiomCo), Scaled(..) )
 import qualified GHC.Core.TyCo.Subst as TyCoSubst
 import GHC.Builtin.KnownKeys ( boolTyConKey, charDataConKey, naturalNSDataConKey, naturalNBDataConKey )
 import {-# SOURCE #-} GHC.Builtin.WiredIn.Types (unmatchableDataConTy)

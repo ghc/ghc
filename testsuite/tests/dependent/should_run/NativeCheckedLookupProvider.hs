@@ -1,5 +1,9 @@
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs #-}
+#ifdef HIDE_ENV
+module NativeCheckedLookupProvider (Nat(..), Env, Fin(..), lookupEnv) where
+#else
 module NativeCheckedLookupProvider where
+#endif
 
 data Nat = Z | S Nat
 

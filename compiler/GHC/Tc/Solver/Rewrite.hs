@@ -28,8 +28,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Errors.Types
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep   -- performs delicate algorithm on types
-import GHC.Core.TyCo.FVs( tyCoVarsOfTypes, tyCoVarsOfCo
-                        , univCoDepsDeepCoVars, univCoDepsHasHoles
+import GHC.Core.TyCo.FVs( univCoDepsDeepCoVars, univCoDepsHasHoles
                         , emptyUnivCoDeps, isEmptyUnivCoDeps
                         , addUnivCoDep, addUnivCoDepCoVar, addUnivCoDepHole
                         , unionUnivCoDeps

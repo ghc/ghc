@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 export LC_ALL=C
+trap 'echo "NativeCheckedClosure.sh failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 
 inputs=$PWD
 work=$(mktemp -d)
@@ -265,5 +266,182 @@ for opt in -O0 -O2; do
     "${ghc[@]}" "$opt" -fforce-recomp -fwrite-source-equations -DWRONG_BODY \
         -c NativeCheckedLookupProvider.hs
     "${ghc[@]}" --show-iface NativeCheckedLookupProvider.hi >provider.iface
-    if grep -Fq 'SourceTable T:lookupEnv' provider.iface; then exit 1; fi
+    if grep -Fq 'SourceTable T:lookupEnv' provider.iface; then
+        echo "Unexpected SourceTable T:lookupEnv for -DWRONG_BODY ($opt)" >&2
+        exit 1
+    fi
+
+    "${ghc[@]}" "$opt" -fforce-recomp -fwrite-source-equations -DHIDE_ENV \
+        -c NativeCheckedLookupProvider.hs
+    "${ghc[@]}" --show-iface NativeCheckedLookupProvider.hi >provider.iface
+    if grep -Fq 'SourceTable T:lookupEnv' provider.iface; then
+        echo "Unexpected SourceTable T:lookupEnv for -DHIDE_ENV ($opt)" >&2
+        exit 1
+    fi
+    cp NativeCheckedLookupProvider.hi ../reader/
+    cd ../reader
+    cat >HiddenEnvClient.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds, TypeOperators #-}
+module HiddenEnvClient where
+import Data.Type.Equality ((:~:)(Refl))
+import qualified NativeCheckedLookupProvider as P
+bad :: forall (n :: P.Nat) (e :: P.Env n) (i :: P.Fin n). P.lookupEnv e i :~: 'True
+bad = Refl
+HS
+    if "${ghc[@]}" "$opt" -fforce-recomp -fno-code -c HiddenEnvClient.hs >hidden-env.log 2>&1 ||
+       ! grep -Eq '\[GHC-(70565|68947)\]' hidden-env.log; then
+        echo "Unexpected result for HiddenEnvClient.hs ($opt):" >&2
+        cat hidden-env.log >&2
+        exit 1
+    fi
+done
+
+# Check same-module mutual environment/closure + GADT lookup, declaration/clause orders,
+# constructor visibility, and early-vs-final Core agreement at -O0 and -O2.
+for opt in -O0 -O2; do
+    for variant in STANDARD REVERSE_DECLS REVERSE_CLAUSES BOTH_REVERSED EXPLICIT_FORALL; do
+        dir="$work/$opt/local-lookup/$variant"
+        mkdir -p "$dir"/{provider,nocode,reader}
+        extra=()
+        case "$variant" in
+            REVERSE_DECLS) extra=(-DREVERSE_DECLS) ;;
+            REVERSE_CLAUSES) extra=(-DREVERSE_CLAUSES) ;;
+            BOTH_REVERSED) extra=(-DREVERSE_DECLS -DREVERSE_CLAUSES) ;;
+            EXPLICIT_FORALL) extra=(-DEXPLICIT_FORALL) ;;
+        esac
+
+        cd "$dir/nocode"
+        cp "$inputs/NativeLocalLookup.hs" .
+        "${ghc[@]}" "$opt" -fno-code -fwrite-interface -fomit-interface-pragmas \
+            "${extra[@]}" -c NativeLocalLookup.hs
+        test -s NativeLocalLookup.hi && test ! -e NativeLocalLookup.o
+
+        cd "$dir/provider"
+        cp "$inputs/NativeLocalLookup.hs" .
+        "${ghc[@]}" "$opt" -fomit-interface-pragmas "${extra[@]}" -c NativeLocalLookup.hs
+        "${ghc[@]}" --show-iface NativeLocalLookup.hi >local.iface
+        grep -Fq 'SourceTable T:lookupEnv' local.iface
+        if grep -Eq '\(lookupEnv :: .*->' local.iface; then
+            cat local.iface >&2
+            exit 1
+        fi
+
+        cd "$dir/reader"
+        cp ../provider/NativeLocalLookup.hi "$inputs/NativeLocalLookupClient.hs" .
+        test ! -e NativeLocalLookup.hs
+        "${ghc[@]}" "$opt" -fno-code -fwrite-interface -c NativeLocalLookupClient.hs
+        test ! -e NativeLocalLookupClient.o
+        "${ghc[@]}" "$opt" -fforce-recomp -c NativeLocalLookupClient.hs
+        "${ghc[@]}" "$opt" NativeLocalLookupClient.o ../provider/NativeLocalLookup.o -o run
+        test "$(./run)" = '(True,True,True,True)'
+    done
+
+    ctrl="$work/$opt/local-lookup/controls"
+    mkdir -p "$ctrl"/{provider,abstract-eval,abstract-reader,unused-splice}
+    cd "$ctrl/provider"
+    cp "$inputs/NativeLocalLookup.hs" .
+
+    reject_local() {
+        local expected=$1
+        shift
+        if "${ghc[@]}" "$opt" -fforce-recomp "$@" -c NativeLocalLookup.hs >reject.log 2>&1; then
+            echo "Unexpectedly compiled NativeLocalLookup.hs with flags: $*" >&2
+            exit 1
+        fi
+        if ! grep -Fq "[$expected]" reject.log; then
+            echo "Expected [$expected] for flags: $*" >&2
+            cat reject.log >&2
+            exit 1
+        fi
+    }
+
+    reject_local GHC-25897 -DWRONG_INDEX
+    reject_local GHC-68947 -DWRONG_BODY
+    reject_local GHC-83605 -DLOCAL_RULE
+    reject_local GHC-68947 -DSPECIALISE_LOOKUP
+    reject_local GHC-70566 -DHIDE_ENV_CONS
+    grep -Fq 'Export the constructors of Env' reject.log
+    reject_local GHC-70566 -DHIDE_FIN_CONS
+    grep -Fq 'Export the constructors of Fin' reject.log
+    reject_local GHC-70566 -DHIDE_CLOS_CONS
+    grep -Fq 'Export the constructors of Clos' reject.log
+    reject_local GHC-70566 -DHIDE_LOOKUP
+    grep -Fq 'Export lookupEnv' reject.log
+
+    # Early-vs-final Core disagreement: coverage ticks (-fhpc) alter Core after early
+    # staging succeeds and must not leave early equations silently certified.
+    reject_local GHC-68947 -fhpc
+    reject_local GHC-68947 -fno-code -fwrite-interface -fhpc
+
+    # Single-constructor product result types still preserve lazy demand and pass both stages.
+    "${ghc[@]}" "$opt" -fforce-recomp -DSINGLE_PRODUCT_CLOS -c NativeLocalLookup.hs
+    "${ghc[@]}" "$opt" -fforce-recomp -fno-code -fwrite-interface -DSINGLE_PRODUCT_CLOS -c NativeLocalLookup.hs
+
+    # An imported orphan rule via hs-boot must also invalidate same-module staged lookup at -O0 and -O2.
+    mkdir -p "$ctrl/orphan-rule"
+    cd "$ctrl/orphan-rule"
+    cp "$inputs/NativeLocalLookup.hs" .
+    cat >NativeLocalLookup.hs-boot <<'BOOT'
+{-# LANGUAGE DataKinds, GADTs, KindSignatures #-}
+module NativeLocalLookup (Nat(..), Fin(..), UTerm(..), Env(..), Clos(..), lookupEnv) where
+data Nat = Zero | Succ Nat
+data Fin (n :: Nat) where
+  FZ :: Fin ('Succ n)
+  FS :: Fin n -> Fin ('Succ n)
+data UTerm (n :: Nat) where
+  UVar :: Fin n -> UTerm n
+  ULam :: UTerm ('Succ n) -> UTerm n
+  UApp :: UTerm n -> UTerm n -> UTerm n
+data Env (n :: Nat) where
+  ENil  :: Env 'Zero
+  ECons :: Clos -> Env n -> Env ('Succ n)
+data Clos where
+  MkClos :: UTerm n -> Env n -> Clos
+lookupEnv :: Env n -> Fin n -> Clos
+BOOT
+    cat >OrphanLookupRule.hs <<'ORPHAN'
+{-# OPTIONS_GHC -Wno-orphans #-}
+module OrphanLookupRule () where
+import {-# SOURCE #-} NativeLocalLookup
+{-# RULES "orphan lookup hijack" forall c e. lookupEnv (ECons c e) FZ = MkClos (ULam (UVar FZ)) ENil #-}
+ORPHAN
+    "${ghc[@]}" "$opt" -c NativeLocalLookup.hs-boot
+    "${ghc[@]}" "$opt" -fenable-rewrite-rules -fno-omit-interface-pragmas -c OrphanLookupRule.hs
+    if "${ghc[@]}" "$opt" -fno-ignore-interface-pragmas -fforce-recomp -DIMPORTED_ORPHAN_RULE \
+         -c NativeLocalLookup.hs >orphan.log 2>&1 ||
+       ! grep -Fq '[GHC-83605]' orphan.log; then
+        echo "Unexpected result for -DIMPORTED_ORPHAN_RULE ($opt):" >&2
+        cat orphan.log >&2
+        exit 1
+    fi
+
+    # Exporting EvalBig abstractly (without EVar) while exporting Env(..), Fin(..), Clos(..),
+    # lookupEnv allows lookupEnv in client types while keeping EVar hidden.
+    cd "$ctrl/abstract-eval"
+    cp "$inputs/NativeLocalLookup.hs" .
+    "${ghc[@]}" "$opt" -fomit-interface-pragmas -DABSTRACT_EVAL -c NativeLocalLookup.hs
+    cp NativeLocalLookup.hi "$ctrl/abstract-reader/"
+    cd "$ctrl/abstract-reader"
+    cp "$inputs/NativeLocalLookupClient.hs" .
+    "${ghc[@]}" "$opt" -DABSTRACT_CLIENT -c NativeLocalLookupClient.hs
+    "${ghc[@]}" "$opt" NativeLocalLookupClient.o ../abstract-eval/NativeLocalLookup.o -o run
+    test "$(./run)" = '(True,True,True)'
+    if "${ghc[@]}" "$opt" -fforce-recomp -DABSTRACT_CLIENT -DUSE_HIDDEN_EVAR \
+         -c NativeLocalLookupClient.hs >hidden-evar.log 2>&1 ||
+       ! grep -Fq '[GHC-76037]' hidden-evar.log; then
+        echo "Unexpected result for -DUSE_HIDDEN_EVAR ($opt):" >&2
+        cat hidden-evar.log >&2
+        exit 1
+    fi
+
+    # An unused lookup before a TH splice with abstract Env compiles cleanly without leaking T:lookupEnv.
+    cd "$ctrl/unused-splice"
+    cp "$inputs/NativeLocalLookup.hs" .
+    "${ghc[@]}" "$opt" -fno-write-source-equations -DSPLICE_UNUSED_ABSTRACT -c NativeLocalLookup.hs
+    "${ghc[@]}" --show-iface NativeLocalLookup.hi >unused.iface
+    if grep -Fq 'T:lookupEnv' unused.iface; then
+        echo "Unexpected T:lookupEnv in unused-splice interface ($opt):" >&2
+        cat unused.iface >&2
+        exit 1
+    fi
 done

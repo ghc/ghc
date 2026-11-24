@@ -81,6 +81,9 @@ import GHC.Core (CoreExpr)
 import qualified GHC.Core as Core
 import GHC.Core.Utils (exprType)
 import GHC.Data.OrdList (fromOL)
+import GHC.Tc.Gen.SourceClosure
+  ( checkLocalIndexedLookupExports, indexedLookupType, pruneUnusedIndexedLookups
+  , sourceIndexedLookupTable )
 import GHC.Tc.Gen.SourceTable (sourceTableTyCons, sourceCaseTables, sourceMapperType, sourceMapperTable, sourceCharacterTables, sourceRetainedWitnessTables, sourceLocalBooleanCases, checkLocalRetainedWitnessExports, isMonomorphicRetainedWitness,
                                isStructuralSourceTable, isNominalStructuralSource, sourceRuleOwners, sourceRuleOwnersAt, visibleSourceMethodRules,
                                hasSourceMethodRule, hasSourceMethodRuleAt, sourceLiteralWorkers, checkSourceMethodUses,
@@ -721,15 +724,19 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
               new_tables
                 | tables_enabled = tables
                 | otherwise = filter (\(owner, _) -> not (idName owner `elemNameSet` case_owners)) tables
-          with_fields <- if null fields then getGblEnv else fst <$> addTyConsToGblEnv fields
+          with_fields0 <- if null fields then getGblEnv else fst <$> addTyConsToGblEnv fields
+          with_fields <- pruneUnusedIndexedLookups with_fields0
           let installed = typeEnvIds (tcg_type_env with_fields)
               early_nominal = [(fun, table) | fun <- installed
                                             , SourceTableId _ table NominalSourceTable <- [idDetails fun]
-                                            , isNominalStructuralSource fun || sourceMapperType (idType fun)]
-          checkLocalRetainedWitnessExports with_fields installed
-          failIfErrsM
-          env <- setGblEnv with_fields (installSourceTables (early_nominal ++ new_tables ++ cases))
-          installSourceMethods (\sel -> tables_enabled || sourceMapSelector sel) env }
+                                            , isNominalStructuralSource fun || sourceMapperType (idType fun) ||
+                                              indexedLookupType (idType fun)]
+          setGblEnv with_fields $ do
+            checkLocalRetainedWitnessExports with_fields installed
+            checkLocalIndexedLookupExports with_fields
+            failIfErrsM
+            env <- installSourceTables (early_nominal ++ new_tables ++ cases)
+            installSourceMethods (\sel -> tables_enabled || sourceMapSelector sel) env }
 
 -- | Publish only checked method aliases that user rules cannot replace.
 -- See Note [Certifying a source method alias] in GHC.Tc.TyCl.Instance.
@@ -857,7 +864,7 @@ owners back to installSourceTables before writing the interface, so
 the final rule environment can withdraw that authority.
 -}
 
--- | Check the requested constructor mappers after solving their value group.
+-- | Check the requested constructor cases after solving their value group.
 -- See Note [Early constructor mapper equations].
 sourceTablesWithMappers :: Bool -> NameSet -> Bag EvBind -> TcGblEnv -> TcM [(Id, TyCon)]
 sourceTablesWithMappers structural names evidence env = do
@@ -867,16 +874,20 @@ sourceTablesWithMappers structural names evidence env = do
                           , idName owner `elemNameSet` names]
     candidates <- fmap catMaybes $ forM in_group $ \owner -> do
       ty <- liftZonkM (zonkTcType (idType owner))
-      pure (owner <$ guard (sourceMapperType ty))
-    mappers <- forM candidates $ \owner ->
+      pure ((owner, indexedLookupType ty) <$ guard (sourceMapperType ty || indexedLookupType ty))
+    cases <- forM candidates $ \(owner, indexed) ->
       tryTcDiscardingErrs (pure Nothing) $ do
         let name = idName owner
-        (definitions, _) <- localOpenDefinitions [(name, nameSrcSpan name)]
+            demands = [(name, nameSrcSpan name)]
+        when indexed (checkLocalOpenDeferrals demands)
+        (definitions, _) <- localOpenDefinitions demands
                               (tcg_ev_binds env `unionBags` evidence) (tcg_binds env)
         case lookupNameEnv definitions name of
-          Just (actual, rhs) | actual == owner -> sourceMapperTable actual rhs
+          Just (actual, rhs) | actual == owner
+            -> if indexed then sourceIndexedLookupTable actual definitions
+                          else sourceMapperTable actual rhs
           _ -> pure Nothing
-    pure (ordinary ++ catMaybes mappers)
+    pure (ordinary ++ catMaybes cases)
 
 -- | Merge the finalised types and retain a source table already attached to
 -- its exact owner. A local signature can already use the table's equations.
@@ -2528,7 +2539,7 @@ checked matches and constructor equations without dictionary evidence.
 
 -- | Follow the same-group types needed by a source-table signature.
 -- See Note [Ordering local source tables] in GHC.Rename.Module.
-sourceTableTypeDependencies :: TcGblEnv -> HsGroup GhcRn -> (Name -> Maybe Int)
+sourceTableTypeDependencies :: TcGblEnv -> HsGroup GhcRn -> (Name -> Maybe (Int, NameSet))
                             -> [(Name, Maybe Int)] -> Maybe NameSet
 sourceTableTypeDependencies env HsGroup{hs_tyclds = groups} ready uses = do
     guard (all saturated uses)
@@ -2557,7 +2568,7 @@ sourceTableTypeDependencies env HsGroup{hs_tyclds = groups} ready uses = do
       | otherwise = False
     saturated (name, Just supplied)
       | Just (arity, _) <- lookupNameEnv aliases name = supplied == arity
-      | Just arity <- ready name = supplied == arity
+      | Just (arity, _) <- ready name = supplied == arity
       | supplied == 0 = True
       | Just (ATyCon tc) <- lookupTypeEnv (tcg_type_env env) name
       , isTypeSynonymTyCon tc, isFamFreeTyCon tc
@@ -2565,7 +2576,8 @@ sourceTableTypeDependencies env HsGroup{hs_tyclds = groups} ready uses = do
       | otherwise = False
 
     dependencies name
-      | isJust (ready name) || not (name `elemNameSet` local_types) = Just emptyNameSet
+      | Just (_, deps) <- ready name = Just deps
+      | not (name `elemNameSet` local_types) = Just emptyNameSet
       | otherwise = snd <$> lookupNameEnv aliases name
 
 {- Note [Scheduling local open definitions]

@@ -1,24 +1,33 @@
-module GHC.Tc.Gen.SourceClosure (publishCheckedSourceClosures) where
+module GHC.Tc.Gen.SourceClosure
+  ( publishCheckedSourceClosures
+  , indexedLookupType
+  , earlyIndexedLookups
+  , pruneUnusedIndexedLookups
+  , sourceIndexedLookupTable
+  , checkLocalIndexedLookupExports
+  , validateEarlyIndexedLookups
+  ) where
 
 import GHC.Prelude
 
 import Control.Applicative ((<|>))
-import Control.Monad (foldM, guard, zipWithM, zipWithM_)
+import Control.Monad (foldM, guard, unless, when, zipWithM, zipWithM_)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Maybe (MaybeT(..))
 import Control.Monad.Fix (mfix)
-import Data.Foldable (traverse_)
-import Data.List (nubBy, sortOn)
-import Data.Maybe (catMaybes, fromMaybe, isJust, mapMaybe)
+import Data.Foldable (for_, traverse_)
+import Data.List (find, nubBy, sortBy, sortOn)
+import Data.Maybe (catMaybes, fromMaybe, isJust, mapMaybe, maybeToList)
 
 import GHC.Builtin.KnownKeys (patErrorIdKey)
 import GHC.Builtin.WiredIn.Types (manyDataConTy, unmatchableDataConTy)
-import GHC.Core (CoreBind, CoreExpr)
+import GHC.Core (CoreBind, CoreExpr, CoreRule)
 import qualified GHC.Core as Core
 import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole)
 import GHC.Core.Coercion.Axiom
   ( CoAxBranch, ClosedTyFam(CTF), Role(Nominal)
-  , coAxBranchLHS, coAxBranchRHS, coAxBranchTyVars )
+  , coAxiomBranches, coAxBranchLHS, coAxBranchRHS, coAxBranchTyVars, fromBranches )
+import GHC.Core.ConLike (ConLike(RealDataCon))
 import qualified GHC.Core.DataCon as DC
 import GHC.Core.FamInstEnv (emptyFamInstEnvs, mkBranchedCoAxiom, mkCoAxBranch)
 import GHC.Core.FVs (exprFreeVars, exprSomeFreeVarsList)
@@ -27,12 +36,13 @@ import GHC.Core.Predicate (tyCoVarsOfTypesWellScoped)
 import GHC.Core.SimpleOpt (simpleOptExpr)
 import GHC.Core.Subst (extendTvSubst, mkEmptySubst, mkOpenSubst, substExpr)
 import GHC.Core.TyCo.Compare (eqType, eqTypes)
+import GHC.Core.TyCo.FVs (tyConsOfTypes)
 import GHC.Core.TyCo.Rep (Coercion(..), MCoercion(MRefl), Scaled(..), Type(TyVarTy), scaledThing)
 import GHC.Core.TyCon
   ( FamTyConFlav(ClosedTypeFamilyTyCon), AlgTyConFlav(VanillaAlgTyCon)
-  , TyCon, TyConBinder, Injectivity(NotInjective), mkAlgTyCon
+  , TyCon, TyConBinder, Injectivity(NotInjective), closedFamilyTyConCoAxiom_maybe, mkAlgTyCon
   , mkLevPolyDataTyConRhs, mkTyConKind, mkAnonTyConBinder, mkNamedTyConBinder, mkNamedTyConBinders
-  , mkFamilyTyCon, mkTyConKindWithMatchability, isAlgTyCon, isPromotedDataCon
+  , mkFamilyTyCon, mkTyConKindWithMatchability, isAlgTyCon, isPromotedDataCon, synTyConRhs_maybe
   , tyConDataCons, tyConKind, tyConName )
 import GHC.Core.Type
   ( Kind, getTyVar_maybe, isLiftedTypeKind, isManyTy, liftedTypeKind, lookupTyVar
@@ -42,33 +52,40 @@ import GHC.Core.Type
 import GHC.Core.Unify (alwaysBindTv, tcMatchTys, tcUnifyTys)
 import GHC.Core.Utils (exprType, stripTicksE)
 import GHC.Driver.Config (initSimpleOpts)
-import GHC.Driver.DynFlags (HasDynFlags(getDynFlags))
+import GHC.Driver.DynFlags (GeneralFlag(Opt_Hpc), HasDynFlags(getDynFlags), pluginModNames)
+import GHC.Tc.Errors.Types (RetainedQuantificationError(RetainedSourceRule), TcRnMessage(..))
 import GHC.Tc.Gen.SourceTable
   ( hasSourceMethodRule, ordinaryImport, publicCaseType, sourceEquationDatatypes
   , visibleSourceMethodRules )
 import GHC.Tc.TyCl.Build (buildDataCon, newImplicitBinder, newTyConRepName)
 import GHC.Tc.Utils.Instantiate (freshenTyVarBndrs)
-import GHC.Tc.Utils.Monad (TcGblEnv(..), TcM, getGblEnv, getGlobalRdrEnv, newSysName)
+import GHC.Tc.Utils.Monad
+  ( TcGblEnv(..), TcM, addErr, failIfErrsM, getGblEnv, getGlobalRdrEnv, goptM
+  , newSysName, readTcRef, setSrcSpan )
 import GHC.Tc.Utils.TcType (isTyFamFree)
 import GHC.Types.Avail (availsToNameSet)
-import GHC.Types.Id (Id, idDetails, idName, isDataConWorkId_maybe, isDataConWrapId_maybe)
+import GHC.Types.Id (Id, idCoreRules, idDetails, idName, isDataConWorkId_maybe, isDataConWrapId_maybe)
 import GHC.Types.Id.Info (IdDetails(CheckedClosureSourceTableId, SourceTableId, VanillaId))
 import GHC.Types.Basic (SourceTableOrigin(NominalSourceTable))
 import GHC.Types.Id.Make (DataConBangOpts(FixedBangOpts))
+import GHC.Types.InlinePragma (isNeverActive)
 import GHC.Types.Name
-  ( Name, isExternalName, isWiredInName, mkDataOcc, mkInstTyCoOcc, mkSourceTableOcc, mkTcOcc
-  , mkTyVarOcc, nameModule_maybe, nameStableString, occNameString )
-import GHC.Types.Name.Env (mkNameEnv)
-import GHC.Types.Name.Set (elemNameSet, mkNameSet, nameSetElemsStable)
+  ( Name, NamedThing(getName), isExternalName, isWiredInName, mkDataOcc, mkInstTyCoOcc, mkSourceTableOcc
+  , mkTcOcc, mkTyVarOcc, nameModule_maybe, nameOccName, nameSrcSpan, nameStableString, occNameString
+  , stableNameCmp )
+import GHC.Types.Name.Env (NameEnv, filterNameEnv, mapNameEnv, mkNameEnv, nonDetNameEnvElts)
+import GHC.Types.Name.Reader (isLocalGRE, lookupGRE_Name)
+import GHC.Types.Name.Set (NameSet, elemNameSet, mkNameSet, nameSetElemsStable)
 import GHC.Types.SourceText (SourceText(NoSourceText))
 import GHC.Types.SrcLoc (noSrcSpan)
 import GHC.Types.Tickish (GenTickish(Breakpoint))
-import GHC.Types.TyThing (TyThing(AnId))
-import GHC.Types.TypeEnv (TypeEnv, lookupTypeEnv)
+import GHC.Types.TyThing (TyThing(AConLike, ATyCon, AnId))
+import GHC.Types.TypeEnv (TypeEnv, lookupTypeEnv, typeEnvElts, typeEnvIds)
+import GHC.Types.Unique (hasKey)
+import GHC.Types.Unique.Set (elementOfUniqSet)
 import GHC.Types.Var
   ( ForAllTyFlag(Specified), TyVar, VarBndr(Bndr), isCoVar, isId, isLocalId, isTyVar
   , Var, mkTyVar, mkTyVarBinders, setIdDetails, varType )
-import GHC.Types.Unique (hasKey)
 import GHC.Types.Var.Env (mkInScopeSet)
 import GHC.Types.Var.Set (elemVarSet, mkVarSet, subVarSet, unionVarSet)
 
@@ -728,6 +745,30 @@ Core give the same equations.
 
 data IndexedLookup = IndexedLookup Id [TyVar] [Type] Type [(IndexedPattern, IndexedRow)]
 
+-- | Select a signed lookup over two operands at the same index.
+indexedLookupType :: Type -> Bool
+indexedLookupType = isJust . indexedLookupSignature
+
+-- | Read the shared scope and value domains from the checked signature.
+indexedLookupSignature :: Type -> Maybe (TyVar, [Type], Type)
+indexedLookupSignature ty = do
+    ([(scope_match, scope)], tau) <- pure (splitForAllTyVars ty)
+    (matches, [Scaled left_mult left, Scaled right_mult right], result) <- pure (splitFunTys tau)
+    (left_tc, [left_scope]) <- splitTyConApp_maybe left
+    (right_tc, [right_scope]) <- splitTyConApp_maybe right
+    guard (all (`eqType` unmatchableDataConTy) (scope_match : matches) &&
+           all isManyTy [left_mult, right_mult] &&
+           eqTypes [left_scope, right_scope] (map mkTyVarTy [scope, scope]) &&
+           isAlgTyCon left_tc && isAlgTyCon right_tc &&
+           any hasEqSpec (tyConDataCons left_tc) &&
+           length (tyConDataCons right_tc) == 2 &&
+           all hasEqSpec (tyConDataCons right_tc))
+    pure (scope, [left, right], result)
+  where
+    hasEqSpec con = case DC.dataConFullSig con of
+      (_, _, _ : _, _, _, _) -> True
+      _ -> False
+
 -- | Read the two nested matches of a structurally decreasing lookup.
 indexedLookup :: [(Id, CoreExpr)] -> Id -> CoreExpr -> Maybe IndexedLookup
 indexedLookup bindings owner rhs = do
@@ -735,13 +776,10 @@ indexedLookup bindings owner rhs = do
     guard (input == left)
     let left_kind = varType left
         right_kind = varType right
-    ([(scope_match, declared_scope)], tau) <- pure (splitForAllTyVars (varType owner))
+    (declared_scope, domains, result_type) <- indexedLookupSignature (varType owner)
     let instantiate = substTyWith [declared_scope] [mkTyVarTy scope]
-    (matches, [Scaled left_mult left_type, Scaled right_mult right_type], result_type) <- pure (splitFunTys tau)
     guard (varType scope `eqType` varType declared_scope &&
-           all (`eqType` unmatchableDataConTy) (scope_match : matches) &&
-           all isManyTy [left_mult, right_mult] &&
-           eqTypes (map instantiate [left_type, right_type, result_type]) [left_kind, right_kind, result])
+           eqTypes (map instantiate (domains ++ [result_type])) [left_kind, right_kind, result])
     (left_tc, [left_scope]) <- splitTyConApp_maybe left_kind
     (right_tc, [right_scope]) <- splitTyConApp_maybe right_kind
     guard (eqTypes [left_scope, right_scope] (map mkTyVarTy [scope, scope]))
@@ -783,6 +821,190 @@ indexedLookup bindings owner rhs = do
 publishIndexedLookup :: (TyCon -> Bool) -> (Id, (IndexedLookup, IndexedLookup), [Id])
                      -> TcM (Maybe (Id, [TyCon]))
 publishIndexedLookup public (owner, (original, final), _) = runMaybeT $ do
+    table <- makeIndexedLookupTable public owner original (Just final)
+    pure (setIdDetails owner (SourceTableId (idName owner) table NominalSourceTable), [table])
+
+-- | Check the solved local binding before checking the declaration that uses it.
+sourceIndexedLookupTable :: Id -> NameEnv (Id, CoreExpr) -> TcM (Maybe (Id, TyCon))
+sourceIndexedLookupTable owner definitions = do
+    env <- getGblEnv
+    dflags <- getDynFlags
+    added_plugins <- readTcRef (tcg_th_coreplugins env)
+    let opts = initSimpleOpts dflags
+        rdr_env = tcg_rdr_env env
+        available name
+          | nameModule_maybe name == Just (tcg_semantic_mod env) =
+              maybe False isLocalGRE (lookupGRE_Name rdr_env name)
+          | otherwise = isWiredInName name || ordinaryImport rdr_env name
+        public tc = all available (tyConName tc : map DC.dataConName (tyConDataCons tc))
+        bindings = [(v, simpleOptExpr opts rhs) | (v, rhs) <- nonDetNameEnvElts definitions]
+    runMaybeT $ do
+      guard (null added_plugins && null (pluginModNames dflags))
+      rhs <- MaybeT (pure (lookup owner bindings))
+      checked <- MaybeT (pure (indexedLookup bindings owner rhs))
+      (owner,) <$> makeIndexedLookupTable public owner checked Nothing
+
+-- | Collect early-staged indexed lookup owners currently installed in the module.
+earlyIndexedLookups :: TcGblEnv -> [(Id, TyCon)]
+earlyIndexedLookups env =
+    sortBy (\(a, _) (b, _) -> stableNameCmp (idName a) (idName b))
+      [ (fun, table)
+      | fun <- typeEnvIds (tcg_type_env env)
+      , SourceTableId name table NominalSourceTable <- [idDetails fun]
+      , name == idName fun
+      , indexedLookupType (varType fun)
+      , isIndexedLookupTable table ]
+
+isIndexedLookupTable :: TyCon -> Bool
+isIndexedLookupTable table
+  | Just axiom <- closedFamilyTyConCoAxiom_maybe table
+  , [first, second] <- fromBranches (coAxiomBranches axiom)
+  = promotedPairLHS first && promotedPairLHS second &&
+    isJust (getTyVar_maybe (coAxBranchRHS first)) &&
+    case splitTyConApp_maybe (coAxBranchRHS second) of
+      Just (callee, [_, _, _]) -> callee == table
+      _ -> False
+  | otherwise = False
+  where
+    promotedPairLHS branch
+      | [_, left, right] <- coAxBranchLHS branch
+      , Just (left_con, _) <- splitTyConApp_maybe left
+      , Just (right_con, _) <- splitTyConApp_maybe right
+      = isPromotedDataCon left_con && isPromotedDataCon right_con
+      | otherwise = False
+
+-- | Drop speculative early lookup tables that no dependent type referenced.
+pruneUnusedIndexedLookups :: TcGblEnv -> TcM TcGblEnv
+pruneUnusedIndexedLookups env = do
+    used <- readTcRef (tcg_source_table_uses env)
+    let unused = [ (fun, table)
+                 | (fun, table) <- earlyIndexedLookups env
+                 , not (tyConName table `elemNameSet` used) ]
+    if null unused then pure env else do
+      let owners = mkNameSet (map (idName . fst) unused)
+          families = mkNameSet (map (tyConName . snd) unused)
+          clearThing (AnId v) | idName v `elemNameSet` owners = AnId (setIdDetails v VanillaId)
+          clearThing thing = thing
+      pure env
+        { tcg_tcs = filter (not . (`elemNameSet` families) . tyConName) (tcg_tcs env)
+        , tcg_type_env = mapNameEnv clearThing
+            (filterNameEnv (not . (`elemNameSet` families) . getName) (tcg_type_env env))
+        }
+
+-- | Validate constructor exports, owner visibility, and imported rules for used early lookups.
+checkLocalIndexedLookupExports :: TcGblEnv -> TcM ()
+checkLocalIndexedLookupExports env = do
+    let candidates = earlyIndexedLookups env
+    unless (null candidates) $ do
+      visible <- visibleSourceMethodRules env
+      let exported = availsToNameSet (tcg_exports env)
+          exported_tycons = tyConsOfTypes (exportedInterfaceTypes exported (tcg_type_env env))
+      for_ candidates $ \(owner, table) -> do
+        let name = idName owner
+            unexported_types = sortBy stableNameCmp
+              [ tc_name
+              | tc <- sourceEquationDatatypes [table]
+              , let tc_name = tyConName tc
+              , nameModule_maybe tc_name == Just (tcg_semantic_mod env)
+              , not (publicCaseType env exported (const False) tc) ]
+        case unexported_types of
+          hidden : _ -> do
+            let reason = "The dependent type needs this equation. Export the constructors of "
+                         ++ occNameString (nameOccName hidden) ++ " to make it available."
+            setSrcSpan (nameSrcSpan name) $
+              addErr (TcRnOpenTypeEval name Nothing reason)
+          [] | not (name `elemNameSet` exported)
+             , table `elementOfUniqSet` exported_tycons -> do
+            let reason = "The dependent type needs this equation. Export "
+                         ++ occNameString (nameOccName name) ++ " to make it available."
+            setSrcSpan (nameSrcSpan name) $
+              addErr (TcRnOpenTypeEval name Nothing reason)
+          [] -> pure ()
+        when (hasSourceMethodRule visible owner) $
+          setSrcSpan (nameSrcSpan name) $
+            addErr (TcRnRetainedQuantificationError (RetainedSourceRule name))
+
+exportedInterfaceTypes :: NameSet -> TypeEnv -> [Type]
+exportedInterfaceTypes exported type_env = concatMap entity_types (typeEnvElts type_env)
+  where
+    data_con_types dc = [varType (DC.dataConWrapId dc), varType (DC.dataConWorkId dc)]
+    entity_types (AnId v)
+      | idName v `elemNameSet` exported = [varType v]
+      | otherwise = []
+    entity_types (AConLike (RealDataCon dc))
+      | DC.dataConName dc `elemNameSet` exported = data_con_types dc
+      | otherwise = []
+    entity_types (ATyCon tc)
+      | tyConName tc `elemNameSet` exported =
+          tyConKind tc : maybeToList (synTyConRhs_maybe tc)
+          ++ concatMap data_con_types (tyConDataCons tc)
+          ++ [ ty | ax <- maybeToList (closedFamilyTyConCoAxiom_maybe tc)
+                  , br <- fromBranches (coAxiomBranches ax)
+                  , ty <- coAxBranchRHS br : coAxBranchLHS br ++ map varType (coAxBranchTyVars br) ]
+      | otherwise =
+          [ ty | dc <- tyConDataCons tc
+               , DC.dataConName dc `elemNameSet` exported
+               , ty <- data_con_types dc ]
+    entity_types _ = []
+
+-- | Require every early-staged lookup table to agree with desugared and final Core.
+validateEarlyIndexedLookups :: Bool -> [CoreRule] -> [CoreBind]
+                            -> Maybe [CoreBind] -> Maybe [CoreBind] -> TcM ()
+validateEarlyIndexedLookups plugins_free rules desugared_binds mb_simplified mb_tidy = do
+    env <- getGblEnv
+    let candidates = earlyIndexedLookups env
+    unless (null candidates) $ do
+      opts <- initSimpleOpts <$> getDynFlags
+      hpc <- goptM Opt_Hpc
+      let exported = availsToNameSet (tcg_exports env)
+          breakpoint Breakpoint{} = True
+          breakpoint _ = False
+          inspect binds = [(v, stripTicksE breakpoint rhs) | (v, rhs) <- Core.flattenBinds binds]
+          desugared = [(v, simpleOptExpr opts rhs) | (v, rhs) <- inspect desugared_binds]
+          user_rule_owner Core.Rule{Core.ru_fn = fn, Core.ru_auto = auto, Core.ru_act = act}
+            | not (auto || isNeverActive act) = Just fn
+          user_rule_owner _ = Nothing
+          active_rule_owners = mkNameSet (mapMaybe user_rule_owner rules)
+      for_ candidates $ \(owner, table) -> do
+        let name = idName owner
+        if name `elemNameSet` active_rule_owners
+          then setSrcSpan (nameSrcSpan name) $
+                 addErr (TcRnRetainedQuantificationError (RetainedSourceRule name))
+          else do
+            ok <- fmap isJust $ runMaybeT $ do
+              guard (plugins_free && not hpc)
+              axiom <- MaybeT (pure (closedFamilyTyConCoAxiom_maybe table))
+              let expected = fromBranches (coAxiomBranches axiom)
+              guard (length expected == 2)
+              checkStage expected table owner False desugared
+              simplified <- MaybeT (pure (inspect <$> mb_simplified))
+              checkStage expected table owner True simplified
+              for_ mb_tidy $ \tidy_raw ->
+                when (name `elemNameSet` exported) $
+                  checkStage expected table owner True (inspect tidy_raw)
+            unless ok $
+              setSrcSpan (nameSrcSpan name) $
+                addErr (TcRnNoSourceTable name)
+      failIfErrsM
+  where
+    checkStage expected table owner check_id_rules binds = do
+      (actual, rhs) <- MaybeT $ pure $
+        find (\(v, _) -> idName v == idName owner) binds
+      guard (varType actual `eqType` varType owner)
+      when check_id_rules $
+        guard (all (\r -> case r of
+                            Core.BuiltinRule{} -> True
+                            _ -> Core.isAutoRule r || isNeverActive (Core.ruleActivation r))
+                   (idCoreRules actual))
+      checked <- MaybeT (pure (indexedLookup binds actual rhs))
+      rows <- lookupRows table checked
+      guard (length rows == length expected)
+      zipWithM_ sameIndexedRow expected (map (`applyRow` table) rows)
+
+-- | Allocate the family and check each nominal equation.
+makeIndexedLookupTable :: (TyCon -> Bool) -> Id -> IndexedLookup -> Maybe IndexedLookup
+                       -> MaybeT TcM TyCon
+makeIndexedLookupTable public owner original final = do
     let IndexedLookup _ parameters domains result _ = original
         (flags, _) = splitForAllForAllTyBinders (varType owner)
     guard (length flags == length parameters)
@@ -794,11 +1016,12 @@ publishIndexedLookup public (owner, (original, final), _) = runMaybeT $ do
         make = mkFamily name axiom binders result
         header = make []
     startup <- lookupRows header original
-    optimized <- lookupRows header final
-    zipWithM_ sameIndexedRow (map (`applyRow` header) startup) (map (`applyRow` header) optimized)
+    for_ final $ \optimized -> do
+      rows <- lookupRows header optimized
+      zipWithM_ sameIndexedRow (map (`applyRow` header) startup) (map (`applyRow` header) rows)
     let table = make (map (`applyRow` table) startup)
     guard (all public (sourceEquationDatatypes [table]))
-    pure (setIdDetails owner (SourceTableId (idName owner) table NominalSourceTable), [table])
+    pure table
 
 -- | Specialize the nominal scope equalities and read both exact rows.
 lookupRows :: TyCon -> IndexedLookup -> MaybeT TcM [IndexedEquation]
@@ -2103,7 +2326,8 @@ publishUntypedRenameExtension public (_, (owner, shape), _) = runMaybeT $ do
     let UntypedFamilyInputs _ _ context _ ext index _ _ hit miss _ = shape
     g <- lift (freshVar "g" context)
     d <- lift (freshVar "d" context)
-    let [gk, dk] = mkTyVarTys [g, d]
+    let gk = mkTyVarTy g
+        dk = mkTyVarTy d
         lookupAt c = mkTyConApp index [c]
         extend c = mkTyConApp ext [c]
         domain = lookupAt (extend gk)
@@ -2131,7 +2355,8 @@ publishUntypedRenaming public extensions (owner, (extension, shape), helpers) = 
     let UntypedFamilyInputs _ _ context term ext index _ var _ _ recipes = shape
     g <- lift (freshVar "g" context)
     d <- lift (freshVar "d" context)
-    let [gk, dk] = mkTyVarTys [g, d]
+    let gk = mkTyVarTy g
+        dk = mkTyVarTy d
         termAt c = mkTyConApp term [c]
         result = termAt dk
     r_var <- lift (freshVar "r" (untypedRenamingKind index gk dk))

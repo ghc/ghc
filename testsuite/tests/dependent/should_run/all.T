@@ -25,11 +25,11 @@ test('NativeOrdinaryGadtSource',
      [req_host_target_ghc, only_ways(['normal'])],
      run_command, ['bash NativeOrdinaryGadtSource.sh "{compiler}" "{libdir}"'])
 test('NativeCheckedClosure',
-     [req_host_target_ghc, only_ways(['normal']),
+     [req_host_target_ghc, req_th, req_interp, only_ways(['normal']),
       extra_files(['NativeCheckedClosureProvider.hs', 'NativeCheckedClosure.hs',
                    'NativeCheckedClosureDoubleProvider.hs', 'NativeCheckedClosureDouble.hs',
                    'NativeCheckedClosureDoubleRule.hs', 'NativeCheckedLookupProvider.hs',
-                   'NativeCheckedLookup.hs'])],
+                   'NativeCheckedLookup.hs', 'NativeLocalLookup.hs', 'NativeLocalLookupClient.hs'])],
      run_command, ['bash NativeCheckedClosure.sh "{compiler}" "{libdir}"'])
 test('NativeCheckedPlugSubstU',
      [req_host_target_ghc, only_ways(['normal']),

@@ -177,7 +177,8 @@ import GHC.Types.Var.Env       ( mkEmptyTidyEnv )
 import GHC.Types.Var.Set
 
 import GHC.Utils.Fingerprint ( Fingerprint )
-import GHC.Tc.Gen.SourceClosure (publishCheckedSourceClosures)
+import GHC.Tc.Gen.SourceClosure
+  ( earlyIndexedLookups, publishCheckedSourceClosures, validateEarlyIndexedLookups )
 import GHC.Tc.Gen.SourceTable (finalCoreMappers, verifyFinalCoreMapper, failedFinalListTables,
                                finalCoreSourceFamilies, sourceTableCallees, publishListFoldMethods,
                                keepCheckedMapWorkers, publishCheckedMapMethods)
@@ -906,6 +907,12 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
           (cg_guts, original_details) <-
               liftIO $ hscTidy hsc_env simplified_guts
 
+          let no_plugins = null plugins && null (pluginsWithArgs (hsc_plugins hsc_env)) &&
+                           null (pluginModNames dflags)
+          checkEarlyIndexedLookups hsc_env hsc_src logger print_config diag_opts tc_result no_plugins
+            (mg_rules desugared_guts ++ mg_rules simplified_guts)
+            (mg_binds desugared_guts) (Just (mg_binds simplified_guts)) (Just (cg_binds cg_guts))
+
           publication <- case publishCheckedMapMethods after_tidy tc_result (cg_binds cg_guts) of
             Nothing -> pure Nothing
             Just publish -> liftIO $ fmap snd $
@@ -960,6 +967,12 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
           (cg_guts, _) <-
               liftIO $ hscTidy hsc_env simplified_guts
 
+          let no_plugins = null plugins && null (pluginsWithArgs (hsc_plugins hsc_env)) &&
+                           null (pluginModNames dflags)
+          checkEarlyIndexedLookups hsc_env hsc_src logger print_config diag_opts tc_result no_plugins
+            (mg_rules desugared_guts ++ mg_rules simplified_guts)
+            (mg_binds desugared_guts) (Just (mg_binds simplified_guts)) (Just (cg_binds cg_guts))
+
           (iface, _details) <- liftIO $
             hscSimpleIface hsc_env (Just $ cg_binds cg_guts) (cg_modBreaks cg_guts) tc_result summary
 
@@ -975,20 +988,42 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
       -- Check a provisional source equation against optimized Core even
       -- when the interface will not contain a Core program.
       _ -> do
+        let has_early_lookups = not (null (earlyIndexedLookups tc_result))
         checked_tc <- case mb_desugar of
-          Just guts | not (null (finalCoreMappers (mg_binds guts))) -> do
-            optimized <- if not (null (mg_rules guts))
-              then pure Nothing
-              else if hasNativeDependentModuleBody (mg_binds guts) [] (mg_tcs guts)
-                then do
-                  added_plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
-                  if null added_plugins && null (pluginsWithArgs (hsc_plugins hsc_env)) &&
-                     null (pluginModNames dflags)
-                    then liftIO $ validateRetainedSourceBodies hsc_env guts
-                    else pure Nothing
-                else Just <$> hscSimplify' [] guts
-            pure (validateSimpleSourceTables guts optimized tc_result)
-          _ -> pure tc_result
+          Just guts | let has_mappers = not (null (finalCoreMappers (mg_binds guts)))
+                    , has_mappers || has_early_lookups -> do
+            added_plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
+            let no_plugins = null added_plugins && null (pluginsWithArgs (hsc_plugins hsc_env)) &&
+                             null (pluginModNames dflags)
+                retained = hasNativeDependentModuleBody (mg_binds guts) [] (mg_tcs guts)
+            non_retained_opt <- if not retained && (has_early_lookups || (has_mappers && null (mg_rules guts)))
+              then Just <$> hscSimplify' [] guts
+              else pure Nothing
+            when has_early_lookups $ do
+              lookup_opt <- if not no_plugins
+                then pure Nothing
+                else if retained
+                  then liftIO $ validateRetainedLookupBodies hsc_env guts
+                  else pure non_retained_opt
+              checkEarlyIndexedLookups hsc_env hsc_src logger print_config diag_opts tc_result no_plugins
+                (mg_rules guts ++ maybe [] mg_rules lookup_opt)
+                (mg_binds guts) (mg_binds <$> lookup_opt) Nothing
+            if has_mappers
+              then do
+                optimized <- if not (null (mg_rules guts))
+                  then pure Nothing
+                  else if retained
+                    then if no_plugins
+                           then liftIO $ validateRetainedSourceBodies hsc_env guts
+                           else pure Nothing
+                    else pure non_retained_opt
+                pure (validateSimpleSourceTables guts optimized tc_result)
+              else pure tc_result
+          _ -> do
+            when has_early_lookups $
+              checkEarlyIndexedLookups hsc_env hsc_src logger print_config diag_opts tc_result False
+                [] [] Nothing Nothing
+            pure tc_result
         (iface, _details) <- liftIO $
           hscSimpleIface hsc_env Nothing Nothing checked_tc summary
 
@@ -1040,6 +1075,33 @@ validateRetainedSourceBodies env guts
     simplified = simpleOptNativeProgram (mg_binds guts)
     lint_env = hscUpdateFlags
       (\df -> gopt_set (gopt_unset df Opt_EnableRewriteRules) Opt_DoCoreLinting) env
+
+-- | Run the active optimization pipeline on a no-code retained module with early lookups.
+validateRetainedLookupBodies :: HscEnv -> ModGuts -> IO (Maybe ModGuts)
+validateRetainedLookupBodies env guts
+  | Just _ <- nativeOptLevel (hsc_dflags env)
+  , null (mg_rules guts)
+  , supportsNativeRuleBinds simplified
+  = Just <$> core2coreRetained (hscUpdateFlags (`gopt_set` Opt_DoCoreLinting) env)
+                               (guts { mg_binds = simplified })
+  | null (mg_rules guts) = validateRetainedSourceBodies env guts
+  | otherwise = pure Nothing
+  where
+    simplified = simpleOptNativeProgram (mg_binds guts)
+
+-- | Confirm that early-staged indexed lookup tables match desugared and final Core.
+checkEarlyIndexedLookups :: HscEnv -> HscSource -> Logger -> GhcMessageOpts -> DiagOpts
+                         -> TcGblEnv -> Bool -> [CoreRule] -> [CoreBind]
+                         -> Maybe [CoreBind] -> Maybe [CoreBind] -> Hsc ()
+checkEarlyIndexedLookups hsc_env hsc_src logger print_config diag_opts tc_result
+                         no_plugins rules desugared_binds mb_simplified mb_tidy
+  | null (earlyIndexedLookups tc_result) = pure ()
+  | otherwise = do
+      (msgs, _) <- liftIO $
+        initTc NoTcMPlugins hsc_env hsc_src False (tcg_mod tc_result) (tcg_top_loc tc_result) $
+          setGblEnv tc_result $
+            validateEarlyIndexedLookups no_plugins rules desugared_binds mb_simplified mb_tidy
+      liftIO $ printOrThrowDiagnostics logger print_config diag_opts (GhcTcRnMessage <$> msgs)
 
 -- | Collect rejected owners and families, including equations that refer to them.
 invalidSourceMappers :: ModGuts -> Maybe ModGuts -> (NameSet, NameSet)

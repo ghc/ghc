@@ -2841,7 +2841,7 @@ the swap and supplies its exact equation.
 -- The callback receives the arities of independent local datatypes.
 -- See Note [Ordering local source tables].
 data SourceTableUse
-  = TableInType ((Name -> Maybe Int) -> [(Name, Maybe Int)] -> Maybe NameSet)
+  = TableInType ((Name -> Maybe (Int, NameSet)) -> [(Name, Maybe Int)] -> Maybe NameSet)
   | TableInTerm
 
 -- | Schedule independent local source functions. See Note [Ordering local source tables].
@@ -2913,13 +2913,18 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
       , not (maybe False (nameSetAny (isJust . sourceTableTermOcc . nameOccName)) defs) ]
     local_values = mkNameSet (collectHsValBinders CollNoDictBinders vals)
     local_binders = mkNameSet (hsGroupBinders group)
-    independent_types kinds fvs = case use of
+    independent_types (indexed, kinds) fvs = case use of
       TableInTerm
         | all ((== Just 0) . snd) kinds -> Just (mkNameSet (map fst kinds))
         | otherwise -> Nothing
       TableInType typeDeps -> do
-        needed <- typeDeps (fmap fst . lookupNameEnv early_datatypes) kinds
-        let cons = mkNameSet (concatMap (maybe [] snd . lookupNameEnv early_datatypes)
+        let ready name
+              | indexed, Just info <- lookupNameEnv indexed_datatypes name = Just info
+              | Just (arity, cons) <- lookupNameEnv early_datatypes name =
+                  Just (arity, emptyNameSet, cons)
+              | otherwise = Nothing
+        needed <- typeDeps (fmap (\(arity, deps, _) -> (arity, deps)) . ready) kinds
+        let cons = mkNameSet (concatMap (maybe [] (\(_, _, cs) -> cs) . ready)
                                         (nameSetElemsStable needed))
         guard (nameSetAll (`elemNameSet` cons) (fvs `intersectNameSet` local_binders))
         pure needed
@@ -2977,6 +2982,30 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
       pure (root, params)
 
     worker_dependencies outer arg result
+      | TableInType{} <- use
+      , Just (scope, scope_deps) <- indexed_scope_binder outer
+      , Just (other, output) <- source_arrow result
+      , Just (left, [left_scope]) <- type_application arg
+      , Just (right, [right_scope]) <- type_application other
+      , left /= right
+      , parameter_name left_scope == Just scope
+      , parameter_name right_scope == Just scope
+      , Just target <- type_name output
+      = Just (True, [(left, Nothing), (right, Nothing), (target, Just 0)] ++ scope_deps)
+      | otherwise = (False,) <$> ordinary_worker_dependencies outer arg result
+
+    indexed_scope_binder :: HsOuterSigTyVarBndrs GhcRn -> Maybe (Name, [(Name, Maybe Int)])
+    indexed_scope_binder (HsOuterImplicit [scope]) = Just (scope, [])
+    indexed_scope_binder (HsOuterExplicit _ Nothing
+                           [L _ (HsTvb _ SpecifiedSpec (HsBndrVar _ (L _ scope)) kind)]) =
+      case kind of
+        HsBndrNoKind{} -> Just (scope, [])
+        HsBndrKind _ k
+          | HsStarTy{} <- unLoc (ignoreParens k) -> Just (scope, [])
+          | otherwise -> (scope,) <$> type_dependencies k
+    indexed_scope_binder _ = Nothing
+
+    ordinary_worker_dependencies outer arg result
       | TableInType{} <- use
       , Just vars <- outer_vars outer
       , Just (root, params) <- parameter_domain arg
@@ -3053,6 +3082,57 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
                                      dd_cons = DataTypeCons False cs, dd_derivs = derivs}}]} <- tycls
                   , isEmptyNameSet deps
                   , Just cons <- [early_constructors t params cs derivs] ]
+
+    -- A lookup over two indexed operands can need a mutual datatype group.
+    -- Move the whole renamed group and follow its prerequisites. See
+    -- Note [Ordering local source tables].
+    indexed_datatypes = mkNameEnv
+      [ (t, (arity, group_ext tg, constructors))
+      | tg <- tycls, null (group_kisigs tg)
+      , Just ds <- [traverse indexed_datatype (group_tyclds tg)]
+      , (t, arity, constructors) <- ds ]
+
+    indexed_datatype (L _ DataDecl
+      { tcdLName = L _ t, tcdModifiers = [], tcdDExt = DataDeclRn{tcdFVs = fvs}
+      , tcdTyVars = HsQTvs{hsq_explicit = params}
+      , tcdDataDefn = HsDataDefn{dd_ctxt = Nothing, dd_kindSig = Nothing,
+          dd_cons = DataTypeCons False cs, dd_derivs = []} })
+      | not (nameSetAny (isJust . sourceTableTermOcc . nameOccName) fvs)
+      , all indexed_parameter params
+      , Just constructors <- traverse indexed_constructor cs
+      = Just (t, length params, concat constructors)
+    indexed_datatype _ = Nothing
+
+    indexed_parameter (L _ HsTvb{tvb_flag = HsBndrRequired{}, tvb_kind = kind})
+      = case kind of
+          HsBndrNoKind{} -> True
+          HsBndrKind _ ty -> indexed_type ty
+    indexed_parameter _ = False
+
+    indexed_constructor (L _ ConDeclGADT{con_names = cs, con_modifiers = [],
+                                          con_telescope = [], con_outer_bndrs = L _ outer_bndrs,
+                                          con_g_args = PrefixConGADT _ fields, con_res_ty = res})
+      | indexed_outer outer_bndrs
+      , indexed_type res, all (plain_constructor_field indexed_type) fields
+      = Just (map unLoc (toList cs))
+    indexed_constructor _ = Nothing
+
+    indexed_outer HsOuterImplicit{} = True
+    indexed_outer (HsOuterExplicit _ Nothing bndrs) = all indexed_spec_binder bndrs
+    indexed_outer _ = False
+
+    indexed_spec_binder (L _ HsTvb{tvb_flag = SpecifiedSpec, tvb_kind = kind}) =
+      case kind of
+        HsBndrNoKind{} -> True
+        HsBndrKind _ ty -> indexed_type ty
+    indexed_spec_binder _ = False
+
+    indexed_type ty = case unLoc (ignoreParens ty) of
+      HsTyVar _ _ (L _ (WithUserRdr _ name)) ->
+        isTyVarName name || isDataConName name || isJust (type_name ty)
+      HsAppTy _ fun arg -> indexed_type fun && indexed_type arg
+      HsStarTy{} -> True
+      _ -> False
 
     early_constructors t [] [con] [] | Just c <- retained_constructor t con = Just [c]
     early_constructors t [] cs _ = concat <$> traverse (prefix_con t) cs
