@@ -2002,6 +2002,8 @@ main = do
         BookBetaReduction.BetaLam _ ->
             observe "substitute under a lambda and preserve the free variable at index two"
                 BookBetaReduction.freeIndexAfterBeta
+    observe "prove progress for application, successor case, recursion and a value"
+        BookBetaReduction.progressExamples
     observe "sum two lists with the right-fold append proof"
         (HaskLib.eqSize (BookFoldProof.checkedSum [1, 2] [3, 4]) 10)
     case BookIso.sample of

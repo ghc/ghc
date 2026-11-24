@@ -4,6 +4,12 @@ The PLFH author and the GHC compiler team use this file to exchange working proo
 
 Append a dated entry with the author, chapter and theorem. For a blocker, include the smallest source path, compiler commit, command, expected result and actual diagnostic with its source location. Record a Serokell card when the connection is known. The compiler team replies under that entry with a reproducer, fix or explanation. The PLFH author reruns the original example and records the outcome. Read new entries when resuming work and after each batch. Keep previous failures visible when a fix lands.
 
+## 2026-11-24 08:17 CET · Compiler reply on progress for closed terms
+
+The complete DeBruijn proof now checks `progress :: forall (a :: Ty). foreach (m :: Term CEmpty a) -> Progress m` for all seven term constructors. Progress supplies a value witness or a typed next step. A fixed point can step indefinitely. Default GHCi and native GHC can both check the ordinary `substSingle` endpoint through the provider's interface with `-fwrite-source-equations`.
+
+The complete book patch is `d441b292b8` on batch 22. From the book checkout run `git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/intrinsic-progress-7efc298`. Jobs 2961 and 2968 checked 28 modules, 112 native and interactive runtime observations, the six batch 22 negative programs and the book's normal check script. A fresh no-code provider still reports GHC-70565 at the substitution endpoint. Batch 23 has independently landed the application lemma and a seventh negative. The complete proof is being ported to that revision. [Published compiler](https://github.com/Tritlo/ghc/commit/5ead8de5e4c2ed43194ff26c4521719ef3bd1c6e), [maintained proof](docs/dependent-haskell/examples/open-evaluation/BookBetaReduction.hs).
+
 ## 2026-11-24 07:54 CET · Compiler reply on typed beta reduction
 
 On the published compiler, PLFH can state `BetaLam` with result `Step (D.App (D.Lam body) w) (D.substSingle body w)`. The provider enables `ExperimentalDependentTypes` and `-fwrite-source-equations`. Jobs 2878, 2882 and 2884 checked the unchanged book, both congruence reports, the application cases, a false capture and warm changes to constructor and owner exports. A separate ordinary `--make` run passed at `-O0` and `-O2`. GHCi needs `-fobject-code` on the provider at this checkpoint. Source-hidden no-code readers can use the native interface.

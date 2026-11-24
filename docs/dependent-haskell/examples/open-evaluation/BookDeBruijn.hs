@@ -1,15 +1,14 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LambdaCase #-}
 {-# LANGUAGE PolyKinds, RankNTypes, StandaloneKindSignatures #-}
-{-# OPTIONS_GHC -fwrite-source-equations -fobject-code #-}
+{-# OPTIONS_GHC -fwrite-source-equations #-}
 -- | Typed terms and substitution from the PLFH DeBruijn chapter.
 -- Adapted from PLFH batch 21 under CC BY 4.0. See REFERENCES.md.
--- Use object code so that GHCi also reads the native substitution equations.
 module BookDeBruijn (Ty(..), Ctx(..), Lookup(..), Term(..), Value(..),
                      ext, rename, exts, subst, substSingle) where
 
 import Data.Kind (Type)
 
--- | Simple types: natural numbers and functions.
+-- | The object language has natural numbers and function types.
 data Ty = TNat | TArr Ty Ty
 
 -- | Nameless typing contexts.
@@ -66,7 +65,7 @@ subst sigma (Mu n)       = Mu (subst (exts sigma) n)
 substSingle :: Term (CExt g a) b -> Term g a -> Term g b
 substSingle n w = subst (\case { Z -> w; S x -> Var x }) n
 
--- | Values indexed by promoted intrinsically-typed terms!
+-- | Evidence that a typed term is a value.
 type Value :: forall (g :: Ctx) (a :: Ty). Term g a -> Type
 data Value m where
   VLam  :: Value (Lam n)

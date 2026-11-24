@@ -79,6 +79,14 @@ a comparison implementation. External solvers remain later work.
   [license](https://creativecommons.org/licenses/by/4.0/),
   [Agda DeBruijn](https://plfa.github.io/DeBruijn/),
   [Haskell proof](examples/open-evaluation/BookBetaReduction.hs).
+- **Progress for closed terms.** PLFA's proof inspects a term in the
+  empty typing context. A variable cannot occur there. A lambda is a
+  value. An application steps its function, steps its argument, or uses
+  substitution in the beta rule. The Haskell proof checks the same
+  alternatives, both natural-number case branches and recursive unfolding.
+  The result supplies one step. A recursive term can keep unfolding.
+  [PLFA DeBruijn, Progress](https://plfa.github.io/DeBruijn/#progress),
+  [Haskell proof](examples/open-evaluation/BookBetaReduction.hs).
 - **Representing a checked callback.** Danvy and Nielsen describe
   defunctionalization with constructors for captured values. The fork
   uses private constructors for replacement, shifting, and lifting a

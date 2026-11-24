@@ -828,6 +828,20 @@ checked substitution pattern. General higher-order evaluation remains open.
 [Provider](../examples/open-evaluation/BookDeBruijn.hs),
 [capture proof](../examples/open-evaluation/BookBetaReduction.hs).
 
+Compiler `5ead8de5e4` also checks the complete progress proof in native
+GHC and default GHCi. The verifier reads through breakpoint ticks in
+its view of bytecode Core. Executable Core keeps the breakpoints.
+A case on a retained term can now use the equality for an ordinary
+constructor of an indexed GADT, including `Case` and `Mu`. The interface
+marks this new evidence so that an older reader can reject it. Job 2960
+checks this case and the default interactive path in the maintained
+`NativeCheckedClosure` registration.
+
+A fresh no-code reader can check the proof with a native provider.
+Publishing the same equations from a fresh no-code provider remains
+open. Its simple interfaces must account for relevant imported rewrite
+rules before a client can use their equations.
+
 ## M155. Reachable helper chains
 
 A checked case can now use a helper that calls another helper. The

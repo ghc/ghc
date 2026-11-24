@@ -8,51 +8,45 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
-[Compiler `fb64eaff81`](https://github.com/Tritlo/ghc/commit/fb64eaff8171a630b136167bf45c4af8e8333f5f)
-checks a beta step whose target is the ordinary `substSingle body w` on
-intrinsically typed de Bruijn terms. The capture example verifies the
-free variable's new index in the type and returns `Just 2` at runtime.
-Job 2907 matched all 614 Showcase observations at native `-O0`, default
-`-O2` and in GHCi. Its provider uses `-fwrite-source-equations` and
-`-fobject-code`. [Proof](examples/open-evaluation/BookBetaReduction.hs)
-and [current producer requirements](roadmap/R16-open-term-evaluator.md#typed-substitution-under-a-binder).
+A closed term in PLFH's intrinsically typed language now has a checked
+progress theorem. The proof covers all seven term constructors. It returns
+a value witness or a reduction to a term of the same type. Beta reduction
+and fixed-point unfolding use the book's capture-avoiding `substSingle` in
+the result type. Job 2939 matched all 615 Showcase outputs at native
+`-O0`, default `-O2` and in default GHCi. The provider enables
+`-fwrite-source-equations`. Job 2960 checked the corresponding native
+and interactive compiler regression.
+[Public compiler](https://github.com/Tritlo/ghc/commit/5ead8de5e4c2ed43194ff26c4521719ef3bd1c6e),
+[progress proof](examples/open-evaluation/BookBetaReduction.hs),
+[provider requirements](roadmap/R16-open-term-evaluator.md#typed-substitution-under-a-binder).
 
-[Published PLFH batch 21](https://github.com/Tritlo/PLFH/tree/246574dca2182bff387a8e20e61273216849714b)
-uses the same-module proofs of powers and truncated subtraction. On that
-unchanged book, job 2881 found **33 of 40 original reports compile at
-`-O0` and 30 at default `-O2`**. Only the two congruence reports changed
-from job 2873. Both runs checked 27 modules in four configurations, 102
-runtime observations per native reader and six negative programs per mode.
-
-The joint book patch `95ddd8c7` uses visible congruence in Relations
-and Induction. Lists converts `Any` evidence to an existential witness
-and back. Job 2883 checked all 30 reports in its fixed directory and 103
-runtime observations per native reader. The extra observation preserves
-the fourth occurrence in `[1,2,1,2]`. The general inverse proofs for the
-two conversions remain open. From the book checkout, run
-`git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/visible-congruence-246574d`.
+[PLFH batch 23](https://github.com/Tritlo/PLFH/tree/8a351936672142e61c6c444fc6ae5e823b2d6645)
+contains the application lemma and a negative test for accidental capture.
+The complete theorem was qualified separately on batch 22 in book commit
+`d441b292b8`. Job 2961 checked 28 book modules at both native optimization
+levels. All 112 runtime observations also matched in default GHCi. Job 2968
+passed the book's 66 checks, including the 30 maintained fixed reports.
+From a book checkout, fetch the tested patch with
+`git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/intrinsic-progress-7efc298`.
+On unchanged batch 22, job 2940 accepted 33 of the original 40 reports at
+`-O0` and 30 at default `-O2`.
 
 ## Next compiler work
 
-- The application case now uses the checked beta constructor when both
-  subterms are values. From the book checkout fetch
-  `refs/yardsticks/plfh/native-app-progress-246574d` from the local GHC
-  repository. The application proof takes progress for its subterms as
-  an argument. Full progress also requires the ordinary `Case` and `Mu`
-  constructors of the indexed GADT to refine their branches.
-- At this checkpoint bytecode and fresh no-code producers still withhold
-  the substitution equations. Native `--make` works at `-O0` and `-O2`.
-  An interface-only reader can use the native provider in no-code mode.
-- Job 2680 built both stages of the 607-example source `a745ffc9b8`.
-  The selected tests passed 47/49, compatibility passed 231/234 and
-  the focused suite passed 136/138. The package and all three Showcase
-  gates passed. Jobs 2817 and 2831 verified the indexed append, named
-  sibling and opaque callback diagnostics after integration. The two
-  focused failures were `NativeDependentCoreRun` (copied source certificate)
-  and the known `deriving-via-compile` diagnostic. Job 2854 passed the
-  revised Core Lint fixture in `551528d74c`. Use the independent
-  build to compare the complete cohorts. Job 2837 built both stages of the 612-example
-  checkpoint `781a6c6a8f`. Its results are under
+- Combine the progress proof with the additions in PLFH batch 23 and the
+  shared arithmetic proof in HaskLib. Preserve the new capture test and
+  qualify the combined book with its ordinary check script.
+- A no-code reader can use a separately compiled native provider. A fresh
+  no-code provider withholds the substitution equation. Job 2968 reproduced
+  GHC-70565 at the beta endpoint at both optimization levels. Publication
+  requires an account of imported rewrite rules for no-code interfaces.
+- Run the independent two-stage build of the 615 checkpoint. The previous
+  build at `781a6c6a8f` passed all 15 gates, including 52 selected tests
+  and all three modes of the 612-line Showcase. Job 2837 also passed
+  234/234 compatibility cases and 136/138 focused tests. The two failures
+  were the old `NativeDependentCoreRun` expectation and the known
+  `deriving-via-compile` diagnostic. Job 2974 replays the revised
+  fixture on the same compiler. The complete original results are under
   `_build/on-demand/plfh-batch18-normal-next-20261124`.
 - Three compiler agents use a shared queue with four GHC build slots,
   16 logical CPUs and 64 GB of memory.

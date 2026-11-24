@@ -25,6 +25,13 @@ inherited 23 gives **27 of 50 complete** on the roadmap. These figures
 count cards. They do not estimate the effort left or certify all inherited
 GHC behavior on the fork.
 
+PLFH now checks progress for a closed, intrinsically typed term. A case
+on the term returns a value witness or a typed step. The beta step uses
+the book's ordinary substitution function in its result type. This adds
+client evidence for R03 and R16. Both cards remain partial.
+[Checked progress proof](examples/open-evaluation/BookBetaReduction.hs)
+and [R16 provider and interface requirements](roadmap/R16-open-term-evaluator.md#typed-substitution-under-a-binder).
+
 | Area | Open cards with a tested implementation in the fork |
 | --- | --- |
 | Dependent binders, Core and equality | R03, R04, R05, R11, R22 |
