@@ -4,6 +4,7 @@ module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourc
                               sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, monomorphicEnumCaseArity, groundFirstHead, sourceLocalBooleanCases,
                               isFinalStructuralSource, isStructuralSourceTable, isNominalStructuralSource,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
+                              sourceEquationDatatypes, publicCaseType, ordinaryImport,
                               sourceBinarySelector, sourceMapSelector, lookupSourceBinaryMethod, lookupSourceContainerMethod, lookupSourceGroundDFun, lookupSourceCheckedMapMethod, publishListFoldMethods, keepCheckedMapWorkers, publishCheckedMapMethods, sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers, isSourceFilterGuard,
                               OptionalSourceUses, optionalSourceUses, registerOptionalSourceUses,
                               checkOptionalSourceUses, checkSourceMethodUses,
@@ -2512,18 +2513,26 @@ checkLocalRetainedWitnessExports env owners = do
         _ -> pure ()
   where
     unexported_case_types exported table =
-      sortBy stableNameCmp $
-        [ name | tc <- nonDetEltsUniqSet (tyConsOfTypes (concatMap equation_types tables))
-               , let parent = maybe tc dataConTyCon (isPromotedDataCon_maybe tc)
-                     name = tyConName parent
-               , isAlgTyCon parent, nameModule_maybe name == Just (tcg_semantic_mod env)
-               , not (publicCaseType env exported (const False) parent) ]
+      sortBy stableNameCmp
+        [ name | tc <- sourceEquationDatatypes tables
+               , let name = tyConName tc
+               , nameModule_maybe name == Just (tcg_semantic_mod env)
+               , not (publicCaseType env exported (const False) tc) ]
       where
         tables = table : fromMaybe [] (sourceTableCallees table)
-        equation_types tc = tyConKind tc :
-          [ ty | axiom <- maybeToList (closedFamilyTyConCoAxiom_maybe tc)
-               , branch <- fromBranches (coAxiomBranches axiom)
-               , ty <- coAxBranchRHS branch : coAxBranchLHS branch ++ map tyVarKind (coAxBranchTyVars branch) ]
+
+-- | Find the datatypes that supply the types and promoted constructors
+-- of a group of emitted equations, including their operand kinds.
+sourceEquationDatatypes :: [TyCon] -> [TyCon]
+sourceEquationDatatypes tables =
+    [ parent | tc <- nonDetEltsUniqSet (tyConsOfTypes (concatMap equation_types tables))
+             , let parent = maybe tc dataConTyCon (isPromotedDataCon_maybe tc)
+             , isAlgTyCon parent ]
+  where
+    equation_types tc = tyConKind tc :
+      [ ty | axiom <- maybeToList (closedFamilyTyConCoAxiom_maybe tc)
+           , branch <- fromBranches (coAxiomBranches axiom)
+           , ty <- coAxBranchRHS branch : coAxBranchLHS branch ++ map tyVarKind (coAxBranchTyVars branch) ]
 
 -- | The early witness path only considers signatures accepted by this rule.
 isMonomorphicRetainedWitness :: Id -> Bool

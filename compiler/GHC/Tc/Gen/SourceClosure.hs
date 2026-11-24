@@ -36,17 +36,19 @@ import GHC.Core.Unify (tcMatchTys)
 import GHC.Core.Utils (exprType)
 import GHC.Driver.Config (initSimpleOpts)
 import GHC.Driver.DynFlags (HasDynFlags(getDynFlags))
-import GHC.Tc.Gen.SourceTable (hasSourceMethodRule, visibleSourceMethodRules)
+import GHC.Tc.Gen.SourceTable
+  ( hasSourceMethodRule, ordinaryImport, publicCaseType, sourceEquationDatatypes
+  , visibleSourceMethodRules )
 import GHC.Tc.TyCl.Build (buildDataCon, newImplicitBinder, newTyConRepName)
 import GHC.Tc.Utils.Instantiate (freshenTyVarBndrs)
-import GHC.Tc.Utils.Monad (TcGblEnv(..), TcM, getGblEnv, newSysName)
+import GHC.Tc.Utils.Monad (TcGblEnv(..), TcM, getGblEnv, getGlobalRdrEnv, newSysName)
 import GHC.Tc.Utils.TcType (isTyFamFree)
-import GHC.Types.Avail (availNames)
+import GHC.Types.Avail (availsToNameSet)
 import GHC.Types.Id (Id, idDetails, idName, isDataConWorkId_maybe, isDataConWrapId_maybe)
 import GHC.Types.Id.Info (IdDetails(CheckedClosureSourceTableId, VanillaId))
 import GHC.Types.Id.Make (DataConBangOpts(FixedBangOpts))
 import GHC.Types.Name
-  ( Name, isExternalName, mkDataOcc, mkInstTyCoOcc, mkSourceTableOcc, mkTcOcc
+  ( Name, isExternalName, isWiredInName, mkDataOcc, mkInstTyCoOcc, mkSourceTableOcc, mkTcOcc
   , mkTyVarOcc, nameModule_maybe, nameStableString, occNameString )
 import GHC.Types.Name.Env (mkNameEnv)
 import GHC.Types.Name.Set (elemNameSet, mkNameSet, nameSetElemsStable)
@@ -83,6 +85,11 @@ the resulting term, but cannot reintroduce a replacement. An
 unavailable scrutinized field leaves the corresponding match stuck.
 The rebuilt fields must stay lazy in both traversals.
 
+Check the source datatypes of all generated equations, including the
+private interpreters. Their source types and constructors must be
+visible under the ordinary source equation policy. The generated
+closure datatype belongs to the certificate and is private.
+
 Keep the actual owner and all reachable original and final helper
 Names in IdDetails. Withhold publication if any Name is absent after
 Tidy or if a visible rule can rewrite a checked function. See
@@ -97,9 +104,12 @@ data FamilyInputs = FamilyInputs Id Kind Kind TyCon TyCon TyCon
 publishCheckedSourceClosures :: [CoreBind] -> [CoreBind] -> TypeEnv -> TcM ([Id], [TyCon])
 publishCheckedSourceClosures original_binds final_binds final_types = do
     env <- getGblEnv
+    rdr_env <- getGlobalRdrEnv
     opts <- initSimpleOpts <$> getDynFlags
     let here = Just (tcg_mod env)
-        exported = mkNameSet (concatMap availNames (tcg_exports env))
+        exported = availsToNameSet (tcg_exports env)
+        imported name = isWiredInName name || ordinaryImport rdr_env name
+        public = publicCaseType env exported imported
         original = [(v, simpleOptExpr opts rhs) | (v, rhs) <- Core.flattenBinds original_binds]
         final = Core.flattenBinds final_binds
         lookupLocal name = case lookupTypeEnv final_types name of
@@ -126,13 +136,14 @@ publishCheckedSourceClosures original_binds final_binds final_types = do
       candidates -> do
         visible <- visibleSourceMethodRules env
         let safe (owner, _, helpers) = all (not . hasSourceMethodRule visible) (owner:helpers)
-        accepted <- catMaybes <$> traverse publish (filter safe candidates)
+        accepted <- catMaybes <$> traverse (publish public) (filter safe candidates)
         pure (map fst accepted, concatMap snd accepted)
   where
-    publish (owner, shape, helpers) = do
+    publish public (owner, shape, helpers) = do
       generated <- allocateFamilies shape
       pure $ do
         (root, families) <- generated
+        guard (all (\tc -> tc `elem` families || public tc) (sourceEquationDatatypes families))
         let new = setIdDetails owner (CheckedClosureSourceTableId (idName owner) root (map idName helpers))
         pure (new, families)
 
