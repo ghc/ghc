@@ -197,6 +197,10 @@ test('NativeIndependentConstructorRows',
 test('NativeStructuralSizePredicate',
      [only_ways(['normal'])],
      run_command, ['bash NativeStructuralSizePredicate.sh "{compiler}" "{libdir}"'])
+test('NativeOpenMonus',
+     [only_ways(['normal']),
+      extra_files(['NativeOpenMonusSource.hs', open_eval_dir + 'PreludeMapLengthSize.hs'])],
+     run_command, ['bash NativeOpenMonus.sh "{compiler}" "{libdir}"'])
 test('NativeSizeListNoDescent',
      [only_ways(['normal']),
       extra_files(['NativeSizeListNoDescent.hs', 'NativeSizeListNoDescentSource.hs',
