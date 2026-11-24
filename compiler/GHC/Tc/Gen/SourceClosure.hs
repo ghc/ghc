@@ -7,7 +7,7 @@ import Control.Monad (foldM, guard, zipWithM, zipWithM_)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Maybe (MaybeT(..))
 import Control.Monad.Fix (mfix)
-import Data.List (foldl', sortOn)
+import Data.List (foldl', nubBy, sortOn)
 import Data.Maybe (catMaybes, fromMaybe, isJust, mapMaybe)
 
 import GHC.Builtin.WiredIn.Types (manyDataConTy, unmatchableDataConTy)
@@ -33,7 +33,8 @@ import GHC.Core.TyCon
   , mkFamilyTyCon, mkTyConKindWithMatchability, isAlgTyCon, isPromotedDataCon
   , tyConDataCons, tyConKind, tyConName )
 import GHC.Core.Type
-  ( Kind, getTyVar_maybe, isLiftedTypeKind, isManyTy, liftedTypeKind, lookupTyVar, mkTyConApp, mkTyVarTy
+  ( Kind, getTyVar_maybe, isLiftedTypeKind, isManyTy, liftedTypeKind, lookupTyVar
+  , mkAppTys, mkSpecForAllTys, mkTyConApp, mkTyVarTy, mkVisFunTyManyU
   , mkTyVarTys, splitForAllForAllTyBinders, splitForAllTyVars, splitFunTys, splitTyConApp_maybe, substTyUnchecked, substTyWith
   , tyCoVarsOfTypes, typeKind )
 import GHC.Core.Unify (alwaysBindTv, tcMatchTys, tcUnifyTys)
@@ -113,7 +114,7 @@ bytecode generation, including the variables used by the debugger.
 
 data CallbackLift = NamedLift Id | InlinedRename | InlinedSubst Id
 
-data FamilyInputs = FamilyInputs Id Int Kind Kind TyCon TyCon TyCon
+data FamilyInputs = FamilyInputs Id Int Kind Kind TyCon TyCon TyCon (Id, Id)
                                   DC.DataCon DC.DataCon DC.DataCon [(DC.DataCon, [Int])]
 
 -- | Publish tables for eligible final Core bindings. The caller checks
@@ -151,12 +152,12 @@ publishCheckedSourceClosures original_binds final_binds final_types = do
           actual <- lookupOwner old
           original_shape <- familyInputs original old original_rhs
           final_rhs <- lookup actual final
-          shape@(FamilyInputs _ _ _ _ term ext index _ _ _ _) <- familyInputs final actual final_rhs
+          shape@(FamilyInputs _ _ _ _ term ext index _ _ _ _ _) <- familyInputs final actual final_rhs
           guard (sameShapes original_shape shape)
           guard (all ((== here) . nameModule_maybe . tyConName) [term, ext, index])
           helper_ids <- dependencies isExternalName old actual
           guard (not (null helper_ids))
-          pure (actual, shape, helper_ids)
+          pure (actual, (original_shape, shape), helper_ids)
         indexed_candidate (old, original_rhs) = do
           actual <- lookupOwner old
           final_rhs <- lookup actual final
@@ -169,6 +170,16 @@ publishCheckedSourceClosures original_binds final_binds final_types = do
           -- a floated type-only body, which can have an internal Name.
           helper_ids <- dependencies (\name -> not is_encoder || isExternalName name) old actual
           pure (actual, shapes, helper_ids)
+        -- See Note [Renaming with an abstract callback].
+        renaming_candidate (_, (original_shape, shape), _) = do
+          let (rename, extend) = renamingOperations original_shape
+              (final_rename, final_extend) = renamingOperations shape
+          guard (idName rename == idName final_rename && idName extend == idName final_extend)
+          actual_rename <- lookupOwner final_rename
+          actual_extend <- lookupOwner final_extend
+          helpers <- dependencies isExternalName rename actual_rename
+          guard (actual_extend `elem` helpers)
+          pure (actual_rename, (actual_extend, shape), helpers)
     case (mapMaybe candidate original, mapMaybe indexed_candidate original) of
       ([], []) -> pure ([], [])
       (closures, indexed) -> do
@@ -177,10 +188,16 @@ publishCheckedSourceClosures original_binds final_binds final_types = do
             safe (owner, _, helpers) = all (not . hasSourceMethodRule visible) (owner:helpers)
         checked_closures <- catMaybes <$> traverse (publish public) (filter safe closures)
         checked_indexed <- catMaybes <$> traverse (publishIndexed public) (filter safe indexed)
-        let accepted = checked_closures ++ checked_indexed
+        let renamings = filter safe (mapMaybe renaming_candidate closures)
+            sameRename (owner, _, _) (other, _, _) = owner == other
+            sameExtension (_, (ext, _), _) (_, (other, _), _) = ext == other
+        extensions <- catMaybes <$> traverse (publishRenameExtension public) (nubBy sameExtension renamings)
+        let extension_tables = [(idName ext, table) | (ext, [table]) <- extensions]
+        checked_renamings <- catMaybes <$> traverse (publishRenaming public extension_tables) (nubBy sameRename renamings)
+        let accepted = checked_closures ++ checked_indexed ++ extensions ++ checked_renamings
         pure (map fst accepted, concatMap snd accepted)
   where
-    publish public (owner, shape, helpers) = do
+    publish public (owner, (_, shape), helpers) = do
       generated <- allocateFamilies shape
       pure $ do
         (root, families) <- generated
@@ -619,10 +636,13 @@ indexedConstructor specialize callee args = do
     pure (con, supplied, values)
 
 sameShapes :: FamilyInputs -> FamilyInputs -> Bool
-sameShapes (FamilyInputs _ arity g a term ext index var hit miss rows)
-           (FamilyInputs _ arity' g' a' term' ext' index' var' hit' miss' rows') =
+sameShapes (FamilyInputs _ arity g a term ext index _ var hit miss rows)
+           (FamilyInputs _ arity' g' a' term' ext' index' _ var' hit' miss' rows') =
     arity == arity' && g `eqType` g' && a `eqType` a' && term == term' && ext == ext' && index == index' &&
     var == var' && hit == hit' && miss == miss' && rows == rows'
+
+renamingOperations :: FamilyInputs -> (Id, Id)
+renamingOperations (FamilyInputs _ _ _ _ _ _ _ operations _ _ _ _) = operations
 
 familyInputs :: [(Id, CoreExpr)] -> Id -> CoreExpr -> Maybe FamilyInputs
 familyInputs bindings owner rhs = do
@@ -667,8 +687,8 @@ familyInputs bindings owner rhs = do
     checked <- branchBody var_bs var_rhs
     (Core.Var use, [Core.Var x]) <- application checked
     guard (use == sigma && x == field)
-    recipes <- checkedTraversals bindings traversal sigma var hit miss rows
-    pure (FamilyInputs owner (length captures) context_kind sort_kind term ext index var hit miss recipes)
+    (operations, recipes) <- checkedTraversals bindings traversal sigma var hit miss rows
+    pure (FamilyInputs owner (length captures) context_kind sort_kind term ext index operations var hit miss recipes)
 
 -- Check both case traversals before emitting any nominal equations.
 -- The recipe records the number of binder extensions for each field.
@@ -676,7 +696,7 @@ checkedTraversals :: [(Id, CoreExpr)]
                   -> Id -> Id
                   -> DC.DataCon -> DC.DataCon -> DC.DataCon
                   -> [(DC.DataCon, [Var], CoreExpr)]
-                  -> Maybe [(DC.DataCon, [Int])]
+                  -> Maybe ((Id, Id), [(DC.DataCon, [Int])])
 checkedTraversals bindings subst sigma var hit miss rows = do
     let constructors = tyConDataCons (DC.dataConTyCon var)
     guard (complete constructors rows)
@@ -708,7 +728,7 @@ checkedTraversals bindings subst sigma var hit miss rows = do
     extend_rename <- allSame [v | NamedLift v <- rename_steps]
     extend_rename_rhs <- lookup extend_rename bindings
     checkRenameExtension hit miss extend_rename_rhs
-    pure recipes
+    pure ((rename, extend_rename), recipes)
   where
     complete constructors alts =
       let heads = [con | (con, _, _) <- alts]
@@ -967,8 +987,130 @@ caseCoercion scope co = case co of
 isValueVar :: Id -> Bool
 isValueVar v = isId v && not (isCoVar v)
 
+{- Note [Renaming with an abstract callback]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The checked substitution traversal also verifies the renaming and
+binder extension operations. Give these operations their own equations
+when the provider exports both. The variable row keeps the rank-n
+callback application below a lazy constructor. A binder row partially
+applies the same checked extension that the client can name. Reduction
+stops at an unknown lookup or term.
+
+Use the original unmatchable callback kind. A runtime renaming can
+map two distinct lookups to the same value. This certificate gives no
+injectivity for that application.
+-}
+
+-- | Emit the binder extension once, even if several traversals use it.
+publishRenameExtension :: (TyCon -> Bool) -> (Id, (Id, FamilyInputs), [Id])
+                       -> TcM (Maybe (Id, [TyCon]))
+publishRenameExtension public (_, (owner, shape), _) = runMaybeT $ do
+    let FamilyInputs _ _ context sort _ ext index _ _ hit miss _ = shape
+    g <- lift (freshVar "g" context)
+    d <- lift (freshVar "d" context)
+    b <- lift (freshVar "binder" sort)
+    a <- lift (freshVar "a" sort)
+    rank <- lift (freshVar "sort" sort)
+    let [gk,dk,bk,ak] = mkTyVarTys [g,d,b,a]
+        lookupAt c s = mkTyConApp index [c,s]
+        extend c = mkTyConApp ext [c,bk]
+        domain = lookupAt (extend gk) ak
+        result = lookupAt (extend dk) ak
+    rho <- lift (freshVar "rho" (renamingKind index rank gk dk))
+    input <- lift (freshVar "input" domain)
+    old <- lift (freshVar "index" (lookupAt gk ak))
+    let r = mkTyVarTy rho
+        x = mkTyVarTy old
+        binders = mkNamedTyConBinders Specified [g,d,b] ++
+                  [mkAnonTyConBinder rho, mkNamedTyConBinder Specified a, mkAnonTyConBinder input]
+        branches = do
+          fresh <- conAt hit (lookupAt (extend gk) bk) []
+          fresh' <- conAt hit (lookupAt (extend dk) bk) []
+          previous <- conAt miss domain [x]
+          previous' <- conAt miss result [mkAppTys r [ak,x]]
+          pure [renamingBranch [gk,dk,bk,r,bk,fresh] fresh',
+                renamingBranch [gk,dk,bk,r,ak,previous] previous']
+    publishRenamingTable public owner [] binders result (const branches)
+
+-- | A traversal can extend its callback only at each field's own binders.
+publishRenaming :: (TyCon -> Bool) -> [(Name, TyCon)] -> (Id, (Id, FamilyInputs), [Id])
+                -> TcM (Maybe (Id, [TyCon]))
+publishRenaming public extensions (owner, (extension, shape), helpers) = runMaybeT $ do
+    extend <- MaybeT (pure (lookup (idName extension) extensions))
+    let FamilyInputs _ _ context sort term ext index _ var _ _ recipes = shape
+    g <- lift (freshVar "g" context)
+    d <- lift (freshVar "d" context)
+    a <- lift (freshVar "a" sort)
+    rank <- lift (freshVar "sort" sort)
+    let [gk,dk,ak] = mkTyVarTys [g,d,a]
+        termAt c s = mkTyConApp term [c,s]
+        result = termAt dk ak
+    rho <- lift (freshVar "rho" (renamingKind index rank gk dk))
+    input <- lift (freshVar "input" (termAt gk ak))
+    let binders = mkNamedTyConBinders Specified [g,d,a] ++ map mkAnonTyConBinder [rho,input]
+        prepare (con, depths) = do
+          let (con_vars, telescope) = splitForAllTyVars (tyConKind (DC.promoteDataCon con))
+              (_, fields, codomain) = splitFunTys telescope
+          (subst, vars) <- lift (freshenTyVarBndrs (map snd con_vars))
+          let kind = substTyUnchecked subst codomain
+          args <- lift (traverse (freshVar "field" . substTyUnchecked subst . scaledThing) fields)
+          (tc, [source, sort_at]) <- MaybeT (pure (splitTyConApp_maybe kind))
+          guard (tc == term)
+          local <- lift (freshVar "rho" (renamingKind index rank source dk))
+          let r = mkTyVarTy local
+              fields = mkTyVarTys args
+              lhs = mkTyConApp (DC.promoteDataCon con) (mkTyVarTys vars ++ fields)
+              liftField 0 ctx = (dk,r) <$ guard (ctx `eqType` source)
+              liftField depth ctx = do
+                (cl, [outer, introduced]) <- splitTyConApp_maybe ctx
+                guard (cl == ext)
+                (target, inherited) <- liftField (depth - 1) outer
+                pure (mkTyConApp ext [target,introduced],
+                      mkTyConApp extend [outer,target,introduced,inherited])
+              rewrite family depth arg = do
+                (t, [ctx, at]) <- splitTyConApp_maybe (typeKind arg)
+                guard (t == term)
+                (target, captured) <- liftField depth ctx
+                guard (typeKind captured `eqType` renamingKind index rank ctx target)
+                pure (mkTyConApp family [ctx,target,at,captured,arg])
+          pure $ \family -> do
+            guard (typeKind lhs `eqType` kind)
+            output <- if con == var
+              then do [x] <- pure fields
+                      guard (typeKind x `eqType` mkTyConApp index [source,sort_at])
+                      pure [mkAppTys r [sort_at,x]]
+              else zipWithM (rewrite family) depths fields
+            out <- conAt con (termAt dk sort_at) output
+            pure (renamingBranch [source,dk,sort_at,r,lhs] out)
+    rows <- traverse prepare ((var,[]) : recipes)
+    publishRenamingTable public owner helpers binders result (\family -> traverse ($ family) rows)
+
+-- | Preserve the exact rank-n callback type when generating a table kind.
+renamingKind :: TyCon -> TyVar -> Type -> Type -> Kind
+renamingKind index rank g d =
+    mkSpecForAllTys [(unmatchableDataConTy, rank)] $
+      mkVisFunTyManyU (mkTyConApp index [g,mkTyVarTy rank]) (mkTyConApp index [d,mkTyVarTy rank])
+
+renamingBranch :: [Type] -> Type -> CoAxBranch
+renamingBranch lhs = mkBranch (tyCoVarsOfTypesWellScoped lhs) lhs
+
+publishRenamingTable :: (TyCon -> Bool) -> Id -> [Id] -> [TyConBinder] -> Kind
+                     -> (TyCon -> Maybe [CoAxBranch]) -> MaybeT TcM (Id, [TyCon])
+publishRenamingTable public owner helpers binders result rows = do
+    root <- lift (newImplicitBinder (idName owner) mkSourceTableOcc)
+    axiom <- lift (newImplicitBinder root mkInstTyCoOcc)
+    let equations = rows table
+        table = mkFamily root axiom binders result (fromMaybe [] equations)
+        details = case helpers of
+          [] -> SourceTableId (idName owner) table NominalSourceTable
+          ids -> CheckedClosureSourceTableId (idName owner) table (map idName ids)
+    guard (tyConKind table `eqType` varType owner)
+    branches <- MaybeT (pure equations)
+    guard (all validBranch branches && all public (sourceEquationDatatypes [table]))
+    pure (setIdDetails owner details, [table])
+
 allocateFamilies :: FamilyInputs -> TcM (Maybe (TyCon, [TyCon]))
-allocateFamilies (FamilyInputs owner arity context sort term ext lookup_tycon var hit miss recipes) = do
+allocateFamilies (FamilyInputs owner arity context sort term ext lookup_tycon _ var hit miss recipes) = do
     (closure, constructors) <- allocateClosure owner context sort term ext
     case constructors of
       [replace, shift, lift, replace_next] -> do
