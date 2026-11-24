@@ -63,7 +63,7 @@ import GHC.Types.Tickish (GenTickish(Breakpoint))
 import GHC.Types.TyThing (TyThing(AnId))
 import GHC.Types.TypeEnv (TypeEnv, lookupTypeEnv)
 import GHC.Types.Var
-  ( ForAllTyFlag(Specified), TyVar, VarBndr(Bndr), isCoVar, isId, isTyVar
+  ( ForAllTyFlag(Specified), TyVar, VarBndr(Bndr), isCoVar, isId, isLocalId, isTyVar
   , Var, mkTyVar, mkTyVarBinders, setIdDetails, varType )
 import GHC.Types.Var.Env (mkInScopeSet)
 import GHC.Types.Var.Set (elemVarSet, mkVarSet, subVarSet, unionVarSet)
@@ -105,8 +105,10 @@ closure dependencies] in GHC.Tc.Gen.SourceTable.
 
 GHCi inserts breakpoint ticks at source spans, including in the middle
 of an application. Inspect the Core with only those ticks removed.
-The certificate describes evaluation of the Haskell term. The bytecode
-generator still sees the original ticks and their debugger variables.
+A breakpoint can keep a lifted let between the type and value lambdas
+of a callback. After removing the ticks, skip the let in the function
+view if the binder has no remaining use. Keep the unmodified Core for
+bytecode generation, including the variables used by the debugger.
 -}
 
 data CallbackLift = NamedLift Id | InlinedRename | InlinedSubst Id
@@ -779,10 +781,19 @@ outcomes hit miss scope argument captures expr = do
 
 function :: CoreExpr -> Maybe ([TyVar], [Id], CoreExpr)
 function expr = do
-    let (binders, body) = Core.collectBinders expr
+    let (binders, body) = collect [] expr
         (ty_binders, tm_binders) = span isTyVar binders
     guard (all isValueVar tm_binders)
     pure (ty_binders, tm_binders, body)
+  where
+    -- See Note [Certifying a checked source closure].
+    collect binders (Core.Lam binder body) = collect (binder:binders) body
+    collect binders (Core.Let (Core.NonRec binder _) body)
+      | isLocalId binder
+      , isLiftedTypeKind (typeKind (varType binder))
+      , not (binder `elemVarSet` exprFreeVars body)
+      = collect binders body
+    collect binders body = (reverse binders, body)
 
 application :: CoreExpr -> Maybe (CoreExpr, [CoreExpr])
 application expr = do
