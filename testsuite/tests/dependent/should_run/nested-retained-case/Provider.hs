@@ -1,5 +1,7 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs #-}
+{-# LANGUAGE DataKinds, EmptyCase, ExperimentalDependentTypes, GADTs, TypeOperators #-}
 module Provider where
+
+import Data.Type.Equality ((:~:)(Refl))
 
 data Ty = Nat | Arr Ty Ty deriving Show
 data Ctx = Empty | Extend Ctx Ty
@@ -29,3 +31,17 @@ refineEither _ box = case box of
     Arr a b -> case u of
       Nat -> Just (MkArrow a b x)
       Arr c d -> Just (MkArrow c d y)
+
+data Value = B | A Value Value | J Value Value
+
+nestedEquality :: foreach (x :: Value)
+               -> x :~: 'J ('A a b) ('A a c) -> x :~: 'J ('A a b) ('A a c)
+nestedEquality B       eq = case eq of {}
+nestedEquality (A _ _) eq = case eq of {}
+nestedEquality (J l r) eq = case l of
+  B     -> case eq of {}
+  J _ _ -> case eq of {}
+  A _ _ -> case r of
+    B     -> case eq of {}
+    J _ _ -> case eq of {}
+    A _ _ -> case eq of Refl -> Refl

@@ -24,9 +24,10 @@ for opt in -O0 -O2 -fno-code; do
         echo "Expected retained case errors" >&2
         exit 1
     fi
-    if ! grep -Eq 'Reject\.hs:11:[0-9]+: error: \[GHC-05617\]' reject.log ||
-       ! grep -Eq 'Reject\.hs:18:[0-9]+: error: \[GHC-83865\]' reject.log ||
-       ! grep -Eq 'Reject\.hs:24:[0-9]+: error: \[GHC-18872\]' reject.log; then
+    if ! grep -Eq 'Reject\.hs:12:[0-9]+: error: \[GHC-05617\]' reject.log ||
+       ! grep -Eq 'Reject\.hs:19:[0-9]+: error: \[GHC-83865\]' reject.log ||
+       ! grep -Eq 'Reject\.hs:25:[0-9]+: error: \[GHC-18872\]' reject.log ||
+       ! grep -Eq 'Reject\.hs:32:[0-9]+: error: \[GHC-83865\]' reject.log; then
         cat reject.log >&2
         exit 1
     fi

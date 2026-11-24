@@ -1,6 +1,7 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LinearTypes #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LinearTypes, TypeOperators #-}
 module Reject where
 
+import qualified Data.Type.Equality as Eq
 import Provider
 
 swapped :: foreach (g :: Ctx) -> Maybe (Typed g) -> Maybe (Arrow g)
@@ -26,3 +27,6 @@ discard box = case box of
   Just (LinearPack t x) -> case t of
     Nat -> Nothing
     Arr a b -> Just (MkArrow a b x)
+
+wrongWitness :: 'J ('A 'B 'B) 'B Eq.:~: 'J ('A 'B 'B) ('A 'B 'B)
+wrongWitness = nestedEquality (J (A B B) B) Eq.Refl

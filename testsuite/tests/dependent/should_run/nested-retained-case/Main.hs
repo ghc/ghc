@@ -2,6 +2,7 @@
 module Main where
 
 import Control.Exception (ErrorCall, evaluate, try)
+import Data.Type.Equality ((:~:)(Refl))
 import Provider
 
 indices :: Maybe (Arrow 'Empty) -> Maybe (Ty, Ty)
@@ -26,3 +27,5 @@ main = do
   print (indices (refineEither Empty (Just (nat, bad))))
   demanded <- try (evaluate (indices (refine Empty (Just bad))))
   print (either (const True) (const False) (demanded :: Either ErrorCall (Maybe (Ty, Ty))))
+  case nestedEquality (J (A B B) (A B B)) Refl of
+    Refl -> putStrLn "nested Refl"
