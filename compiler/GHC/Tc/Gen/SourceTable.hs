@@ -82,7 +82,7 @@ import GHC.Types.Avail (availNames, availsToNameSet)
 import GHC.Types.Basic (Origin(..), LeftOrRight(..), SourceTableOrigin(..), UnfoldingSource(VanillaSrc),
                         isMarkedCbv, pickLR)
 import GHC.Types.Error (errorsFound)
-import GHC.Types.Id.Info (IdDetails(DFunId, SourceTableId, VanillaId), SourceDFun(..), setSourceProofRuleInfo)
+import GHC.Types.Id.Info (IdDetails(CheckedClosureSourceTableId, DFunId, SourceTableId, VanillaId), SourceDFun(..), setSourceProofRuleInfo)
 import GHC.Types.Id (globaliseId, idArity, idCbvMarks_maybe, idCoreRules, idInfo, idName, setIdInfo, idInlineActivation, idInlinePragma, isClassOpId_maybe, isDataConId_maybe, isDataConWorkId_maybe, isJoinId, idUnfolding, realIdUnfolding, mkSysLocalM, mkVanillaGlobal, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
                      setIdExported, setSourceMethodIds, sourceMethodAliases, sourceMethodTarget_maybe,
                      sourceMethodDFunClass)
@@ -231,7 +231,17 @@ sourceTableCallees table = do
 -- | Recover all checked callees from closed source equations.
 -- See Note [Composed source equations].
 sourceTableDependencies :: TyCon -> TcM (Maybe [Id])
-sourceTableDependencies root = walk (unitNameSet (tyConName root)) [] [root]
+sourceTableDependencies root = do
+    owner <- sourceTableOwner root
+    case idDetails <$> owner of
+      Just (CheckedClosureSourceTableId _ _ helpers)
+        | not (null helpers) -> do
+            ids <- traverse tcLookupIdMaybe helpers
+            case sequence ids of
+              Just checked -> walk (unitNameSet (tyConName root)) (reverse checked) [root]
+              Nothing -> pure Nothing
+        | otherwise -> pure Nothing
+      _ -> walk (unitNameSet (tyConName root)) [] [root]
   where
     walk _ owners [] = pure (Just (reverse owners))
     walk seen owners (table : rest)
