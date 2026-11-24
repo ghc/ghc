@@ -868,6 +868,30 @@ generator still receives the original Core. Job 3145 stopped inside
 execution. [Verifier and Note](../../../compiler/GHC/Tc/Gen/SourceClosure.hs),
 [regression](../../../testsuite/tests/dependent/should_run/NativeCheckedClosure.sh).
 
+## Renaming under a binder
+
+The ordinary `rename` function can appear in a result type with an
+abstract renaming. Its callback works for every object-language type.
+PLFH declares the callback arrow unmatchable with `%U`. Distinct
+variables can map to the same target variable. The solver therefore
+cannot recover the source variable by inverting this application.
+
+The verifier checks the exported renaming traversal and its binder
+extension in both Core programs. A variable row constructs `Var (r x)`
+without evaluating the callback. Under a lambda, the extension maps
+the new variable to itself and applies the original renaming to an
+older variable. A list pattern introduces two binders. The verifier
+checks both extensions in order. An abstract term stops reduction.
+See `Note [Renaming with an abstract callback]`.
+
+The PLFH Bisimulation proof applies these equations to all 20 constructors
+of `SimRel`. The batch 31 client shifts a free variable under both list
+binders. A different, well-typed lookup fails at `Refl`. The unchanged
+standalone report uses a matchable callback and receives GHC-83865.
+[Showcase proof](../examples/open-evaluation/BookBetaReduction.hs),
+[registered tests](../../../testsuite/tests/dependent/should_run/NativeCheckedClosureDouble.hs),
+[PLFA Bisimulation](https://plfa.github.io/Bisimulation/#simulation-commutes-with-renaming).
+
 ## M155. Reachable helper chains
 
 A checked case can now use a helper that calls another helper. The

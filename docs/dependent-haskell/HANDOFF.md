@@ -8,6 +8,38 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
+Work paused for handoff on 24 November 2026. All compiler lanes have stopped.
+The last compiler change is `7bd39424e0`. Revision `944a4efa9d` adds the
+623rd Showcase observation. The roadmap has **27 of 50 cards complete**
+(23 inherited, four completed on the fork), 18 partial and five unstarted.
+[Roadmap and acceptance criteria](ROADMAP.md#where-this-fork-stands)
+
+The BigStep proof now converts relational evidence into a result indexed
+by an ordinary Haskell function. Induction on the lookup derivation selects
+the same closure as `lookupEnv`. The second-variable example checks that the
+successor case skips the most recent binding. The provider and proof can live
+in separate modules. The Bisimulation chapter also proves `simRename` for
+all 20 constructors, including the case that shifts a free variable under
+two binders. [Lookup definition](examples/open-evaluation/BookEnvironment.hs)
+and [proof in the Showcase](Showcase.hs).
+
+| Verified input | Result |
+| --- | --- |
+| Showcase at `944a4efa9d`, job 3295 | All 623 observations matched the golden output at native `-O0`, default `-O2` and in GHCi. |
+| Combined PLFH book at `749aaf2388`, job 3294 | 33 modules in each of four modes, including native interface readers at both optimization levels. Both native runs matched 140 observations. All nine negative programs failed with their expected diagnostic in each mode. |
+| Original batch 31 reports on the lookup compiler | 36/42 compile at `-O0` and 33/42 at default `-O2`. The book's original matchable-arrow version of abstract renaming remains open. |
+| Compiler and library qualification | The normal 617 build passed 15 gates and 234 compatibility cases. Its focused suite passed 137/138 with the known `MTrans` diagnostic. Normal 621 passed 53/54 registered tests. The vector-facade correction passed its original installed-package test in job 3272. |
+
+The [PLFH checkpoint](plfh/README.md) has portable Git bundles, exact
+revisions and restore commands for the combined manuscript and all three
+unfinished compiler candidates. The [shared notebook](../../PLFH-NOTES.md)
+records the book author's reports. Batch 31 is published at
+[`21dff64b26`](https://github.com/Tritlo/PLFH/tree/21dff64b26b9e447d7dfc9b99717933e897ca716).
+The earlier paths and queue IDs below are historical records.
+
+<details>
+<summary>Membership, parallel reduction and bytecode results through batch 29</summary>
+
 Compiler `0452d7d17c` checks both inverse laws for the ordinary Lists
 functions `anyToWitness` and `witnessToAny`. It also checks PLFH's
 `parRefl` under a lambda, where the body has one more variable in
@@ -101,38 +133,25 @@ Job 2996 matched the 113 book observations at native `-O0`, default
 `-O2` and in GHCi. From a batch 24 book checkout, fetch it with
 `git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/hasklib-plus-comm-2fd9b9a`.
 
+</details>
+
 ## Next compiler work
 
-- R16. Check the new batch 28 Bisimulation report. The result of
-  `simRename` mentions the ordinary renamer applied to an abstract
-  function that must work at every object-language type.
-- In **Adequacy**, check that a closed type family respects the equality
-  learned by matching a retained witness. Any nested call to a checked
-  function still needs its rewrite-rule dependencies recorded.
-- A no-code reader can use a separately compiled native provider. A fresh
-  no-code provider withholds the substitution equation. Job 2968 reproduced
-  GHC-70565 at the beta endpoint at both optimization levels. Publication
-  requires an account of imported rewrite rules for no-code interfaces.
-- Job 2983 built both stages of the 615 checkpoint at `2c9b9b286e`.
-  All 15 qualification gates and 234/234 compatibility tests passed.
-  The focused suite passed 137/138 with the known `MTrans` diagnostic.
-  Job 3106 built both stages of the 617 checkpoint and passed 54 selected
-  registrations and the three Showcase modes. Job 3222 will build the
-  621 checkpoint after the 617 compatibility and focused suites. The previous
-  build at `781a6c6a8f` passed all 15 gates, including 52 selected tests
-  and all three modes of the 612-line Showcase. Job 2837 also passed
-  234/234 compatibility cases and 136/138 focused tests. The two failures
-  were the old `NativeDependentCoreRun` expectation and the known
-  `deriving-via-compile` diagnostic. Job 2974 passed the revised
-  fixture on the same compiler, giving 137/138 across the two runs.
-  The complete original results are under
-  `_build/on-demand/plfh-batch18-normal-next-20261124`.
-- Three compiler agents use a shared queue with four GHC build slots,
-  16 logical CPUs and 64 GB of memory.
-  A runnable local benchmark pauses the GHC queue and freezes the shared
-  build slice. Job 2752 checked that running builds resumed after the
-  benchmark finished. The [roadmap](ROADMAP.md#where-this-fork-stands)
-  counts 27 of 50 cards complete.
+1. For PLFH Bisimulation (R16), compare the two native providers for
+   `exts`. The ordinary `simExt` reader passes at `-O0` and fails at default
+   `-O2` with GHC-68947. Recheck the changed-endpoint control before extending
+   the proof to all 20 constructors.
+2. For BigStep (R21), qualify early lookup equations for a variable rule
+   declared in the same module. The candidate handles the mutual environment
+   and closure declarations. Its remaining checks concern exported constructor
+   visibility and final equation publication.
+3. For Adequacy (R03), qualify the corrected family-refinement candidate.
+   Nested checked calls must retain their rewrite-rule dependencies.
+4. For fresh no-code providers, account for imported rewrite rules before
+   publishing substitution equations. A no-code reader can already use a
+   native provider. A fresh no-code provider still withholds the beta equation.
+
+See the [candidate revisions and examples](plfh/README.md#resume-unfinished-work).
 
 <details>
 <summary>Earlier PLFH verification through the 599-example candidate</summary>
@@ -876,23 +895,16 @@ defaults and an opt-in migration warning.
 
 ## Resume after a restart
 
-1. Check `git status -sb` and `git ls-remote fork refs/heads/dependent-haskell`.
-   Compare both revisions with the checkpoint table. Fetch the fork branch
-   if this checkout predates the release.
-2. Check `env -u XDG_RUNTIME_DIR pueue status` and inspect the named job and
-   its checkout. On 22 November, Pueue recorded signal 15 (exit 143) for
-   job `382`. Its shell wrote a zero exit status during shutdown. The
-   missing `build.pass` and the unfinished Hadrian log confirmed the
-   interruption. Check Pueue, both compiler revisions and the success
-   record before reusing a result.
-   The earlier WSL restart erased `/tmp` while Git and Pueue retained
-   records for its old paths. Keep active builds under `_build/on-demand/`.
-3. Restore the [shared WSL build queue](CHECKPOINTS.md#restore-the-shared-wsl-build-queue)
-   before submitting work. Use three subagents for the current assignments. The coordinator
-   reviews and integrates their results. Check the live assignments and
-   queue before resuming a roadmap card. The group has four slots. All GHC jobs share
-   16 logical CPUs, 64,000,000,000 bytes of memory and zero swap.
-   Higher-priority jobs pause the queue and freeze the GHC slice.
+1. Compare `git status -sb` and `git rev-parse HEAD` with the fork's
+   `refs/heads/dependent-haskell`. The fork URL appears at the top of this file.
+2. Read the current checkpoint, then restore the book and the candidate for
+   the card you intend to work on. All required candidate sources are in the
+   branch. The old experiment directories can be regenerated.
+3. On the shared WSL host, inspect `env -u XDG_RUNTIME_DIR pueue status` and
+   the [queue setup](CHECKPOINTS.md#restore-the-shared-wsl-build-queue).
+   Use `tools/ghc-build-job` for builds. The shared GHC slice has a 16-core
+   and 64 GB limit and yields to local benchmarks. Choose new assignments
+   when work resumes.
 
 ## Build and verify
 

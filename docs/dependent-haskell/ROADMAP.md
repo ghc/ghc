@@ -33,9 +33,11 @@ Its list case replaces two distinct variables under two binders. Both
 proofs work in native code and in default GHCi with breakpoints enabled.
 Lists now proves both inverse laws between a predicate witness and an
 existential membership at a particular position. Confluence proves
-reflexivity of parallel reduction by induction under a lambda. R03 and
-R16 remain partial. The Bisimulation report needs an abstract renaming
-function in a type.
+reflexivity of parallel reduction by induction under a lambda.
+Bisimulation now preserves its relation under an arbitrary type-preserving
+renaming. The proof extends the renaming when it crosses a binder.
+Simultaneous substitution with an arbitrary function is still open.
+R03 and R16 remain partial.
 [DeBruijn proof](examples/open-evaluation/BookBetaReduction.hs),
 [More proof](https://github.com/Tritlo/PLFH/blob/81f8c63afdb722766d5ea6a1163f7d20345105d9/clients/PLFH/Part2/MoreProgress.hs),
 [Lists proof](examples/open-evaluation/BookAnyWitnessProof.hs),

@@ -7314,6 +7314,29 @@ beta rule. [PLFA Confluence](https://plfa.github.io/Confluence/),
 [Haskell proof](examples/open-evaluation/BookParallel.hs),
 [branch evidence](../../compiler/GHC/Core.hs).
 
+PLFA's renaming lemma takes a function that preserves the type of each
+variable. Its lambda case applies the induction hypothesis to the
+extended renaming. PLFH uses that same argument in `simRename` with
+an explicit rank-polymorphic callback. Proposal #242 supplies the
+distinction between matchable and unmatchable functions. The fork
+uses `%U` for this callback because two source variables can have the
+same image. Publication of equations from checked Core is a fork
+implementation decision. [PLFA Bisimulation](https://plfa.github.io/Bisimulation/#simulation-commutes-with-renaming),
+[proposal #242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html),
+[evaluation and verification](roadmap/R16-open-term-evaluator.md#renaming-under-a-binder).
+
+PLFA's call-by-name environment maps variables to closures. Its variable
+rule requires the selected closure to contain the term and environment
+used for the next evaluation. PLFH represents the environment as an
+indexed datatype. Its ordinary `lookupEnv` selects the head closure at
+`FZ` and recurses into the tail at `FS x`. The compiler checks both
+input cases and their shared scope index in original and optimized Core.
+A consumer can then state the same variable rule against the compiled
+interface. See `Note [Checked lookup over two indexed operands]`.
+[PLFA BigStep](https://plfa.github.io/BigStep/#big-step-evaluation),
+[book implementation](https://github.com/Tritlo/PLFH/blob/21dff64b26b9e447d7dfc9b99717933e897ca716/hs/PLFH/Part2/BigStep.hs),
+[verifier](../../compiler/GHC/Tc/Gen/SourceClosure.hs).
+
 PLFA eliminates a reflexive equality proof by matching on its
 constructor. In the fork, a retained match gives a branch equality for
 the actual proof value. A `case` still forces that Haskell value. The

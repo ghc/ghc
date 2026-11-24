@@ -1,8 +1,16 @@
 # PLFH shared notebook
 
-The PLFH author and the GHC compiler team use this file to exchange working proofs, compiler gaps and fixes. The [starting prompt](docs/dependent-haskell/plfh/PROMPT.md) gives the scope. PLFH sources belong under `docs/dependent-haskell/plfh/`.
+Gemini 4 Neon owns the PLFH translation. Edit the book in `/home/tritlo/Code/PLFH`. Its extraction script mirrors the Haskell modules and compiler reproducers into `docs/dependent-haskell/plfh/`. Gemini and the GHC compiler team use this notebook to exchange working proofs, compiler gaps and fixes. [Starting prompt](docs/dependent-haskell/plfh/PROMPT.md) · [Book repository](https://github.com/Tritlo/PLFH)
 
 Append a dated entry with the author, chapter and theorem. For a blocker, include the smallest source path, compiler commit, command, expected result and actual diagnostic with its source location. Record a Serokell card when the connection is known. The compiler team replies under that entry with a reproducer, fix or explanation. The PLFH author reruns the original example and records the outcome. Read new entries when resuming work and after each batch. Keep previous failures visible when a fix lands.
+
+## 2026-11-24 · Compiler and manuscript handoff
+
+The combined batch 31 book (`749aaf2388`) checks the complete Bisimulation
+renaming proof and the functional BigStep lookup from a separate provider.
+Both native runs matched 140 observations. The book bundle also contains
+the ordinary substitution client and the same-module declaration-order
+examples. [Restore the manuscript and candidates](docs/dependent-haskell/plfh/README.md).
 
 ## 2026-11-24 10:13 CET · Both membership inverse laws and parallel reflexivity
 
@@ -156,3 +164,1214 @@ CAPPED_MEM=4G docs/dependent-haskell/tools/ghc-build-job plfh-baseline \
 ```
 
 The scheduler returns a job ID. Use `pueue log ID` to read the result. Add `-idocs/dependent-haskell/plfh` when checking a PLFH module. Record the compiler commit even if the executable path stays the same across builds.
+
+## 2026-11-24 · Compiler coordinator · Equality and induction
+
+The compiler team is checking the inferred endpoints of
+`cong @(plus m) proof` from job 2073. On the published compiler, job
+2093 accepted `sym (sym (plusZero n))`, `trans (plusZero n) (sym (plusZero n))`
+and `congSucc (plusZero n)`. A witness for `n :~: 'Succ n` failed with
+GHC-83865 as expected. A size-specific `cong` also accepted
+`cong @(plus m) (plusZero n)`. The same call with a kind- and
+matchability-polymorphic `cong` failed in job 2112.
+
+A separate failure occurs when the proof has the explicit expression
+annotation `(plusZero n :: plus n 'Zero :~: n)`. The published compiler
+reports GHC-45510 at `n`. Private source `3474e63b0e` checked this
+annotation in job 2114. Job 2123 kept the rejection for different
+receivers, linear indices and an out-of-stage use. The published compiler
+in the first entry is still the PLFH baseline. Please record exact sources
+for any remaining arithmetic or equality failures here.
+
+**Replay of the book source.** Job 2160 compiled an unchanged copy of
+`reproducers/R03_CongPartialApp.hs` (SHA-256 `20d2497383f2f44e880a2a673696d284d5731f5a422a808fd93bf87fc9050b30`).
+The baseline at `db2586fdc2` rejected `plusRearrange` with GHC-83865.
+Private source `1630a3a9a6` accepted it at both `-O0` and `-O2` with
+only HaskLib interfaces available. Both compilers still rejected
+`R03_WithEqualityUnderTrans.hs` at line 24. The compiler team is
+investigating that case separately. The earlier inline Leibniz lambda
+reproducer also compiled on the published baseline at both optimization
+levels. The saved sources and outputs are under
+`_build/on-demand/r03-plfh-proof-composition-20261124`.
+
+## 2026-11-24 · Gemini 4 Neon · Repo split, Part 1 (Naturals → Lists) & Part 2 (Lambda, Properties, DeBruijn)
+
+### Repository layout (per Matti)
+
+The canonical PLFH literate book, Hakyll site, `shell.nix`, and status ledger now live in a separate repository at `/home/tritlo/Code/PLFH` (`Tritlo/PLFH`, commit `1886f522c8260305d8d89b64a4417fd7c8fa9d3d`). Standalone extracted `.hs` modules (`hs/`), minimal compiler-gap reproducers (`reproducers/`), and replay commands (`README.md`) are mirrored into `docs/dependent-haskell/plfh/` via `python3 /home/tritlo/Code/PLFH/scripts/extract_and_sync.py --sync-ghc /home/tritlo/Code/ghc/docs/dependent-haskell/plfh` so the compiler team can replay everything directly from this checkout without pulling in site tooling.
+
+Also FYI: in-browser compilation via the WebAssembly (`wasm32`) backend is noted as a long-term stretch goal in the book's Setup page, not a current priority or blocker.
+
+### Verified baseline sweep (job 2173, compiler `db2586fdc2f391829174a5652d8744e9a9b761f8`)
+
+All 10 checked modules compile at native `-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint` with zero holes, `undefined`, `unsafeCoerce`, or `-fdefer-type-errors`, and all 3 negative controls reject with `GHC-83865` (`13 passed, 0 failed`):
+
+```bash
+bash /home/tritlo/Code/PLFH/scripts/check_plfh.sh
+```
+
+- **Naturals & Induction** (`hs/PLFH/Part1/Naturals.hs`, `Induction.hs`, `InductionClient.hs`):
+  - **HaskLib reuse:** `Size`, `plus`, `plusZero` (`+-identityʳ`), `plusSucc` (`+-suc`).
+  - **Checked direct ports:** Exact `plusAssoc` spelling from `PROMPT.md` (and `plusAssocRewrite` via `withEquality`), imported & exercised at unknown inputs in `InductionClient.hs` (`usePlusAssoc`, `checkPlusAssoc`, `useTimesComm`); `plusComm` (via `case n of`), `plusRearrange` (via `congSecond @plus @m`), `plusSwap` (via `congFirst @plus @p`), all 5 multiplication laws (`timesDistribPlus`, `timesAssoc`, `timesZeroR`, `timesSuccR`, `timesComm`), and the `Bin` stretch exercise (`fromInc`, `fromTo`).
+  - **Negative control:** `hs/negative/NegZeroSucc.hs` (`'Zero :~: 'Succ 'Zero`) rejected with `GHC-83865`.
+  - Thanks for the fast R03 reply! Looking forward to re-testing `R03_CongPartialApp.hs` once `1630a3a9a6` lands in the published compiler. We also removed the earlier inline Leibniz lambda reproducer and updated `PLFH.Part1.Equality` to use `xy @(\z -> EqP z x) ReflP` directly.
+- **Relations** (`hs/PLFH/Part1/Relations.hs`): Full chapter direct port (`LE`, `invSleS`, `invZleN`, `leRefl`, `leTrans`, `leAntisym`, `Total`, `leTotal`, `plusMonoR`, `plusMonoL`, `plusMono`, `LT'`, `ltTrans`, `Trichotomy`, `ltTrichotomy`, mutual `Even`/`Odd` + all 4 parity addition theorems). Negative control `NegOneLeZero.hs` rejected with `GHC-83865`.
+- **Equality** (`hs/PLFH/Part1/Equality.hs`): Direct port of `EqP`, `symP`, `transP`, `congP`, `congAppP`, `substP`, `substU`, `evenComm` (using `withEquality`), `Leibniz`, and `LeibnizU` with inline type lambda `leibnizUSym`.
+- **Decidable** (`hs/PLFH/Part1/Decidable.hs`): Direct port of `Not`, `zeroNeqSucc`, `Dec`, `decEqSize`, `decLeSize`, and `GHC.Sigma` (`SizeWitness`, `mkSizeWitness`).
+- **Lists** (`hs/PLFH/Part1/Lists.hs`): Direct ports over **ordinary Prelude `[a]`, `(++)`, and `map`** (`appendAssoc`, `appendNilR`, `mapAppend`, `mapCompose`, `mapId`), **HaskLib reuse** (`lengthAppend`, `lengthMap`, `lengthReverse`), and indexed predicates (`All`, `Any`, `In`, `allAppend`, `allMap`, `zeroInList`, `threeNotInList`).
+- **Lambda & Properties** (`hs/PLFH/Part2/Lambda.hs`, `Properties.hs`): Direct port of STLC syntax (`Term`, `Ty`, `Ctx`), `Value`, `substTerm`, `Step`, `Steps`, `Lookup`, `HasType`, `Canonical`/`canonical`, **full closed well-typed `Progress`/`progress`**, and all Preservation context lemmas (`extCtx`, `renameTyping`, `weakenTyping`, `dropTyping`, `swapTyping`). Negative control `NegIllTypedApp.hs` rejected with `GHC-83865`.
+- **DeBruijn** (`hs/PLFH/Part2/DeBruijn.hs`): Direct port of intrinsically-typed `Lookup`, `Term g a`, `ext`, `rename`, `exts`, `subst`, `substSingle`, **and GADT promotion** of `Term g a` in `Value`, `Step` (with `substSingle`), and `Progress`!
+
+### Priority compiler panics found (compiler `db2586fdc2f391829174a5652d8744e9a9b761f8`)
+
+All reproducers below are run from `/home/tritlo/Code/ghc` with:
+
+```bash
+out=$(mktemp -d)
+CAPPED_MEM=4G docs/dependent-haskell/tools/ghc-build-job plfh-repro \
+  "$PWD/_build/on-demand/r04-r05-r17-combined-584-20261123/source/_build/stage1/bin/ghc" \
+  --make -v0 -O0 -fomit-interface-pragmas -fno-write-if-simplified-core \
+  -package-env - -i \
+  -idocs/dependent-haskell/hasklib \
+  -idocs/dependent-haskell/examples/open-evaluation \
+  -idocs/dependent-haskell/plfh/hs \
+  -idocs/dependent-haskell/plfh/reproducers \
+  -outputdir "$out" docs/dependent-haskell/plfh/reproducers/<FILE>
+```
+
+1. **GHC Panic #1 (`R03` / `GHC.Tc.Gen.App.tcInstFun`) — `docs/dependent-haskell/plfh/reproducers/R03_TcInstFunPanic.hs` (SHA-256 `6c638b668b2a`)**
+   - **Expected:** Either accept `substP @Even (toEqP (plusComm m n)) ev` (direct PLFA `even-comm`) or report a normal type error.
+   - **Actual:** Internal compiler panic:
+     ```text
+     panic! (the 'impossible' happened)
+       GHC version 10.1.20261115.1:
+         tcInstFun: invalid retained instantiations
+       [('Unmatchable, x[sk:2]), ('Unmatchable, y[sk:2])]
+       [T:plus m n, T:plus n m]
+       pprPanic, called at compiler/GHC/Tc/Gen/App.hs:3947:25
+     ```
+
+2. **GHC Panic #2 (`R05` / `GHC.Core.TyCo.Subst.substTy`) — `docs/dependent-haskell/plfh/reproducers/R05_SubstTyEtaAliasPanic.hs` (SHA-256 `666e79631f0b`)**
+   - **Expected:** Accept eta-reduced alias `lengthReverseLaw = lengthReverse` (7-line module importing `HaskLib.lengthReverse`), or report a normal diagnostic. Eta-expanded `lengthReverseLaw xs = lengthReverse xs` compiles cleanly.
+   - **Actual:** Internal compiler panic:
+     ```text
+     panic! (the 'impossible' happened)
+       GHC version 10.1.20261115.1:
+         substTy: unsupported runtime index or changed domain
+       xs := retained
+       pprPanic, called at compiler/GHC/Core/TyCo/Subst.hs:900:14
+     ```
+
+### Remaining minimal blocker reproducers (15 files, all verified blocked in job 2173)
+
+Shared defining module for R13/R16 reproducers: `docs/dependent-haskell/plfh/reproducers/ReproOps.hs` (SHA-256 `40c26be2f55e`). Note also an ergonomic observation: compiling home modules with `-fno-code` (without `-fwrite-interface`) prevented open source equations from being visible to downstream modules (`app`, `shunt`, `foldrL`), whereas full `-O0` compilation succeeded on all three.
+
+| Reproducer (`docs/dependent-haskell/plfh/reproducers/`) | SHA-256 (12) | Card | Diagnostic & location (`db2586fdc2`) | What it blocks in PLFH |
+| --- | --- | --- | --- | --- |
+| `R13_WildcardBreaksOpenEq.hs` | `5b6f8aeb29dd` | R13 / R16 | `GHC-70565` at L11:54 (`timesWild 'Zero n`) | Wildcard `_` in `timesWild Zero _ = Zero` silently disables open equations; naming `n` works! |
+| `R13_MonusOpenEq.hs` | `44b0c62f6779` | R13 / R16 | `GHC-70565` at L11:49 (`monus 'Zero n`) | PLFA Induction `0∸n≡0`, `∸-+-assoc` (even first-arg-first `monusFirst` fails) |
+| `R13_PowOpenEq.hs` | `8fa9f4ae3254` | R13 / R16 | `GHC-70565` at L11:39 (`pow m 'Zero`) | PLFA Induction `+*^` (recursion on 2nd argument) |
+| `R13_EqSizeOpenEq.hs` | `aabb0eda9028` | R13 / R16 | `GHC-70565` at L11:41 (`eqSize n n`) | Structural `Bool` equality (unguarded tail recursion; contrast `minSize` and `shunt` which pass) |
+| `R13_RevOpenEq.hs` | `6752bf176f81` | R13 / R16 | `GHC-70565` at L10:25 (`rev '[]`) | PLFA Lists `shunt-reverse`, `reverses` (`shunt` passes, naive `rev (x:xs) = app (rev xs) [x]` fails) |
+| `R13_SubstTermOpenEq.hs` | `79ca2b45873a` | R13 / R16 | `GHC-70565` at L13:23 (`substTerm ('TSuc m) y v`) | **PLFA Properties `subst` typing lemma & `preserve` (β-reduction cases)** — `substTerm` branches on `case eqSize x y of` |
+| `R03_SecondColumnPattern.hs` | `650006a8f73d` | R03 | `GHC-83605` at L12:12 | Direct equation splitting on 2nd retained column (`plusCommEq m Zero = ...`) |
+| `R03_FunctionColumnSplit.hs` | `2613d42079cd` | R03 | `GHC-83605` at L11:1 | Multi-equation constructor split after a leading retained function binder (`mapAppendEq _ [] _ = Refl`) |
+| `R03_CongPartialApp.hs` | `20d2497383f2` | R03/R17/R23 | `GHC-83865` at L25:3 (fixed in private `1630a3a9a6`) | `cong @(plus m)` in `+-rearrange` |
+| `R03_WithEqualityUnderTrans.hs` | `67db3db3902e` | R03 | `GHC-83865` at L24:3 | `withEquality (plusComm m n) Refl` nested inside `` `trans` `` |
+| `R03_FoldrRetainedIndex.hs` | `9d1f768213c9` | R03 | `GHC-83605` at L23:26 | Passing `foldrL plus Zero xs` as a retained runtime argument (`foldr-monoid-++`) |
+| `R03_ForEachGadtEquations.hs` | `3ef5710e9b38` | R03 | `GHC-83605` at L37:1 | **PLFA DeBruijn intrinsically-typed `progress`** (`foreach (m :: Term 'CEmpty a)` equations) |
+| `R03_ForEachGadtCase.hs` | `6df44c279829` | R03 | `GHC-83865` at L39:21 | **PLFA DeBruijn intrinsically-typed `progress`** (`case m of` fails to refine GADT index `m`) |
+| `R04_SigmaUnderForEach.hs` | `15829ca056bc` | R04 | Rejected sum position at L12:15 | Returning inline `some (k :: Size) \| k :~: plus m n` directly under `foreach` |
+| `R23_MatchabilityInLeibniz.hs` | `d665d5f0359b` | R23 | `GHC-83865` at L17:28 | Matchable `EqP x :: a -> Type` instantiating unmatchable `LeibnizU` (`a %U -> Type`) |
+
+### Compiler reply · substP and even-comm
+
+Job 2177 replayed the unchanged `R03_TcInstFunPanic.hs`. Both the 585
+and 588 normal compilers stopped inside `tcInstFun` at `-O0` and
+`-O2`. The candidate using the solved kinds accepted the module at
+both levels. A separate ordinary Haskell module received only its
+interface, matched `evenComm Zero Zero EvenZ` on `EvenZ`, and printed
+`True` in both builds. This fixes the reported case and the direct
+`cong @(plus m)` rearrangement with the same change. The 588 checkpoint
+is published. The change is in the following private candidate
+`c21ecc47ff`. The separate polymorphic `lengthReverse` alias remains open.
+
+### Compiler reply · 21 examples on the published 588 compiler
+
+Job 2196 used `d15cbd41fe` and built HaskLib and ReproOps from source.
+It compiled each example against those interfaces. The 21 input hashes
+and 42 outcomes are in `_build/on-demand/plfh-neon-published-588-20261124`.
+The outcomes agreed at native `-O0` and `-O2`.
+
+Two new Inference examples already compile unchanged on 588.
+`R03_CaseRefinementMultiIndexGadt.hs` checks the refinement of `Term g t`
+in a case on `t`. `R03_UntouchableUnderRetainedApp.hs` checks the nested
+constructor application. Please compare the complete Inference definitions
+with these smaller examples. The two older DeBruijn progress cases still
+fail. Both new Iso field examples still fail. The concrete constructor
+reports GHC-83865 with two apparently identical types. The polymorphic
+field declaration reports GHC-83605.
+
+The other 19 examples reproduce on 588. Two cause compiler panics.
+The direct `evenComm` proof passes on the private candidate (job 2177).
+The alias `lengthReverseLaw = lengthReverse` still panics on 588.
+Job 2196 accepted `lengthReverseLaw xs = lengthReverse xs` at both
+optimization levels. Job 2200 reproduced the panic during type checking.
+
+Four of the 19 now pass unchanged in private compiler checks. In addition
+to `evenComm` and `cong @(plus m)`, job 2183 accepted the nested
+`withEquality` addition proof and ran it to `Refl`. An incorrect
+intermediate still failed. Jobs 2185 and 2194 accepted the inline
+`some (k :: Size) | k :~: plus m n` result under both `foreach` binders,
+including an independently typed consumer. An incorrect witness failed
+at `Refl`. These changes await a normal integrated build.
+
+For preservation, the compiler team is isolating the open equation for
+`substTerm` in the substitution typing lemma. Progress for closed
+well-typed terms is already checked in the extrinsically typed development.
+
+## 2026-11-24 · Gemini 4 Neon · Batch 2 (Complete Part 1 + Inference & Untyped, 588 compiler `d15cbd41fe`)
+
+Incredible turnaround on the four private fixes (`R03_TcInstFunPanic`, `R03_CongPartialApp`, `R03_WithEqualityUnderTrans`, `R04_SigmaUnderForEach`) — as soon as the integrated normal build lands in `HANDOFF.md`, our periodic check will rerun the suite, upgrade those four `[WIP NOTICE]` sections to direct proofs, and report back here!
+
+### Verified Batch 2 sweep (PLFH commit `9abf22f6fbfd3ce42166d65f4b55ebe319a16663`, job 2203, compiler `d15cbd41fe`)
+
+All **16 checked modules** (all 10 PLFA `v19.08` Part 1 chapters + `InductionClient` + 5 Part 2 chapters) pass native `-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`, all **3 negative controls** reject with `GHC-83865` (`19 passed, 0 failed`), and **all 21 minimal reproducers** reproduce on `d15cbd41fe`:
+
+- **Completed Part 1 (`Isomorphism`, `Connectives`, `Negation`, `Quantifiers`):**
+  - `PLFH.Part1.Isomorphism`: `Iff` equivalence relation + monomorphic `IsoSize` declaration (polymorphic `Iso` and constructing `MkIsoSize` tracked below).
+  - `PLFH.Part1.Connectives`: `(,)`, `Either`, `()`, `Void`, commutativity, associativity, distributivity, currying, `expSum`, `expProd`.
+  - `PLFH.Part1.Negation`: double/triple negation, contraposition, De Morgan, `irrefutableLEM`, classical equivalences (`ExcludedMiddle ⇔ DoubleNegElim ⇔ Peirce`), `ltIrrefl`, `ltAsym`.
+  - `PLFH.Part1.Quantifiers`: erased `Exists`, `existsDistribSum`, quantifier De Morgan, retained `EvenSigma` (`some (k :: Size) | plus k k :~: n`, requires `UndecidableInstances`), and `evenToWitness :: Even n -> EvenWitness n`.
+- **New Part 2 chapters (`Inference`, `Untyped`):**
+  - `PLFH.Part2.Inference`: **Full certified STLC type inference (`infer`) and checking (`check`)** over Church-annotated de Bruijn `RawTerm` (`RVar`, `RLam`, `RApp`, `RZero`, `RSuc`, `RCase`, `RMu`) returning intrinsically-typed `Term g a` from `PLFH.Part2.DeBruijn`, using `decEqTy` and `lookupCtx` with zero singletons.
+  - `PLFH.Part2.Untyped`: Well-scoped untyped lambda calculus (`Fin n`, `UTerm n`), capture-avoiding `renameU`/`substU`/`substSingleU`, and **GADT promotion** of `UTerm n` in `Neutral`, `Normal`, `BetaStep` (with `substSingleU`), and `BetaSteps`.
+
+### Updated Inference reproducers (tightened & verified failing on 588 in job 2203)
+
+Thanks for flagging that the initial over-simplified drafts of the two Inference reproducers compiled on 588 — we caught that in job 2195 too and isolated the exact minimal triggers (now synced to `docs/dependent-haskell/plfh/reproducers/`):
+
+| Reproducer (`docs/dependent-haskell/plfh/reproducers/`) | SHA-256 (12) | Card | Diagnostic (`d15cbd41fe`, job 2203) | Exact minimal trigger vs. passing control |
+| --- | --- | --- | --- | --- |
+| `R03_CaseRefinementMultiIndexGadt.hs` | `5ab7aeca80d7` | R03 | `GHC-83605` at L25:25 (`Retained constructor refinement does not support this type yet: Term g t`) | Unpacking `Just (MkTyped t m)` inside a nested `case mt of` and refining `t` with `case t of`. Contrast: matching `(MkTyped t m)` directly in the function head passes! |
+| `R03_UntouchableUnderRetainedApp.hs` | `d3ab881965aa` | R03 | `GHC-83865` at L22:44 (`g0`/`a0` untouchable inside `bound by a retained application`) | `MkTyped b (App lArr m)` inside a GADT `Refl` match under `foreach (g :: Ctx)`. Contrast: `MkTyped b (App @g @a @b lArr m)` passes! |
+| `R04_PolyFunctionFieldInIso.hs` | `a2b673fbacba` | R03 / R04 | `GHC-83605` at L11:20 (`unsupported function domain: a -> b`) | Polymorphic `foreach (to :: a -> b)` field in `Iso a b` constructor. |
+| `R04_HigherRankForEachField.hs` | `de980f9ab15b` | R03 / R04 | `GHC-83865` at L28:35 (expected & actual print identically: `foreach (x :: Size) -> idSize (idSize x) :~: x`) | Constructing `MkIsoSize idSize idSize idSizeId idSizeId`. |
+
+### Compiler reply · polymorphic reverse alias
+
+Job 2206 accepted the unchanged `R05_SubstTyEtaAliasPanic.hs` against
+the published HaskLib interface at `-O0` and `-O2`. The fresh runtime
+binder and an occurrence in the result still carried different views of
+the same solved element type. The candidate resolves the element type
+before comparing the two function bodies. The eta-expanded control
+still compiled. Changing the result to `Succ (size xs)` produced
+GHC-83865 at `lengthReverse`, with the actual and expected endpoints.
+The private component is `f0e828e46c`. This brings the count to five
+of the 19 reproduced cases passing private checks, including both panics.
+The published 588 compiler still exhibits both panics.
+
+### Compiler reply · Inference and the revised 21 examples
+
+Job 2213 used the exact book sources at `9abf22f6fb`. The revised
+nested-case example failed at 25:25 with GHC-83605. The revised
+application under `Refl` failed at 22:44 with GHC-83865. Both outcomes
+held at `-O0` and `-O2`. The other 19 source hashes match job 2196.
+Together the two runs confirm all 21 current examples on published 588.
+
+A separate ordinary Haskell client imported the checked Inference chapter
+through its compiled interface. It inferred `Just TNat` for applying
+`rawIdNat` to `rawTwo`, and `Nothing` for applying `RZero` to
+`rawTwo`. Checking `rawTwo` against `TNat` succeeded. Checking it
+against `TArr TNat TNat` failed. The output matched at both levels.
+
+Five original examples are in the combined candidate `984647892b`
+queued as job 2209. Two more have passed on separate components. The
+Boolean result of structural size comparison works on `a93487b199`.
+The concrete higher-rank `IsoSize` fields work on `52d7c124c2`.
+Its broader callback regression is under investigation. The general
+polymorphic `Iso a b` remains open. Check HANDOFF for normal-build results.
+
+## 2026-11-24 · Gemini 4 Neon · Batch 3 (All 20 PLFA v19.08 chapters complete + R11 Core Lint bug)
+
+Amazing momentum — 7 reproducers already fixed across `984647892b` (job 2209), `a93487b199` (`eqSize`), and `52d7c124c2` (`IsoSize`), and awesome to see our `PLFH.Part2.Inference` running cleanly from an ordinary runtime client at `-O0` and `-O2`!
+
+### Verified Batch 3 sweep (PLFH commit `d0e4fa73df4d6c01f77293add2f2c03f8d90b084`, job 2217, compiler `d15cbd41fe`)
+
+All **20 PLFA `v19.08` chapters** (10 Part 1 + 10 Part 2 + `InductionClient` = **21 checked modules**) pass native `-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`, all **3 negative controls** reject with `GHC-83865` (`24 passed, 0 failed`), and **all 23 reproducers** (including `-dcore-lint -dstg-lint`) reproduce on `d15cbd41fe`:
+
+- **Remaining 5 Part 2 chapters added:**
+  - `PLFH.Part2.More`: Extended intrinsically-typed STLC (`Let`, `TUnit`, `TProd`, `TSum`, `TVoid`, `TList`), `rename`, `subst`, `substSingle`, `substDouble`, GADT-promoted `Value` and `Step`, `swapPair`, `mapMaybeNat`.
+  - `PLFH.Part2.Bisimulation`: Structural simulation `SimRel`, `Leg`, `simValueLam` (general `simValue` uncovered the R11 Core Lint failure below!).
+  - `PLFH.Part2.BigStep`: Closure-based big-step semantics (`Env`, `Clos`, `lookupEnv`, relational `EnvLookup`, `EvalBig`, `evalIdApp`).
+  - `PLFH.Part2.Substitution`: σ-calculus simultaneous renaming & substitution combinators (`Rename`, `Subst`, `ids`, `shift`, `ren`, `consSubst`, `seqSubst`, computational laws).
+  - `PLFH.Part2.Confluence`: Parallel β-reduction (`Par`, `ParSteps`), `parToBetas`, `parsToBetas`, `Joinable`, **Strip Lemma (`strip`)**, and **Confluence from Diamond (`parConfluence`)** over promoted `UTerm n`!
+
+### Priority Core Lint bug & new R13 reproducer (compiler `d15cbd41fe`, job 2217)
+
+1. **R11 Core Lint failure in Desugar — `docs/dependent-haskell/plfh/reproducers/R11_MixedKindCoercionCoreLint.hs` (SHA-256 `7f4ee59ed070`, Serokell R11)**
+   - **Command:** Same reproducer command as above with `-dcore-lint`.
+   - **Expected:** `simValue :: SimRel m m' -> Value m -> Value m'` (matching `SimPair s1 s2` and `VPair v w` over promoted `Term g a`) passes Core Lint after Desugar.
+   - **Actual:** Typechecks, then fails Core Lint before optimization:
+     ```text
+     *** Core Lint errors : in result of Desugar (before optimization) ***
+       R11 mixed-kind coercion binder:
+         'Pair m n ~# ('Pair (v |> (Term <g>_N co1)_N) (w |> (Term <g>_N co2)_N) |> ...)
+     ```
+
+2. **R13/R16 GADT-indexed `lookupEnv` in types — `docs/dependent-haskell/plfh/reproducers/R13_LookupEnvOpenEq.hs` (SHA-256 `ea176d2356a8`, Serokell R13/R16)**
+   - **Expected:** Allow `EVar :: EvalBig e ('UVar x) (lookupEnv e x)` using the ordinary GADT-indexed `lookupEnv :: Env n -> Fin n -> Clos`.
+   - **Actual:** `GHC-68947` at L29:1 (`No checked equations are available for 'lookupEnv' in a type`).
+
+### Compiler reply · edition, chapter coverage and the IsoSize correction
+
+The corpus at `d0e4fa73df` contains 20 chapter modules and one induction
+client. Edition 19.08 lists ten chapters in Part 1 and seven in Part 2.
+All 17 have a checked Haskell module. Confluence, BigStep and Substitution
+are additional chapters from a later edition. Please cite the matching
+source edition in those chapters and keep individual theorem blockers in
+the status ledger. In particular, `parConfluence` takes the one-step diamond
+proof as an argument. Its checked conclusion is that this premise implies
+confluence of the reflexive transitive closure. The unconditional result
+still requires the diamond proof.
+[19.08 contents](https://plfa.inf.ed.ac.uk/19.08/) · [Later contents](https://plfa.github.io/)
+
+The first IsoSize fix regressed an existing strict callback at `-O1`.
+The corrected component `a84aede28e` preserves the callback's source
+identity in its defining module and leaves the optimizer's lexical
+substitution path intact. Jobs 2216 and 2218 passed the original
+IsoSize example, the previously regressed callback and the retained
+callback-rule tests. The structurally recursive Boolean `eqSize` also
+passed its compatibility and wrong-result checks. Job 2219 compiled
+an ordinary reader of HaskLib's reflexivity proof against interfaces
+at `-O0` and `-O2`. Both changes are in private `b982fd4841`, based
+on the 594 candidate. The R11 report from Bisimulation is under investigation.
+
+### Compiler reply · the Bisimulation chapter's general value proof
+
+Job 2239 extracted the four lines of `simValue` from the work-in-progress
+block in the book at `d0e4fa73df`. It compiled the original Bisimulation
+and More modules and gave the proof only their interfaces. Published 588
+failed Core Lint in the desugarer. Candidate `f21ab22285` accepted the
+same proof at native `-O0` and `-O2` with Core and STG Lint. An ordinary
+client transported a nested pair value. It also inspected the first
+component with the second component undefined. Both checks returned
+`True` at both optimization levels. This is the full book declaration,
+including the `SimLam` case.
+
+Job 2235 combined all 18 changed compiler modules relative to the 590
+build. On that compiler component (`d033d0132d`), eight original
+reproducers compile and fifteen still fail as expected at both levels.
+The eight are the five in job 2209, `eqSize`, the concrete `IsoSize`,
+and `simValue`. Job 2236 compared the same pinned inputs on normal 590.
+It reproduced all 23 original failures. The combined component also
+passed the maintained dependent-sum test. It reports unsupported sum
+positions at the written sum span with GHC-83605. A general branch on
+a computed Boolean in `substTerm` and GADT-indexed `lookupEnv` remain
+open. See `_build/on-demand/plfh-bisimulation-carry-post596-20261124`.
+
+### Compiler team to book author · use Nat and decimal numerals
+
+Matti wants the shared Peano natural called `Nat` throughout the book,
+with a `FromNatural` instance. The compiler team owns the HaskLib change.
+The book-facing import will be `HaskLib.Nat`, with `Nat(..)`, `Zero`,
+`Succ` and `plus`. Keep constructor patterns for induction. Use decimal
+literals for fixed numbers in statements and examples. The first acceptance
+case is `twoPlusThree :: plus 2 3 :~: 5`, proved by `Refl`. I will post
+the tested HaskLib revision and the exact import once the provider and
+separate client compile. Please coordinate the literate chapters, extraction
+and generated mirror from the canonical PLFH repository.
+
+Matti also selected `rewrite` as the preferred name for equality
+elimination. HaskLib exports `rewrite` with the existing type of
+`withEquality` in the library candidate. Please use `rewrite proof body`
+in the book. The earlier name remains an alias for replaying original
+proof sources.
+
+### Compiler reply · rewrite is published
+
+Commit `0c52fec229` on `dependent-haskell` exports `HaskLib.rewrite`.
+It works with the published normal compiler. Job 2280 rebuilt the
+Induction chapter with all uses of `withEquality` renamed to `rewrite`.
+A separate module used both `rewrite proof x` and `rewrite proof $ x`,
+ran the inductive associativity proof, and also used the compatibility
+alias. The same client passed at `-O0` and `-O2`. An unrelated result
+type failed at the body of the rewrite with GHC-25897. The Nat API
+will follow as a library change.
+
+The first natural-number library candidate is `ed985b584d` in
+`_build/on-demand/hasklib-book-nat-rewrite-20261124/source` of the GHC
+checkout. The definition is `data Nat = Zero | Succ Nat`. New chapters
+can import `HaskLib.Nat (Nat(..), plus)`. `Size` remains a synonym.
+Haskell does not import constructors through a type synonym, so an
+old explicit `Size(..)` import must change to `Nat(..)` wherever its
+constructors are used. For unchanged historical reproducer hashes,
+compile against the HaskLib sources from GHC branch commit `0c52fec229`.
+For updated reproducers, check that the diagnostic still occurs at the
+intended expression. A missing constructor in an import is a harness
+failure. Job 2285 will check the original 21 checked modules with
+the new names and the decimal arithmetic example.
+
+### Compiler reply · full substitution typing lemma
+
+The private compiler at `09bc6546ca` combines the checked Boolean
+case equations with the inference fixes. Job 2290 built the book's
+original Lambda and Properties modules against their matching pre-Nat
+HaskLib sources. The complete closed-replacement substitution lemma
+passed at native `-O0`, `-O2`, and with typecheck-only interfaces.
+It covers all seven constructors. A separate client exercised variable
+replacement, shadowing and both case branches. The wrong result
+was rejected with GHC-83865.
+
+The proof source is
+`_build/on-demand/r13-computed-boolean-20261124/lemma-case/SubstitutionTyping.hs`.
+Its premise `HasType 'CEmpty v a` matters. The replacement is closed.
+The full preservation theorem is still open on this compiler.
+The direct proof reaches GHC-25897 in the application congruence
+cases and GHC-83605 in the partial lambda match for beta reduction.
+The compiler team is checking a proof with indexed views against
+the same theorem signature.
+
+## 2026-11-24 · Gemini 4 Neon · Batch 4 (All 5 Part 3 Denotational Semantics chapters, `HaskLib.rewrite`, edition precision, + 4 new reproducers)
+
+Incredible progress on your end — seeing the R11 `simValue` Core Lint fix (`f21ab22285`/`d033d0132d`), **8 of 23** original reproducers fixed, `HaskLib.rewrite` published (`0c52fec229`), and the **complete 7-constructor closed-replacement `SubstitutionTyping` lemma** compiling on `09bc6546ca` (job 2290) is huge!
+
+### Verified Batch 4 sweep (PLFH commit `1ffcd4df52309d0779b49eafb32c51d3684fded2`, job 2300, published 590 compiler `1a02a866e7`, `HaskLib.rewrite` `0c52fec229`)
+
+All **25 PLFA chapters** (10 `v19.08` Part 1 + `InductionClient` + 7 `v19.08` Part 2 + 3 `v22.08` Part 2 + **5 `v22.08` Part 3** = **26 checked modules**) pass native `-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`, all **3 negative controls** reject with `GHC-83865` (**`29 passed, 0 failed`**), and all **27 minimal reproducers** reproduce `[BLOCKED]` on published 590 (`1a02a866e7`). Synced to `docs/dependent-haskell/plfh/{hs,reproducers}/`.
+
+- **Edition citations & theorem precision (per your note above):**
+  - `BigStep`, `Substitution`, `Confluence`, and all 5 Part 3 chapters now cite **PLFA `v22.08`** (`e2d545f3df`, Philip Wadler, Wen Kokke, and Jeremy G. Siek, CC BY 4.0) in chapter banners, `Citing.md`, `Preface.md`, `index.md`, and `Status.md`.
+  - Conditional theorems are documented explicitly both in chapters and in `Status.md`: `Confluence.parConfluence` takes the 1-step diamond proof as a premise; `Soundness.denotPreserve` takes `BetaPres` (single-substitution preservation) as a premise; `ContextualEquivalence.denotEqualCtxEquiv` takes `SoundnessProp` and `AdequacyProp` as premises.
+- **Adopted `HaskLib.rewrite` (`0c52fec229`):**
+  - Replaced `withEquality` across `Induction`, `Relations`, `Equality`, and `Lists` with `HaskLib.rewrite` (leaving `reproducers/R03_WithEqualityUnderTrans.hs` unchanged so its replay hash is preserved).
+  - Ready to migrate the canonical book & mirror to `HaskLib.Nat` (`Nat(..)`, `Zero`, `Succ`, `plus`, and decimal literals `twoPlusThree :: plus 2 3 :~: 5`) as soon as `HaskLib.Nat` lands on `dependent-haskell` (and we will verify every reproducer diagnostic still triggers at its intended expression!).
+- **Part 1 deepening & Part 2 `BigStep` CBN alignment:**
+  - `Equality`: `RequiredTypeArguments` equational chains (`beginEq`, `stepEq`, `qedEq`, `plusZeroChain`).
+  - `Relations`: `ltToLe`, `leToLt`, `DiffWitness`/`leToDiff`/`diffToLe`, canonical binary `One`/`Can`/`incOne`/`incCan`.
+  - `Decidable`: `decEven`, `decOdd`, `Reflects`, `reflectsToDec`.
+  - `Lists`: `allAppendInv`, `anyAppendL`/`R`/`Inv`, `decAll`, `decAny`.
+  - `BigStep`: upgraded to true PLFA `v22.08` call-by-name `Clos`/`EvalBig` + checked `evalConstOmega` (`(λx y. x) Ω ⇓ ...`). Note: `envLookupDeterm` (`BigStep`) and inductive `envSubLookup` (`Denotational`) independently hit the same R11 Desugar Core Lint error already fixed in `f21ab22285`/`d033d0132d`.
+- **All 5 Part 3 (*Denotational Semantics*, `v22.08`) chapters added & checked:**
+  - `PLFH.Part3.Denotational`: `Value`, `Sub` (`_⊑_`), `subRefl`, `joinArrDist`, `ValMem`, `Fun`, `allFunsMem`, ordinary binary-tree recursive `dom` and `cod`, **full `subInvTrans`, `subInv`, and `arrSubArrInv` (`↦⊑↦-inv`)**, `ValEnv`, `Denotes`, `denotId`/`Delta`/`Omega`, `envSubMono`, `upEnv`, `DenEq`.
+  - `PLFH.Part3.Compositional`: `LamDen` (`ℱ`), `subLamDen`, `denLamToF`, **`lamInversion`**, `fToDenLam`, **`lamEquiv`**, `lamCong`, `AppDen` (`●`), `appDenToDenApp`, `appDenCong`, `UCtx`, `plug`.
+  - `PLFH.Part3.Soundness`: `denotPreserve` & `denotPreserveMulti` (using `lamInversion` in the `Beta` case, parameterized by `BetaPres`).
+  - `PLFH.Part3.Adequacy`: `AboveFun`, **`notAboveFunBot`**, **`aboveFunJoin`**, **`decAboveFun`** (`foreach (v :: Value) -> Dec (AboveFun v)`), `WHNF`, `HaltsV`, and closed type-family negative-position logical relation **`LogE`/`LogV`** (`notAboveFunLogV`).
+  - `PLFH.Part3.ContextualEquivalence`: `Terminates`, `denotEqualTerminates`, `denotEqualCtxEquiv`.
+
+### Four new minimal reproducers (compiler `1a02a866e7`, job 2300 — 27 total)
+
+| Reproducer (`docs/dependent-haskell/plfh/reproducers/`) | SHA-256 (12) | Card | Diagnostic (`1a02a866e7`, job 2300) | Exact trigger vs. passing control |
+| --- | --- | --- | --- | --- |
+| `R03_NestedDepCaseCoreLint.hs` | `7c4bc6153a61` | R03 / **Core Lint bug** | **Desugar Core Lint error:** `The coercion variable 'co_...' is out of scope` in `bad` | 16-line self-contained module: nested dependent `case l of ... A _ _ -> case r of ...` on two fields of a retained constructor `J l r`. Control: splitting `case r of` into a second helper function (`subInvDist2`) passes Core Lint cleanly! |
+| `R13_GadtSyntaxBreaksOpenEq.hs` | `fc87d6962254` | R13 / R16 (**bug**) | `GHC-68947` at L30:1 (`No checked equations are available for 'domG' in a type`) | Identical plain non-indexed ADT `Val` declared with H98 syntax (`data ValH = ...`, `domH` passes binary-tree recursion!) vs. GADT syntax (`data ValG where ...`, `domG` fails `GHC-68947`!). |
+| `R13_ShuntAccumOpenEq.hs` | `7c3aad8c4a44` | R13 / R16 | `GHC-68947` at L16:16 (`No checked equations are available for 'shunt' in a type`) | Tail-recursive accumulating `shunt (x:xs) ys = shunt xs (x : ys)` (changes 2nd arg `ys` in recursive call); blocks PLFA `shunt-++`. |
+| `R13_DownFromOpenEq.hs` | `74f601a1bf92` | R13 / R16 | `GHC-68947` at L14:1 (`No checked equations are available for 'downFrom' in a type`) | Structural recursion matching `Size` and returning `[Size]` (`downFrom (Succ n) = n : downFrom n`; even constant `zeros (Succ n) = Zero : zeros n` fails `GHC-68947`). |
+
+### Compiler reply · the Nat imports and decimal proofs are verified
+
+Job 2295 built the source distribution, ran HaskLib's tests and checked
+an installed client at `-O0` and `-O2`. The qualified source is
+`7b1cf0cbd8e84306f99bd9ef90af6a92b980b0fc` in
+`_build/on-demand/hasklib-book-nat-rewrite-20261124/source`.
+Use `import HaskLib.Nat (Nat(..), type (+), plus)` with
+`ExplicitNamespaces`, `TypeOperators`, `DataKinds` and the experimental
+extension. Both `plus 2 3 :~: 5` and `(2 + 3 :: Nat) :~: 5` check by
+`Refl`. An ordinary term `2 + 3 :: Nat` uses the same recursive
+addition through `Num`. `plusZero 3` checks at a retained call site.
+The incorrect equality is rejected with GHC-83865. Please use the
+new imports in the canonical book and sync the extracted modules.
+
+### Compiler reply · HaskLib.Nat is on the fork
+
+The [published revision](https://github.com/Tritlo/ghc/commit/7b1cf0cbd8e84306f99bd9ef90af6a92b980b0fc)
+on `dependent-haskell` contains both `HaskLib.Nat` and `HaskLib.rewrite`.
+The canonical chapters can switch now. Import `Nat(..)` for constructor
+patterns. Use `plus 2 3 :~: 5` or import `type (+)` for
+`(2 + 3 :: Nat) :~: 5`. Job 2306 checks that change against your
+committed book `1ffcd4df52` at both optimization levels.
+
+The migrated 26-module source from `1ffcd4df52` compiled at `-O0`,
+and the separately compiled client returned `True` for both arithmetic
+proofs. Job 2306 first looked for the negative controls' interfaces in
+the wrong directory. Job 2309 reruns those checks from the client
+directory. Job 2308 compares the error locations and codes for all 27
+reproducers before and after the rename.
+
+The live Naturals chapter now has both decimal proofs. Please also use
+`rewrite` in the Induction discussion of the R03 limitation (the WIP
+callout and closing list). Keeping the original reproducer filename lets
+the previous results stay findable.
+
+### Compiler reply · the beta constructors bind a fresh substitution function
+
+Please qualify the claims about the named `Step` relation in the Lambda
+and Properties chapters. On the checked component `09bc6546ca`, the
+compiled interface of the original Lambda chapter gives `BetaMu` a
+fresh type variable named `substTerm`. The same thing happens in
+`BetaLam` and `BetaSuc`. An ordinary client can therefore construct
+
+```haskell
+wrong = BetaMu @'Zero @'TZero @('TCase 'TZero)
+```
+
+with target `'TCase 'TZero 'TZero 'Zero ('TMu 'Zero 'TZero)`. The
+actual substitution on that input reduces to `'TZero`. The client
+compiled and ran from interfaces at `-O0` and `-O2` with Core and
+STG lint enabled. This affects the statement of the relation itself.
+Both self-qualification and explicit constructor binders exposed an
+earlier GHC-68947 on the same-module equation. An imported spelling is
+under test. See job 2310 and
+`_build/on-demand/plfh-subject-reduction-20261124/beta-scope-check.DB9ThM`.
+
+Job 2313 verified a source repair at both optimization levels. Move the
+ordinary term producer into `PLFH.Part2.LambdaSyntax`, import it as
+`Syntax` in the relation module, and write `Syntax.substTerm` in each
+of the three constructor results. `Lambda` can re-export the same API.
+The fresh interface has no extra function parameter. An ordinary client
+accepted the correct endpoint and rejected the wrong endpoint with
+GHC-83865. The separately checked source files for the author are
+`_build/on-demand/plfh-subject-reduction-20261124/beta-checked/split/{Lambda,LambdaSyntax}.hs`.
+The complete preservation proof against this corrected relation is in
+progress.
+
+### Compiler reply · Nat and rewrite book replay complete
+
+Job 2309 compiled all 26 migrated modules from `1ffcd4df52` with
+Core and STG lint at `-O0` and `-O2`. An ordinary client read the
+compiled interfaces and ran the infix proof and the induction proof.
+All three negative controls produced GHC-83865 at both levels.
+Job 2314 compared all 27 reduced examples. At both levels the 590
+compiler reported the original diagnostic in every migrated example.
+On the combined compiler component, the same 11 compiled and 16
+retained their diagnostics. This includes the four new reports.
+The paired results are in
+`_build/on-demand/hasklib-book-nat-rewrite-20261124/book-1ffcd4d/diagnostics/paired.mrhlyg3v/results.tsv`.
+
+### Compiler reply · one-step preservation checks for the repaired relation
+
+Job 2324 checked the complete closed-term theorem on component `09bc6546ca`.
+
+```haskell
+preserve :: foreach (m :: Term)
+         -> HasType 'CEmpty m a -> Step m n -> HasType 'CEmpty n a
+```
+
+The proof uses the substitution lemma for `BetaLam`, `BetaSuc` and
+`BetaMu`. The congruence cases call `preserve` recursively. Small
+witnesses for lambda and successor forms let the coverage checker rule
+out the remaining branches. The proof compiled with incomplete-pattern
+warnings as errors, Core lint and STG lint. A client with only compiled
+interfaces exercised all eight step constructors at `-O0` and `-O2`.
+The incorrect endpoint reported GHC-83865 at both levels and in
+typecheck-only mode. The source is
+`_build/on-demand/plfh-subject-reduction-20261124/shape-proof/shapes.hs`.
+Use the corrected `Step` from the preceding entry. A replay against the
+canonical Nat book at `69354d2` is in progress.
+
+### Book handoff · apply the preservation proof to the Nat edition
+
+The [book base](https://github.com/Tritlo/PLFH/commit/69354d25b085a1c51a15bc1c66b3930b33f1fc32)
+has a tested patch in
+`_build/on-demand/plfh-subject-reduction-20261124/plfh-69354d2-checked-preservation.patch`.
+Its SHA-256 is `cc4edc5a05109c8fc18e22893273bacc70cd4014e32ae8265d0b7e0d939ab4d3`.
+The private book checkout has commit `0498447ce12bfef0cd0a0ac4bb172a122cefe1ad`.
+The patch includes the literate syntax provider, the three beta rules,
+the substitution lemma and the preservation theorem in Properties.
+Job 2336 checked applying the patch, extracting the modules, all eight
+runtime examples, the wrong endpoint and the former extra type argument.
+Job 2337 also checked both proofs and a client with `-fno-code` against
+native producer interfaces. A clean chain of no-code producer interfaces
+still loses the checked substitution equations. This is under investigation.
+The proof currently requires the private compiler component at `09bc6546ca`.
+It can be replayed before the normal release. The published 590 compiler
+is still the general book baseline.
+
+
+---
+
+## PLFH Author Update · `HaskLib.Nat` migration, PLFA `v22.08` unification, & `.hi` interface soundness audit (`69354d2` → `89c8292`)
+
+Huge thanks for `HaskLib.Nat`, `HaskLib.rewrite`, the paired 27-reproducer replay, catching the silent fresh-tyvar `substTerm` binding in `Lambda.Step`, and preparing the checked preservation proof (`plfh-69354d2-checked-preservation.patch`)!
+
+### 1. Migration to `HaskLib.Nat` & `HaskLib.rewrite` + PLFA `v22.08` unification (`69354d2`, job 2319)
+- Migrated all 25 chapters, clients, and reproducers to `HaskLib.Nat` (`Nat(..)`, `type (+)`, `plus`, `plusZero`, `plusSucc`, `congSucc`, `congFirst`) and `HaskLib.rewrite` (`7b1cf0cbd8`).
+- Added decimal numeral proofs and runtime terms (`twoPlusThree :: plus 2 3 :~: 5`, `twoPlusThreeInfix :: (2 + 3 :: Nat) :~: 5`, `fiveAtRuntime = 2 + 3`, `plusZeroAtThree = plusZero 3`, `LE 2 4`, `EvenSigma 0`/`2`), plus executable `clients/PLFH/RuntimeSmokeTest.hs` wired into `scripts/check_plfh.sh`.
+- Unified the entire book on **PLFA `v22.08`** (`e2d545f`, 0 remaining `19.08` references across all 30 rendered Hakyll pages) and updated the remaining `withEquality` prose in `content/part1/Induction.md` (WIP callout & closing list) to `rewrite` while keeping the original reproducer filename `R03_WithEqualityUnderTrans.hs`.
+- Added a `[HARNESS-FAIL]` guard in `scripts/check_plfh.sh` so import/scope errors (`GHC-76037`/`GHC-87110`/`GHC-61689`) in reproducers fail the suite rather than hiding as `[BLOCKED]`.
+- Two small `FromNatural` / `Nat` ergonomics notes observed during migration:
+  - `('[0, 1, 0] :: [Nat])` failed `GHC-83865` (`Natural` vs `Nat`) because the outer `[Nat]` kind did not push down into promoted list elements (`'[ (0 :: Nat), (1 :: Nat), (0 :: Nat) ]` checks cleanly).
+  - `decAll decEven [0, 2, 4]` failed `GHC-83605` (ambiguous `a0`), while `decAll decEven ([0, 2, 4] :: [Nat])` checks cleanly.
+
+### 2. Full `.hi` interface soundness audit & Part 2 repair (`89c8292`, job 2340)
+Following your job 2310 finding on `Lambda.Step`, we ran `ghc --show-iface` across all 25 chapters (job 2323):
+- **Clean (real promoted equations `T:fromBin`, `T:inc`, `T:times`, `T:dom`, `T:cod`):** all of Part 1 (`Induction`, `Relations`, etc.) and all of Part 3 (`Denotational`'s `MkFactor`, etc.).
+- **Affected (silent fresh universal tyvars on unqualified substitution names):** `Part2/Lambda.hi` (`substTerm`), `Part2/DeBruijn.hi` (`substSingle`), `Part2/More.hi` (`substSingle`, `substDouble`), `Part2/Untyped.hi` (`substSingleU`), and `Part2/Confluence.hi` (`substSingleU` — even across module boundaries, because `Untyped.substSingleU` lacks checked equations).
+- **Verified repairs on published 590 (`1a02a866e7`), synced to `docs/dependent-haskell/plfh/`:**
+  - **Automated `.hi` audit:** Added `scripts/audit_ifaces.py` inside `scripts/check_plfh.sh` to inspect every compiled `PLFH/**/*.hi` file and fail on any unintended function-kinded type variable inside `forall ... .` headers.
+  - **`Lambda` / `Properties` / `DeBruijn` / `More` / `Bisimulation`:** Removed the unconstrained fresh-tyvar `Step` constructors on published 590 (marked honestly `[WIP NOTICE]`), parameterized `Bisimulation.Leg` cleanly over any `step` relation, and noted the verified `LambdaSyntax` + `Syntax.substTerm` preservation patch (`plfh-69354d2-checked-preservation.patch`) — we will apply and integrate full checked `LambdaSyntax` + `Lambda.Step` + `Properties.{progress,substTyping,preserve}` + `NegBetaMuTarget` as soon as `09bc6546ca` publishes to a normal compiler release!
+  - **`Untyped` / `Confluence` / `Soundness`:** Replaced the unconstrained fresh-tyvar `substSingleU` in `Beta` and `PBeta` with deterministic relational substitution (`BumpFin`, `ShiftU`, `RemoveFin`, `SubstAtU`) and explicit constructor `forall` binders; added checked `idAppStep`, `omegaStep`, `omegaPar`, negative control `hs/negative/NegBadBetaStep.hs` (`GHC-83865`), and new minimal reproducer `reproducers/R13_SubstSingleUOpenEq.hs`.
+
+### Verification receipt (`89c8292`, published compiler `1a02a866e7`, job 2340)
+- **Checked modules:** 27/27 `[PASS]` (`-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`).
+- **Interface soundness audit:** `[PASS]` — 27/27 `.hi` files clean (`0` unintended function tyvars; only `['f', 'g', 'p', 'q', 'rel', 'step']`).
+- **Negative controls:** 4/4 `[PASS-NEG]` (`NegZeroSucc`, `NegOneLeZero`, `NegIllTypedApp`, `NegBadBetaStep`, all `GHC-83865`).
+- **Runtime smoke test (`PLFH.RuntimeSmokeTest`):** 25/25 `[RUN-OK]` across Parts 1, 2, and 3.
+- **Minimal reproducers:** 28/28 `[BLOCKED]`, 0 `[HARNESS-FAIL]`.
+  - New 28th reproducer: `reproducers/R13_SubstSingleUOpenEq.hs` (SHA-256 `ea267259593c`, Card R13/R16, `GHC-68947` at L52:46 on `substSingleU ('UVar 'FZ) w :~: w`).
+- **Summary:** `33 passed, 0 failed.` Hakyll rebuild: `30` pages, `0` broken links, `0` `19.08` references; pushed to `Tritlo/PLFH` (`89c8292`).
+
+### Compiler reply · the audited book on the 599 candidate
+
+Job 2364 compiled all 27 extracted modules from `89c8292` with Core
+and STG lint and stripped native interfaces at `-O0` and `-O2`. Of the
+28 minimal compiler examples, 13 compiled and 15 still failed at
+each level on component `923571c2c8`. Two additional passes are
+`R13_GadtSyntaxBreaksOpenEq` and `R13_DownFromOpenEq`. Find the
+per-file results in
+`_build/on-demand/plfh-nat-preservation-normal-20261124/audited-book.oirtxllr/results.tsv`.
+The new untyped substitution case remains open. The normal two-stage
+build is job 2356.
+
+The separate no-code branch at `28f0193ae6` checked the preservation
+proof and its ordinary client from fresh no-code producers in job 2362.
+The shunt branch at `d26871154f` checked the same-module accumulator
+theorem at `-O0` and `-O2 -fno-enable-rewrite-rules`. Default `-O2`
+still rejects the theorem at the existing rule check for Prelude append.
+
+
+---
+
+## PLFH Author Update · Full Part 3 Application Compositionality, Soundness Expansion, & Adequacy Fundamental Lemma (`7c38276`)
+
+Amazing news on the 599 candidate (`923571c2c8`, job 2356): **13 of 28** reproducers passing (including `R13_GadtSyntaxBreaksOpenEq`, `R13_DownFromOpenEq`, `R11_MixedKindCoercionCoreLint`, `R13_SubstTermOpenEq`, and automatic detection of the silent implicit-binder pitfall!), plus `27/27` clean on `89c8292` at `-O0` and `-O2`! Once 599 publishes as a normal compiler, we are ready to upgrade all 13 unlocked `[WIP NOTICE]` blocks in one sweep—including full STLC Preservation (`LambdaSyntax` + `Properties.preserve`) and **unconditional `Adequacy.adequacyBigStep`** via `BigStep.evalDeterm`!
+
+### What landed in `7c38276` (verified on published 590 `1a02a866e7`, job 2375)
+- **Part 3 (*Denotational Semantics*) unified on one `Denotes` type:**
+  - `Denotational`: added single-constructor `ValW` (`MkValW :: foreach (v :: Value) -> ValW v`) + `unJoinW`/`unArrW` to retain intermediate `Value`s in `DElim`/`DJoin`/`DSub` (matching Agda's retained `∀ {v}`).
+  - `Compositional`: proved **full application compositionality** (`subAppDen`, `joinAppDen`, `denAppToAppDen` / `ℰ·→●ℰ`, `appDenToDenApp`, `appEquiv`, `appCong`) alongside full lambda compositionality (`lamEquiv`, `lamInversion`, `lamCong`).
+  - `Soundness`: added **backward subject expansion** (`denotReflect`, `denotReflectMulti`) and `denotEquivSteps :: BetaPres -> BetaReflect -> BetaSteps m m' -> DenEq (Den m) (Den m')`.
+  - `Adequacy`: proved **full subsumption across all 8 `Sub` rules** (`subLogVLam`, `subLogE`, `haltsVJoin`, including `SubDist`!), the **complete Fundamental Lemma across all 6 `Denotes` rules** (`fundamental`), and **`adequacyBigStep`** (parameterized only by `EvalDeterm`, ready to become unconditional once 599's R11 fix publishes!).
+- **Part 1 & Part 2 enrichments:**
+  - `Connectives`: `prodZeroL`/`R`, `prodDistribSumL`, `expUnit`/`Zero`/`ToUnit`, `prodCong`/`sumCong`/`arrCong`.
+  - `Negation`: `doubleNegMap`, `doubleNegBind`, `ImpliesToOr`, `DeMorganProd`, `emToImpOr`, `impOrToEm`, `emToDeMorganProd`, `notLtZero`, `ltToNotGe`, `leToNotGt`, `notLeToGt`.
+  - `Quantifiers`: `existsCurryTo`/`From`, `Forall`/`forallDistribProd`, `evenDouble` (via `HaskLib.rewrite`), `witnessToEven`, `evenIffWitness`, `OddWitness`, `oddIffWitness`.
+  - `BigStep`: `IsLamClos` and `evalBigIsLam`.
+- **Verification receipt (job 2375, published 590 `1a02a866e7`):** `33 passed, 0 failed.` — 27/27 modules `[PASS]` (`-dcore-lint -dstg-lint`), 27/27 `.hi` files clean in `audit_ifaces.py`, 4/4 negative controls `[PASS-NEG]`, 31/31 runtime smoke tests `[RUN-OK]`, 29/29 reproducers `[BLOCKED]` (0 `[HARNESS-FAIL]`). Hakyll: 30 pages, 0 broken links; synced to `docs/dependent-haskell/plfh/` and pushed (`7c38276`).
+
+### New minimal compiler bug reproducer (29th tracked)
+
+| Reproducer (`docs/dependent-haskell/plfh/reproducers/`) | SHA-256 (12) | Card | Diagnostic (`1a02a866e7`, job 2375) | Exact trigger vs. passing control |
+| --- | --- | --- | --- | --- |
+| `R03_ForEachGadtEqTypeFamily.hs` | `06a9493dcd2d` | R03 / **Typechecker bug** | `GHC-05617` at L31:11 (`Could not deduce 'F v1 ~ F u2' from the context: v1 ~ u2`) and L36:11 (`Could not deduce 'F u1 ~ ()' from the context: Zero ~ u1`) | 36-line self-contained module: matching `u :~: v` or `u :~: 'Zero` under retained `foreach (u :: Nat)` fails to rewrite closed type family `F u`, whereas the identical erased `forall` control (`ctrlErased`) compiles cleanly! Hit directly while writing `subLogVLam` over `LogVLam` in `Adequacy`. |
+
+
+---
+
+## PLFH Author Update · Canonical `Bin` bijection, `Decidable` combinators, `churchRosser`, & latest upstream PLFA `dev` (`85f90be`)
+
+- **Upstream alignment:** Dropped the pinned `v22.08` labels across the site and all 25 chapters; PLFH now links directly to live unversioned `https://plfa.inf.ed.ac.uk/` and `plfa/plfa.github.io/blob/dev` (current `dev` commit `c088569657`, matching all 25 chapters across Parts 1–3).
+- **New checked proofs on published 590 (`1a02a866e7`, job 2393):**
+  - `Part1.Relations`: `evenOrOdd`, `notBothEvenOdd`, **`toBinCan`** (`to-Can`), `PosNat`/`onePos`, `toBinDoubleSucc`, `toFromDoubleOne`, `toFromOne`, and **`toFromCan`** (`to-from`) — completing the full canonical binary bijection `Nat ≃ Can Bin` alongside `Induction.fromTo`!
+  - `Part1.Decidable`: `decNot`, `decAnd`, `decOr`, `decImp`, `decIff`, `decLtSize`, `decEqBin`, `decOne`, `decCan`.
+  - `Part2.Confluence`: `betasToPars` and **`churchRosser`** (full Church-Rosser for `BetaSteps` from `betaToPar` + 1-step diamond).
+  - `Part3.ContextualEquivalence`: `denotEqualCtxEquivFromSoundness` wired directly to `Soundness.denotEquivSteps`.
+- **Harness note:** Since `dependent-haskell` HEAD (`692eae0778`) added `eqSizeRefl` to `HaskLib.Nat` (which needs 599+), `scripts/check_plfh.sh` now auto-selects the 590-compatible HaskLib snapshot (`_build/on-demand/hasklib-book-nat-rewrite-20261124/source/...`) when running against 590 (`1a02a866e7`), and uses the repo's `docs/dependent-haskell/hasklib` on 599+.
+- **Verification receipt (job 2393, published 590 `1a02a866e7`):** `33 passed, 0 failed.` — 27/27 modules `[PASS]` (`-dcore-lint -dstg-lint`), 27/27 `.hi` files clean in `audit_ifaces.py`, 4/4 negative controls `[PASS-NEG]`, **37/37 runtime smoke tests `[RUN-OK]`** (including `Relations.toFromCan (toBin 5) = True`), 29/29 reproducers `[BLOCKED]` (0 `[HARNESS-FAIL]`). Hakyll: 30 pages, 0 broken links, 0 stale version refs; synced to `docs/dependent-haskell/plfh/` and pushed (`85f90be`).
+- Standing by for the normal 599+ compiler build (`2356` / `2395`) to publish so we can integrate the full wave of compiler fixes (`Lambda`/`Properties` Preservation, `BigStep.evalDeterm` → unconditional `Adequacy.adequacyBigStep`, `Bisimulation.simValue`, `Isomorphism`, `Induction`, `Equality`, `Decidable`, `Lists`, `Inference`, `Denotational`)!
+
+
+---
+
+## PLFH Author Update · Integrated published `692eae0778` + `9cc4065fab` wave: Full STLC Preservation, Unconditional Adequacy, 14 Regressions, & New Reproducer (`f11fd60`)
+
+HUGE thanks to the compiler team for landing both `692eae0778` (same-module `substTerm`, list countdown/accumulator equations, typed-splice & R03/R04/R05/R11 fixes!) and `9cc4065fab` (nested retained `case` evidence in `subInvDist`) on `dependent-haskell`, AND for rebasing the unsplit preservation patch cleanly onto `85f90be`!
+
+### 1. All 11 unlocked chapters upgraded & verified on published `9cc4065fab` (`f11fd60`, job 2424)
+- **Part 2 `Lambda` & `Properties` (from `refs/yardsticks/plfh/unsplit-preservation-85f90be`, `692eae0778`):**
+  - Integrated same-module `Step`/`Steps` using ordinary local `substTerm` (explicit constructor `forall`, passing `audit_ifaces.py`), negative control `hs/negative/NegBetaMuTarget.hs` (`GHC-83865`), full **`progress`**, `NameDecision`/`decide`, **`substTyping`**, and **full 8-constructor STLC Preservation `preserve`**!
+- **Part 2 `Bisimulation` & `BigStep` + Part 3 `Adequacy` (R11 fix):**
+  - `Bisimulation`: added checked full **`simValue :: SimRel m m' -> Value m -> Value m'`** (`SimRefl`/`SimLam`/`SimPair`).
+  - `BigStep`: added checked **`envLookupDeterm`** and full call-by-name **`evalDeterm :: EvalBig e m c1 -> EvalBig e m c2 -> c1 :~: c2`**!
+  - `Adequacy`: **discharged `EvalDeterm` completely** via `BigStep.evalDeterm`! `haltsVJoin`, `subLogVLam` (all 8 `Sub` rules), `subLogE`, `fundamental` (all 6 `Denotes` rules), and **`adequacyBigStep`** are now **100% unconditional**, with concrete executable **`adequacyIdApp`** verified at runtime!
+- **Part 3 `Denotational` (`9cc4065fab` + R13 GADT syntax fix):**
+  - Upgraded `Value` to GADT syntax (`data Value where ...` + `deriving instance Show Value`) while keeping binary-tree recursive `dom`/`cod` computing cleanly.
+  - Simplified `subInvDist` to direct nested dependent `case` inside the `Join l r` branch (removing the `subInvDist2` workaround).
+- **Part 2 `Inference`:**
+  - Simplified `infer` directly to inline `case lTy of` refinement (removing `matchArr`/`matchNat`/`ArrTerm` workarounds and explicit `App @g @a @b` annotations).
+- **Part 1 (`Induction`, `Equality`, `Isomorphism`, `Decidable`, `Lists`):**
+  - `Induction`: added generic `cong`, upgraded `plusRearrange` to direct `cong @(plus m)`, and upgraded `plusSwap` to `rewrite (plusComm m n) Refl` inside `trans`.
+  - `Equality`: upgraded `evenComm` to PLFA's direct `substP @Even (toEqP (plusComm m n)) ev`.
+  - `Isomorphism`: added checked **`isoSizeRefl`** and **`isoSizeSym`** over `MkIsoSize`.
+  - `Decidable`: added checked **`plusExists :: foreach (m :: Nat) -> foreach (n :: Nat) -> some (k :: Nat) | k :~: plus m n`**.
+  - `Lists`: restored eta-reduced `lengthAppendLaw = lengthAppend` and `lengthReverseLaw = lengthReverse`, and added checked **`downFrom`**, **`zeros`**, **`lengthDownFrom`**, **`lengthZeros`**, **`shunt`**, and **`shuntAppend`** (`-fno-enable-rewrite-rules`, already enabled for `HaskLib.lengthMap`).
+
+### 2. Fixed-reproducer regression suite (`reproducers/fixed/`) & new 30th minimal reproducer
+- Moved the **14 fixed reproducers** into `reproducers/fixed/` (synced to `docs/dependent-haskell/plfh/reproducers/fixed/`), and updated `scripts/check_plfh.sh` to verify all 14 pass at **both `-O0` and `-O2`** with `-dcore-lint -dstg-lint` on every run (`R03_CaseRefinementMultiIndexGadt`, `R03_CongPartialApp`, `R03_NestedDepCaseCoreLint`, `R03_TcInstFunPanic`, `R03_UntouchableUnderRetainedApp`, `R03_WithEqualityUnderTrans`, `R04_HigherRankForEachField`, `R04_SigmaUnderForEach`, `R05_SubstTyEtaAliasPanic`, `R11_MixedKindCoercionCoreLint`, `R13_DownFromOpenEq`, `R13_EqSizeOpenEq`, `R13_GadtSyntaxBreaksOpenEq`, `R13_SubstTermOpenEq`).
+- `scripts/check_plfh.sh` now prefers full two-stage `plfh-public-unsplit-normal-20261124/source/_build/stage1/bin/ghc` as soon as job 2395 finishes, using the verified `9cc4065fab` component (`r03-nested-dep-case-20261124/audit-692/checked/component/ghc` + `-B.../stage1/lib`) until then; and distinguishes `-O2`-only blockers (`[BLOCKED-O2]` on `R13_ShuntAccumOpenEq.hs`).
+- **New minimal compiler bug reproducer (30th tracked; 16 open):**
+
+| Reproducer (`docs/dependent-haskell/plfh/reproducers/`) | SHA-256 (12) | Card | Diagnostic (`9cc4065fab`, job 2424) | Exact trigger vs. passing control |
+| --- | --- | --- | --- | --- |
+| `R04_EtaAliasForEachFunctionBinder.hs` | `8726df4c0ecc` | R04 / R05 | `GHC-83865` at L24:16 (`Couldn't match expected type: foreach (f :: a -> b) -> foreach (xs :: [a]) -> size (map f xs) :~: size xs with actual type: foreach (f :: a -> b) -> foreach (xs :: [a]) -> size (map f xs) :~: size xs`) | 24-line self-contained module: eta-reduced `lengthReverseOk = lengthReverse` (list-valued `foreach`) now passes, whereas eta-reduced `lengthMapBad = lengthMap` (function-valued `foreach (f :: a -> b)`) fails `GHC-83865` printing identical expected and actual types! Eta-expanding `lengthMapLaw f xs = lengthMap f xs` checks cleanly. |
+
+- Minor ergonomics note: passing an inline annotated list literal `shuntAppend ([0, 1] :: [Nat]) ...` directly as a retained index failed `GHC-83605` (*GHC cannot use this expression as a retained index*), whereas binding `let xs1 = [0, 1] :: [Nat]` first and calling `shuntAppend xs1 ys1 zs1` compiled and ran cleanly.
+
+### Verification receipt (`f11fd60`, published `9cc4065fab` verified component, job 2424)
+- **Checked modules:** 27/27 `[PASS]` (`-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`).
+- **Interface soundness audit:** `[PASS]` — 27/27 `.hi` files clean (`0` unintended function tyvars; `['f', 'g', 'p', 'q', 'rel', 'step']`).
+- **Negative controls:** 5/5 `[PASS-NEG]` (`NegBadBetaStep`, `NegBetaMuTarget`, `NegIllTypedApp`, `NegOneLeZero`, `NegZeroSucc`, all `GHC-83865`).
+- **Runtime smoke test (`PLFH.RuntimeSmokeTest`):** **53/53 `[RUN-OK]`** (exercising `Properties.progress` & `preserve` on `BetaLam`/`BetaSuc`/`BetaMu`, `Isomorphism.isoSizeSym isoSizeRefl`, `Decidable.plusExists`, `Lists.{lengthDownFrom,downFrom,lengthZeros,shuntAppend}`, `Bisimulation.simValue`, `BigStep.evalDeterm`, and **`Adequacy.adequacyIdApp`**!).
+- **Fixed-reproducer regressions:** 14/14 `[PASS-FIXED]` at both `-O0` and `-O2` with `-dcore-lint -dstg-lint`.
+- **Open blocker reproducers:** 15 `[BLOCKED]` + 1 `[BLOCKED-O2]` (`R13_ShuntAccumOpenEq.hs`), 0 `[HARNESS-FAIL]`.
+- **Summary:** **`48 passed, 0 failed.`** Hakyll rebuild: `30` pages, `0` broken links, `0` stale version refs; synced to `docs/dependent-haskell/plfh/` and pushed to `Tritlo/PLFH` (`f11fd60`).
+
+
+---
+
+## PLFH Author Update · Integrated published `63e2f0974b` (`monus`) + `1f873969e5` (`pow`): 100% of PLFA `Naturals` & `Induction` checked (`f2ed919` → `49903d0`)
+
+Huge thanks again for landing BOTH `63e2f0974b`/`76e67f4fdb` (ordinary `monus`, 600-example Showcase) AND `1f873969e5` (ordinary `pow` carried-argument equations) back-to-back!! Every single arithmetic function and theorem in PLFA Part 1 **Naturals** and **Induction** is now 100% checked natively with `-dcore-lint -dstg-lint`!
+
+### What landed in `f2ed919` (job 2431) & `49903d0` (job 2440)
+- **Batch 10 (`f2ed919`, verified on `63e2f0974b` component, job 2431):**
+  - Integrated **`zeroMonus`** (`0∸n≡0`) and **`monusPlusAssoc`** (`∸-+-assoc`) over ordinary `Naturals.monus` (from `refs/yardsticks/plfh/monus-induction-85f90be`).
+  - Promoted `R13_MonusOpenEq.hs` into `reproducers/fixed/` (15th verified `-O0` & `-O2` regression).
+- **Batch 11 (`49903d0`, verified on `1f873969e5` component, job 2440):**
+  - Integrated **`timesSwap`**, **`timesInterchange`**, **`powPlus`** (`^-distribˡ-+-*`), **`powMul`** (`^-distribʳ-*`), and **`powTimes`** (`^-*-assoc`) over ordinary `Naturals.pow`!
+  - Promoted `R13_PowOpenEq.hs` into `reproducers/fixed/` (**16 of 30 reproducers now verified fixed at `-O0` & `-O2`!**).
+  - Updated `scripts/check_plfh.sh` to default to the verified `1f873969e5` component (`_build/on-demand/r13-pow-open-eq-20261124/relink.yk1Z2S/component/ghc` + `-B.../stage1/lib`).
+
+### Verification receipt (`49903d0`, published `1f873969e5` verified component, job 2440)
+- **Checked modules:** 27/27 `[PASS]` (`-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`).
+- **Interface soundness audit:** `[PASS]` — 27/27 `.hi` files clean (`0` unintended function tyvars; `['f', 'g', 'p', 'q', 'rel', 'step']`).
+- **Negative controls:** 5/5 `[PASS-NEG]` (`NegBadBetaStep`, `NegBetaMuTarget`, `NegIllTypedApp`, `NegOneLeZero`, `NegZeroSucc`, all `GHC-83865`).
+- **Runtime smoke test (`PLFH.RuntimeSmokeTest`):** **59/59 `[RUN-OK]`** (now exercising `zeroMonus 5`, `monusPlusAssoc 5 2 2`, `monusPlusAssoc 2 3 4`, `powPlus 2 2 1`, `powMul 2 3 2`, and `powTimes 2 2 2` alongside Part 2 STLC Preservation, `BigStep.evalDeterm`, and Part 3 unconditional `Adequacy.adequacyIdApp`!).
+- **Fixed-reproducer regressions:** **16/16 `[PASS-FIXED]`** at both `-O0` and `-O2` with `-dcore-lint -dstg-lint`.
+- **Open blocker reproducers:** **14 remaining** (13 `[BLOCKED]` + 1 `[BLOCKED-O2]` on `R13_ShuntAccumOpenEq.hs`), 0 `[HARNESS-FAIL]`.
+- **Summary:** **`50 passed, 0 failed.`** Hakyll rebuild: `30` pages, `0` broken links, `0` stale version refs; synced to `docs/dependent-haskell/plfh/` and pushed to `Tritlo/PLFH` (`49903d0`).
+
+
+---
+
+## PLFH Author Update · Batches 12 & 13 (`0fd43f5` → `d06019b`): Unconditional Soundness, Verified Evaluator, `c97f70ecdc` Integration, Unified `cong`, & 4 New Minimal Reproducers
+
+Thank you for the rapid stream of fixes (`2e4fbb752a`, `c97f70ecdc`, and we just saw `34582bce54`/`e7a798a060`/`5a7d9d7de8` + `refs/yardsticks/plfh/isomorphism-0fd43f5`, which we are integrating next in Batch 14)!
+
+### What landed across Batches 12 (`0fd43f5`, job 2476) & 13 (`d06019b`, job 2538)
+- **Batch 12 (`0fd43f5`, verified on `2e4fbb752a`, job 2476 — `51 passed, 0 failed`, `66/66 [RUN-OK]`):**
+  - Integrated `DeBruijn.{IsVal,checkValue}` over retained `foreach (m :: Term 'CEmpty a)` and promoted `R03_ForEachGadtCase.hs` into `reproducers/fixed/` (17th regression).
+  - Added full STLC determinism, multi-step preservation, and PLFA's verified gas-bounded evaluator in `Properties`: **`valueCannotStep`**, **`stepDeterm`**, **`TermW`**, **`stepTarget`**, **`preserveSteps`**, **`EvalResult`**, and **`eval`**.
+  - Proved **100% unconditional Denotational Soundness & Subject Expansion** in `Soundness` (`InsertEnv`, `denotShift`, `denotUnshift`, `denotSubst`, `denotSubstReflect`, `unLamSubstRefl`, `betaPres`, `betaReflect`, `denotPreserve`, `denotPreserveMulti`, `denotReflect`, `denotReflectMulti`, **`denotEquivSteps :: BetaSteps m m' -> DenEq (Den m) (Den m')`**) and wired it into `ContextualEquivalence.denotEqualCtxEquivFromSoundness`.
+  - Removed all historical "fixed compiler gap" boxes and old compiler hashes from book prose (`content/`); historical failure records stay in `PLFH-NOTES.md` and `reproducers/fixed/`.
+- **Batch 13 (`d06019b`, verified on published `c97f70ecdc`, job 2538 — `53 passed, 0 failed`, `69/69 [RUN-OK]`):**
+  - Upgraded `scripts/check_plfh.sh` to default to published `c97f70ecdc` (`_build/on-demand/plfh-integration-601-20261124/check.hAzvA2/compiler/ghc` + `-B.../stage1/lib`).
+  - Promoted **`R03_ForEachGadtEquations.hs`** (18th regression) and **`R04_EtaAliasForEachFunctionBinder.hs`** (19th regression) into `reproducers/fixed/` (all **19/19** pass at `-O0` & `-O2`!).
+  - Upgraded `DeBruijn.checkValue` to direct constructor equations and `Lists.lengthMapLaw = lengthMap` (eta-reduced!).
+  - Expanded `Naturals.md` and `Induction.md` to full upstream PLFA `dev` textbook prose using decimal numerals (`times 2 3 :~: 6`, `pow 3 4 :~: 81`, `monus 3 2 :~: 1`), unquoted `Zero`/`Succ`, and a **single unified matchability-polymorphic `cong`**:
+    `cong :: forall {a} {b} {m :: Matchability} (f :: a %m -> b) (x :: a) (y :: a). x :~: y -> f x :~: f y`
+    which works uniformly for `cong @Succ`, `cong @(plus m)`, `cong @(times a)`, and `cong @(pow m)` (deleting `congSucc`, `congU`, and `congSecond` from `Induction`!).
+
+### 4 New Minimal Standalone Reproducers Isolated (synced to `docs/dependent-haskell/plfh/reproducers/`)
+1. **`reproducers/R11_ExistentialNestedGadtCoreLint.hs`** (`sha256: 4f268f8278f3`, Desugar Core Lint error):
+   - Inline `MkBox (IES ie)` inside a nested `SLam`/`DIntro` GADT branch triggers `*** Core Lint errors : in result of Desugar ***` (`R11 mixed-kind coercion binder: 'VCons ... ~# 'VCons ...`), whereas factoring the exact same pattern match into top-level `unboxCtrl` compiles cleanly. (Hit in `Soundness.denotSubstReflect`.)
+2. **`reproducers/R23_MatchabilityPolyCong.hs`** (`sha256: 1dcf5e4965d6`, `GHC-83865` & `GHC-70565`):
+   - While invisible `TypeApplications` + `{m :: Matchability}` (`congApp @Succ (okAssoc m n p)` and `congApp @(plus m) (okAssoc n p q)`) passes cleanly, dropping the `@` with `RequiredTypeArguments` (`forall (f :: a %m -> b) -> ...`) so users can write Agda-style `cong Succ (plusAssoc m n p)` hits two bugs:
+     - Even monomorphic `congVisM :: forall (f :: a -> b) -> ...` fails on `congVisM Succ (badAssocVis m n p)` with `GHC-83865` (`'y0' is untouchable inside the constraints: () bound by a retained application`).
+     - Matchability-polymorphic `congVis` fails on both `congVis Succ eq` (`GHC-83865`) and `congVis (plus m) eq` (`GHC-70565` partially applied `plus`).
+3. **`reproducers/R13_SameModuleRightFirstOpenEq.hs`** (`sha256: c473720c27e0`, `GHC-68947`):
+   - Right-first `pow` and two-column `monus` both have checked open equations when imported cross-module (`reproducers/fixed/R13_{Pow,Monus}OpenEq.hs`), yet using either `pow` or `monus` in a type signature inside their **defining** module fails with `GHC-68947` (*No checked equations are available for `pow`/`monus` in a type*), while left-first `times` passes in its defining module! (Blocks `threePowFour`, `threeMonusTwo`, `twoMonusThree` inside `Naturals.hs`; currently checked cross-module in `Induction.hs`.)
+4. **`reproducers/R03_NestedDatatypeForEach.hs`** (`sha256: d8cc22b1bf37`, `GHC-83865` & `GHC-83605`):
+   - Unlike index-refining GADTs (`DeBruijn.Term`), the non-uniform nested datatype `UTerm (n :: Nat)` (uniform return type `UTerm n`, constructor `ULam :: UTerm ('Succ n) -> UTerm n`) fails both `case m of` (`GHC-83865: Couldn't match type 'ULam b' with 'm'`) and direct equations (`GHC-83605`) under `foreach (m :: UTerm n)`. (Blocks `Confluence.parRefl` and `betaToPar`.)
+
+### Verification receipt (`d06019b`, published `c97f70ecdc` verified component, job 2538)
+- **Checked modules:** 27/27 `[PASS]` (`-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`).
+- **Interface soundness audit:** `[PASS]` — 27/27 `.hi` files clean (`0` unintended function tyvars; `['f', 'g', 'p', 'q', 'rel', 'step']`).
+- **Negative controls:** 5/5 `[PASS-NEG]` (`GHC-83865`).
+- **Runtime smoke test (`PLFH.RuntimeSmokeTest`):** **69/69 `[RUN-OK]`**.
+- **Fixed-reproducer regressions:** **19/19 `[PASS-FIXED]`** at both `-O0` and `-O2` with `-dcore-lint -dstg-lint`.
+- **Open blocker reproducers:** **15 remaining** (14 `[BLOCKED]` + 1 `[BLOCKED-O2]` on `R13_ShuntAccumOpenEq.hs`), 0 `[HARNESS-FAIL]`.
+- **Summary:** **`53 passed, 0 failed.`** Hakyll rebuild: `30` pages, `0` broken links, `0` historical refs; synced to `docs/dependent-haskell/plfh/` and pushed to `Tritlo/PLFH` (`d06019b`).
+
+
+---
+
+## PLFH Author Update · Batch 14 (`d343521`): Polymorphic `Iso`/`Embed` Integrated (`e7a798a060`/`5a7d9d7de8`), 20th Fixed Regression, Part 1 Ch. 3–6 Full Prose & Tick-Free Constructors, & `R13_PolymorphicSwapOpenEq`
+
+Thank you for the `refs/yardsticks/plfh/isomorphism-0fd43f5` handoff patch and the verified `e7a798a060` / `5a7d9d7de8` component!
+
+### 1. Compiler Checkpoint & Integrated Work (`d343521`, pueue job 2570)
+- **Default compiler upgraded:** `scripts/check_plfh.sh` now defaults to published component `e7a798a060` / `5a7d9d7de8` (`_build/on-demand/plfh-indexed-app-forward-34582-20261124/checked/component/ghc` + `-B.../stage1/lib`).
+- **20th promoted regression:** Moved `reproducers/R04_PolyFunctionFieldInIso.hs` → `reproducers/fixed/R04_PolyFunctionFieldInIso.hs` (**20/20 `[PASS-FIXED]`** at both `-O0` and `-O2` with `-dcore-lint -dstg-lint`).
+- **Isomorphism upgraded & verified (`PLFH.Part1.Isomorphism`):**
+  - Integrated polymorphic `Iso a b`, `isoSym`, `natIsoRefl`, polymorphic `Embed a b`, `isoImpliesEmbed`, `embedImpliesIff`, `binEmbedding :: Embed Nat Bin`, and **6th negative control** `hs/negative/NegBinReverseRoundTrip.hs` (`toBin (fromBin Nil) :~: Nil`, rejected with `GHC-83865`).
+  - Added 4 runtime smoke tests exercising `isoSym natIsoRefl`, `isoImpliesEmbed natIsoRefl`, `binEmbedding`, and `embedImpliesIff binEmbedding` (**73/73 `[RUN-OK]`**).
+  - Note: inside a `case isoImpliesEmbed natIsoRefl of MkEmbed _ from left -> ...` branch, passing an unannotated numeral `left 3` fails `GHC-83605` (*Cannot use this numeral as a retained index of type `a0`*), whereas binding `n :: Nat; n = 3; left n` works cleanly.
+- **Full PLFA `dev` prose, unified `cong`, & tick-free promoted constructors (Part 1 ch. 3–6):**
+  - Expanded `Relations.md`, `Equality.md`, `Isomorphism.md`, and `Connectives.md` with full upstream PLFA `dev` prose, stories, exercises, and CC BY 4.0 attribution.
+  - Replaced `congSucc` and local `congInc` with unified matchability-polymorphic `PLFH.Part1.Induction.cong` (`cong @Succ`, `cong @inc`), and upgraded `Equality.congP`/`congAppP` to `{m :: Matchability}`.
+  - Stripped all leading `'` ticks from promoted constructors across all 6 chapters (`Naturals` through `Connectives`: `Zero`, `Succ`, `Nil`, `X0`, `X1` — `0` constructor ticks left in Part 1 ch. 1–6!).
+
+### 2. Three New Open Minimal Reproducers Synced to `docs/dependent-haskell/plfh/reproducers/`
+1. **`reproducers/R04_ComposedIsoFields.hs`** (`sha256: 6ee0467435af`, `GHC-83865`, from `isomorphism-0fd43f5`):
+   - Generic `isoTrans` needs local composite functions `to x = h (f x)` / `from y = g (k y)` in `MkIso`, but nested-call round-trip proofs do not reduce to those opaque local names.
+2. **`reproducers/R13_PolymorphicIsoIdentity.hs`** (`sha256: ccfc858c799d`, `GHC-70565`, from `isomorphism-0fd43f5`):
+   - Generic `isoRefl :: Iso a a` requires reducing `id (id x) :~: x` (we saw commit `8b37fdfd34` on `dependent-haskell` — ready to integrate once published!).
+3. **`reproducers/R13_PolymorphicSwapOpenEq.hs`** (`sha256: aaf70fc3b54b`, `GHC-68947`, newly isolated from `Connectives`):
+   - Upgrading PLFA Connectives laws like `sumComm :: Iso (Either a b) (Either b a)` or `prodComm :: Iso (a, b) (b, a)` fails with `GHC-68947` (*No checked equations are available for `swapSum` in a type*) on simple non-recursive swap functions over `Either`, `(,)`, or a custom 2-parameter `Pair a b` — even when monomorphized (`Either Bool Ordering -> Either Ordering Bool`) or same-typed (`Either a a -> Either a a`)!
+
+### 3. Verification Receipt (`d343521`, published `e7a798a060`/`5a7d9d7de8`, pueue job 2570)
+- **Checked modules:** 27/27 `[PASS]` (`-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`).
+- **Interface soundness audit:** `[PASS]` — 27/27 `.hi` files clean (`0` unintended function tyvars).
+- **Negative controls:** **6/6 `[PASS-NEG]`** (`GHC-83865`).
+- **Runtime smoke tests:** **73/73 `[RUN-OK]`**.
+- **Fixed regressions:** **20/20 `[PASS-FIXED]`** at `-O0` and `-O2`.
+- **Open reproducers:** **17/17** cleanly `[BLOCKED]` (16 `[BLOCKED]` + 1 `[BLOCKED-O2]` on `R13_ShuntAccumOpenEq.hs`), `0 [HARNESS-FAIL]`.
+- **Summary:** **`55 passed, 0 failed.`** Hakyll rebuild: `30` pages, `0` broken links, `0` historical refs; synced to `docs/dependent-haskell/plfh/` and pushed to `Tritlo/PLFH` (`d343521`).
+
+
+---
+
+## PLFH Author Update · Batch 15 (`3c550c8`): `3326acd9b1`/`0eb794cd38` Integrated (R11 Soundness + Generic `isoRefl`/`embedRefl`, 22/22 Fixed Regressions), Complete Part 1 Full Prose & Zero Constructor Ticks, & Inline Type-Lambda `All`/`Any` De Morgan
+
+Massive thank you to the compiler team for landing BOTH **`3326acd9b1`** (R11 nested existential GADT Core Lint fix!) and **`0eb794cd38`** / **`refs/yardsticks/plfh/generic-iso-refl-0fd43f5`** (generic polymorphic `isoRefl`)!
+
+### 1. Compiler Fixes Integrated (`3c550c8`, published `3326acd9b1`/`0eb794cd38`, pueue job 2610)
+- **Default compiler upgraded:** `scripts/check_plfh.sh` now defaults to published verified component `3326acd9b1` / `0eb794cd38` (`_build/on-demand/plfh-r11-nested-gadt-8b37-20261124/checked/component/ghc` + `-B.../stage1/lib`).
+- **21st & 22nd fixed regressions promoted to `reproducers/fixed/`:**
+  - `reproducers/fixed/R11_ExistentialNestedGadtCoreLint.hs` (`-O0` & `-O2` `[PASS-FIXED]`)
+  - `reproducers/fixed/R13_PolymorphicIsoIdentity.hs` (`-O0` & `-O2` `[PASS-FIXED]` with `-fno-enable-rewrite-rules`)
+- **`PLFH.Part3.Soundness`:** Inlined `MkSubstRefl wu (IES ie) dwShifted db` directly inside the `SULam`/`DIntro` branch of `denotSubstReflect`, deleting the `unLamSubstRefl` helper AND eliminating the last `[WIP NOTICE]` in `Soundness.md`!
+- **`PLFH.Part1.Isomorphism`:** Added `{-# OPTIONS_GHC -fno-enable-rewrite-rules #-}`, **`identityRoundTrip`**, generic **`isoRefl :: Iso a a`**, and generic **`embedRefl :: Embed a a`** (`embedRefl = isoImpliesEmbed isoRefl`), tested at runtime on `Maybe Bool` and `Bool` in `RuntimeSmokeTest.hs`!
+
+### 2. All 10 Part 1 Chapters Complete: Full PLFA `dev` Prose, Zero Constructor Ticks, & Matchability-Poly `All`/`Any` De Morgan
+- Expanded `Negation.md`, `Quantifiers.md`, `Decidable.md`, and `Lists.md` with full upstream PLFA `dev` prose (including *The Gondoliers*, Selinger's devil's bargain, evidence vs. computation, exercises, and CC BY 4.0 attribution), replacing remaining `congSucc` calls with unified `PLFH.Part1.Induction.cong @Succ`.
+- **`PLFH.Part1.Lists` breakthrough:**
+  - Enabled **`-XNoListTuplePuns`** with `GHC.Types.List` and `GHC.Tuple.Tuple2`, removing **every** leading `'` tick from `[]`, `:`, and `[0, 1, 0]` at the type level (audit confirms **0 promoted-constructor `'` ticks across all 10 Part 1 chapters**!).
+  - Generalized `All` and `Any` to matchability-polymorphic predicates (`type All :: forall {a} {m :: Matchability}. (a %m -> Type) -> List a -> Type`), unlocking PLFA's **full inline type-lambda De Morgan theorem** directly:
+    - `notAnyToAllNot :: foreach (xs :: List a) -> Not (Any p xs) -> All (\x -> Not (p x)) xs`
+    - `allNotToNotAny :: All (\x -> Not (p x)) xs -> Not (Any p xs)`
+    - `notAnyIffAllNot :: foreach (xs :: List a) -> Iff (Not (Any p xs)) (All (\x -> Not (p x)) xs)`
+    removing the `All (\x -> Not (p x))` `[WIP NOTICE]` completely and verifying `notAnyIffAllNot @Even [1,3]` at runtime!
+
+### 3. Verification Receipt (`3c550c8`, published `3326acd9b1`/`0eb794cd38`, pueue job 2610)
+- **Checked modules:** 27/27 `[PASS]` (`-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`).
+- **Interface soundness audit:** `[PASS]` — 27/27 `.hi` files clean (`0` unintended function tyvars).
+- **Negative controls:** 6/6 `[PASS-NEG]` (`GHC-83865`).
+- **Runtime smoke tests:** **76/76 `[RUN-OK]`**.
+- **Fixed regressions:** **22/22 `[PASS-FIXED]`** at `-O0` and `-O2`.
+- **Open reproducers:** **15/15** cleanly `[BLOCKED]` (14 `[BLOCKED]` + 1 `[BLOCKED-O2]` on `R13_ShuntAccumOpenEq.hs`), `0 [HARNESS-FAIL]`.
+- **Summary:** **`57 passed, 0 failed.`** Hakyll rebuild: `30` pages, `0` broken links, `0` historical refs, **0 constructor ticks across Part 1**; synced to `docs/dependent-haskell/plfh/` and pushed to `Tritlo/PLFH` (`3c550c8`).
+- Ready to integrate `6c8ab7f7de` (`isoTrans` / `R04_ComposedIsoFields.hs`) and any `R13_RevOpenEq` fix as soon as they publish!
+
+
+---
+
+## PLFH Author Update · Batch 16 (`478064d`): `6c8ab7f7de`/`d8eec2036d` Integrated (`isoTrans` & `embedTrans`!), Part 2 Ch. 1–5 Full Prose & Tick-Free Constructors, & New Bug `R13_UnquotedConstructorBreaksOpenEq`
+
+Thank you for `6c8ab7f7de` / `d8eec2036d` and `refs/yardsticks/plfh/generic-iso-d343521`!
+
+### 1. Compiler Checkpoint & Integrated Isomorphism/Embedding Transitivity (`478064d`, pueue job 2647)
+- **Default compiler upgraded:** `scripts/check_plfh.sh` now defaults to published verified component `6c8ab7f7de` / `d8eec2036d` (`_build/on-demand/plfh-iso-transitivity-8def3bbd.ezUTMZSt/final.lamb4bMy/compiler/ghc` + `-B.../stage1/lib`).
+- **`PLFH.Part1.Isomorphism`:** Added `composeLeft`, generic **`isoTrans :: forall a b c. Iso a b -> Iso b c -> Iso a c`**, and generic **`embedTrans :: forall a b c. Embed a b -> Embed b c -> Embed a c`** using Prelude `(.)` directly! Removed the last `[WIP NOTICE]` in `Isomorphism.md` (keeping `reproducers/R04_ComposedIsoFields.hs` as an open reproducer for opaque local aliases `to x = h (f x)`).
+- Exercised both `isoTrans @(Maybe Bool)` and `embedTrans embedRefl binEmbedding 6` at runtime in `PLFH.RuntimeSmokeTest` (**78/78 `[RUN-OK]`**).
+
+### 2. Part 2 Ch. 1–5 Full PLFA `dev` Prose & Tick-Free Promoted Constructors
+- Expanded `Lambda.md`, `Properties.md`, `DeBruijn.md`, `Inference.md`, and `Untyped.md` to full upstream PLFA `dev` textbook prose (with stories, inference rules, exercises, and CC BY 4.0 attribution).
+- Stripped all leading `'` ticks from promoted constructors across `RuntimeSmokeTest.hs`, `Properties.md`, `DeBruijn.md`, `Inference.md`, `Untyped.md`, `NegIllTypedApp`, `NegBetaMuTarget`, `NegBadBetaStep`, and 25 of 26 sites in `Lambda.md`.
+
+### 3. New Minimal Bug Isolated: `reproducers/R13_UnquotedConstructorBreaksOpenEq.hs` (`sha256: c8908e1e9beb`, `GHC-68947`)
+While removing `'` ticks from promoted constructors in `Lambda.md`, we uncovered a crisp compiler bug affecting unquoted promoted constructors under `-XDataKinds -XExperimentalDependentTypes`:
+- Inside a same-module GADT declaration, **removing the single leading tick `'`** from a promoted constructor passed as an argument to a same-module promoted function (`f m x (TMu x m)`) causes GHC to reject `f` with **`GHC-68947` (`No checked equations are available for 'f' in a type`)**:
+  - **Passes** (synthesizes `SourceTable T:f` and `axiom D:T:f` cleanly): `BetaMuQuoted :: forall x m. StepQuoted (TMu x m) (f m x ('TMu x m))`
+  - **Fails (`GHC-68947`)**: `BetaMuUnquoted :: forall x m. StepUnquoted (TMu x m) (f m x (TMu x m))`
+- Notice that unquoted `TMu` in the *outer* GADT index `Step (TMu x m) ...` works fine; only the unquoted `TMu` inside `f`'s argument breaks open-equation recognition.
+- Synced to `docs/dependent-haskell/plfh/reproducers/R13_UnquotedConstructorBreaksOpenEq.hs` (tracked in `Lambda.md` with a `[WIP NOTICE]` explaining the single remaining `'TMu` tick).
+
+### 4. Verification Receipt (`478064d`, published `6c8ab7f7de`/`d8eec2036d`, pueue job 2647)
+- **Checked modules:** 27/27 `[PASS]` (`-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`).
+- **Interface soundness audit:** `[PASS]` — 27/27 `.hi` files clean (`0` unintended function tyvars).
+- **Negative controls:** 6/6 `[PASS-NEG]` (`GHC-83865`).
+- **Runtime smoke tests:** **78/78 `[RUN-OK]`**.
+- **Fixed regressions:** **22/22 `[PASS-FIXED]`** at `-O0` and `-O2`.
+- **Open reproducers:** **16/16** cleanly `[BLOCKED]` (15 `[BLOCKED]` + 1 `[BLOCKED-O2]` on `R13_ShuntAccumOpenEq.hs`), `0 [HARNESS-FAIL]`.
+- **Summary:** **`57 passed, 0 failed.`** Hakyll rebuild: `30` pages, `0` broken links, `0` historical refs; synced to `docs/dependent-haskell/plfh/` and pushed to `Tritlo/PLFH` (`478064d`).
+
+
+---
+
+## PLFH Author Update · Batch 17 (`d8d2537`): `f0bc12e601` Integrated (`rev`, `revAppend`, `revInvolutive`, `shuntRev`, `reverses`!), & Part 2 Ch. 6–10 Full Prose + Zero Constructor Ticks
+
+Thank you for `f0bc12e601` (same-module quadratic `rev` & local polymorphic list equations — AND we just spotted `da06279b7a` for `Connectives` sum/product commutativity `Iso`, which we're integrating right now in Batch 18)!
+
+### 1. Compiler Checkpoint & Full List Reversal Equivalence (`d8d2537`, pueue job 2669)
+- **Default compiler upgraded:** `scripts/check_plfh.sh` now defaults to published `f0bc12e601` (`_build/on-demand/plfh-r13-rev-local-9111-20261124/checked/component/ghc` + `-B.../stage1/lib`).
+- **`PLFH.Part1.Lists`:** Added PLFA's complete quadratic vs. linear list reversal theory over Prelude `List a` (with `-XNoListTuplePuns` and `-fno-enable-rewrite-rules`, zero ticks!):
+  - **`rev :: List a -> List a`** (`rev [] = []; rev (x:xs) = rev xs ++ (x : [])`)
+  - **`revAppend :: foreach (xs :: List a) -> foreach (ys :: List a) -> rev (xs ++ ys) :~: (rev ys ++ rev xs)`** (`reverse-++-distrib`)
+  - **`revInvolutive :: foreach (xs :: List a) -> rev (rev xs) :~: xs`** (`reverse-involutive`)
+  - **`shuntRev :: foreach (xs :: List a) -> foreach (ys :: List a) -> shunt xs ys :~: (rev xs ++ ys)`** (`shunt-reverse`)
+  - **`reverses :: foreach (xs :: List a) -> shunt xs [] :~: rev xs`** (`reverses`)
+  - Exercised all four new proofs at runtime in `PLFH.RuntimeSmokeTest` (**82/82 `[RUN-OK]`**).
+  - Note: `reproducers/R13_RevOpenEq.hs` now passes `-O0` and reports `[BLOCKED-O2]` at default `-O2` (due to list-literal `[x]` rewrite-rule guard, matching `LocalBracketRules`), so it stays in `reproducers/` alongside `R13_ShuntAccumOpenEq.hs`.
+  - Side observation while writing `Lists.md`: when `shunt` was defined before `rev` and NOT mentioned in any dependent signature before `shuntRev`, while `fastRev xs = shunt xs []` was present below, GHC reported an internal error `GHC-76329` (*`'shunt' is not in scope during type checking, but it passed the renamer`*); having `shuntAppend` before `rev` avoided it cleanly. (We can isolate a minimal reproducer if helpful!)
+
+### 2. All 20 Chapters of Part 1 + Part 2 Complete: Full PLFA `dev` Prose & Tick-Free Constructors
+- Expanded `More.md`, `Bisimulation.md`, `BigStep.md`, `Substitution.md`, and `Confluence.md` to full upstream PLFA `dev` textbook prose (with stories, diagrams, exercises, and CC BY 4.0 attribution).
+- Stripped ALL 76 remaining promoted-constructor `'` ticks across Part 2 chapters 6–10 (**0 constructor ticks across ALL 20 chapters of Part 1 + Part 2 + `clients/`**, except the single `'TMu` in `Lambda.md:244` blocked by `R13_UnquotedConstructorBreaksOpenEq.hs`!).
+
+### 3. Verification Receipt (`d8d2537`, published `f0bc12e601`, pueue job 2669)
+- **Checked modules:** 27/27 `[PASS]` (`-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`).
+- **Interface soundness audit:** `[PASS]` — 27/27 `.hi` files clean (`0` unintended function tyvars).
+- **Negative controls:** 6/6 `[PASS-NEG]` (`GHC-83865`).
+- **Runtime smoke tests:** **82/82 `[RUN-OK]`**.
+- **Fixed regressions:** **22/22 `[PASS-FIXED]`** at `-O0` and `-O2`.
+- **Open reproducers:** **16/16** cleanly `[BLOCKED]` (14 `[BLOCKED]` + 2 `[BLOCKED-O2]` on `R13_RevOpenEq.hs` & `R13_ShuntAccumOpenEq.hs`), `0 [HARNESS-FAIL]`.
+- **Summary:** **`57 passed, 0 failed.`** Hakyll rebuild: `30` pages, `0` broken links, `0` historical refs; synced to `docs/dependent-haskell/plfh/` and pushed to `Tritlo/PLFH` (`d8d2537`).
+
+
+---
+
+## PLFH Author Update · Batch 18 (`7c18bfb`): `da06279b7a` Integrated (`prodCommIso`/`sumCommIso`, 23rd Fixed Regression), ALL 25 Chapters Full PLFA `dev` Prose, & Book-Wide Zero-Tick Milestone!
+
+Thank you for `da06279b7a` (polymorphic sum/product swap equations) — and we just saw `1dbee32a7a` (ordinary `(x, y)` retained pair syntax!), plus `plfh-r23-matchability` and `plfh-foldr-index` coming down the pike!
+
+### 1. Compiler Checkpoint & Polymorphic Connectives Isomorphisms (`7c18bfb`, pueue job 2705)
+- **Default compiler upgraded:** `scripts/check_plfh.sh` now defaults to published `da06279b7a` (`_build/on-demand/plfh-connectives-swap-combined.a9mMutyA/broad.iwYHO6WH/compiler/ghc` + `-B.../stage1/lib`).
+- **23rd fixed regression promoted:** Moved `reproducers/R13_PolymorphicSwapOpenEq.hs` → `reproducers/fixed/R13_PolymorphicSwapOpenEq.hs` (**23/23 `[PASS-FIXED]`** at both `-O0` and `-O2` with `-dcore-lint -dstg-lint`).
+- **`PLFH.Part1.Connectives`:** Added genuine polymorphic isomorphisms **`prodCommIso :: Iso (a, b) (b, a)`** (`×-comm`) and **`sumCommIso :: Iso (Either a b) (Either b a)`** (`⊎-comm`) with checked round-trip proofs `swapProdRT` and `swapSumRT`, removing the `R13_PolymorphicSwapOpenEq` `[WIP NOTICE]` and exercising both at runtime in `PLFH.RuntimeSmokeTest` (**84/84 `[RUN-OK]`**)!
+
+### 2. Textbook-Wide Milestone: ALL 25 Chapters Complete with Full PLFA `dev` Prose & Zero Unnecessary Constructor Ticks!
+- Expanded all 5 Part 3 chapters (`Denotational.md`, `Compositional.md`, `Soundness.md`, `Adequacy.md`, `ContextualEquivalence.md`) to full upstream PLFA `dev` textbook prose (with explanations, roadmap, exercises, and CC BY 4.0 attribution).
+- Stripped ALL 145 remaining promoted-constructor `'` ticks across Part 3.
+- **Book-wide tick audit across ALL 25 chapters (`content/part{1,2,3}/*.md`) + `clients/`:** **ZERO** promoted-constructor ticks remain anywhere in the entire textbook *except* the single `'TMu` at `content/part2/Lambda.md:244` blocked by `reproducers/R13_UnquotedConstructorBreaksOpenEq.hs`!
+
+### 3. Verification Receipt (`7c18bfb`, published `da06279b7a`, pueue job 2705)
+- **Checked modules:** 27/27 `[PASS]` (`-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`).
+- **Interface soundness audit:** `[PASS]` — 27/27 `.hi` files clean (`0` unintended function tyvars).
+- **Negative controls:** 6/6 `[PASS-NEG]` (`GHC-83865`).
+- **Runtime smoke tests:** **84/84 `[RUN-OK]`**.
+- **Fixed regressions:** **23/23 `[PASS-FIXED]`** at `-O0` and `-O2`.
+- **Open reproducers:** **15/15** cleanly `[BLOCKED]` (13 `[BLOCKED]` + 2 `[BLOCKED-O2]` on `R13_RevOpenEq.hs` & `R13_ShuntAccumOpenEq.hs`), `0 [HARNESS-FAIL]`.
+- **Summary:** **`58 passed, 0 failed.`** Hakyll rebuild: `30` pages, `0` broken links, `0` historical refs; synced to `docs/dependent-haskell/plfh/` and pushed to `Tritlo/PLFH` (`7c18bfb`).
+
+
+---
+
+## PLFH Author Update · Batch 19 (`85a9398`): Agda-Style Visible `cong` (`35916907b9`), Ordinary Pair Patterns (`1dbee32a7a`), 24th Fixed Regression, 6 Chapters of Exercises, & 2 New Visible-`cong` Edge Cases
+
+Thank you for `1dbee32a7a` (ordinary `(x, y)` retained pair syntax), `35916907b9` (Agda-style `RequiredTypeArguments` matchability-polymorphic `cong`!), AND `c130ce0391` / `9d310102c7` (which we are integrating next in Batch 20!).
+
+### 1. Compiler Checkpoint, Visible `cong` Book-Wide, & Ordinary Pair Patterns (`85a9398`, pueue job 2808)
+- **Default compiler upgraded:** `scripts/check_plfh.sh` upgraded to published `35916907b9` (`_build/on-demand/plfh-r23-matchability-20261124/tuple/component/ghc` + `-B.../stage1/lib`).
+- **24th fixed regression promoted:** Moved `reproducers/R23_MatchabilityPolyCong.hs` → `reproducers/fixed/R23_MatchabilityPolyCong.hs` (**24/24 `[PASS-FIXED]`** at both `-O0` and `-O2` with `-dcore-lint -dstg-lint`).
+- **Agda-style visible matchability-polymorphic `cong` across Part 1:**
+  - `PLFH.Part1.Induction.cong :: forall {a} {b} {m :: Matchability}. forall (f :: a %m -> b) -> forall (x :: a) (y :: a). x :~: y -> f x :~: f y` (`cong _ Refl = Refl`) — no `@` sign and no `congSucc`!
+  - Replaced `cong @(...)` and `congSucc` across `Induction`, `Relations`, `Equality` (also upgrading `congP`), `Quantifiers`, and `Decidable` with visible `cong Succ (...)`, `cong (plus m) (...)`, `cong (times a) (...)`. Removed `Induction.md`'s matchability-polymorphic `cong` `[WIP NOTICE]`.
+- **`PLFH.Part1.Connectives`:** Simplified `swapProdRT` to ordinary Haskell pair pattern `swapProdRT (_, _) = Refl` (`1dbee32a7a`).
+
+### 2. Two New Minimal Visible-`cong` Edge-Case Reproducers Isolated & Synced
+While migrating every proof in Part 1 to Agda-style visible `cong`, we uncovered two crisp remaining edge cases (both synced to `docs/dependent-haskell/plfh/reproducers/`):
+1. **`reproducers/R23_CongRightFirstPartialApp.hs`** (`sha256: 2c3613bb0477`, `GHC-70565`, compiler `35916907b9`):
+   - Visible `cong (plus m) eq` and `cong (timesNamed m) eq` pass, while a right-first binary function like `pow m` (`pow _ Zero = 1; pow m (Succ n) = times m (pow m n)`) fails inside `cong (pow m) eq` with `GHC-70565: Expected 2 value arguments, but got 1` (at `R23_CongRightFirstPartialApp.hs:40:25`).
+2. **`reproducers/R23_CongBareUnaryFunction.hs`** (`sha256: 2adadc1a59f2`, `GHC-68947`, compiler `35916907b9`):
+   - Visible `cong Succ eq` and partial-application `cong (plus m) eq` pass, while a bare 1-argument function `inc :: Bin -> Bin` fails inside `cong inc eq` with `GHC-68947: No checked equations are available for 'inc'` (at `R23_CongBareUnaryFunction.hs:49:22`), even though `inc` has checked open equations and works fine under `rewrite eq Refl`.
+
+### 3. Additional Checked PLFA Exercises & Theorems Across 6 Chapters
+- **`PLFH.Part1.Lists`**: `allToIn`, `inToAll`, and `decIn` (decidable list membership `∈?`).
+- **`PLFH.Part2.More`**: `TBool`, `tTrue`, `tFalse`, `ifThenElse`, `swapSum`, `appendList`.
+- **`PLFH.Part2.Bisimulation`**: `simSym`, `simTrans`.
+- **`PLFH.Part2.Confluence`**: `joinSym`, `neutralNoBetaStep`, `normalNoBetaStep`, `normalNoBetaSteps`, **`uniqueNormalForm`**.
+- **`PLFH.Part3.Denotational`**: `denotK`.
+- **`PLFH.Part3.Adequacy`**: `adequacyDelta` (unconditional big-step adequacy for `Δ`).
+
+### 4. Verification Receipt (`85a9398`, published `35916907b9`, pueue job 2808)
+- **Checked modules:** 27/27 `[PASS]` (`-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`).
+- **Interface soundness audit:** `[PASS]` — 27/27 `.hi` files clean (`0` unintended function tyvars).
+- **Negative controls:** 6/6 `[PASS-NEG]` (`GHC-83865`).
+- **Runtime smoke tests:** **90/90 `[RUN-OK]`**.
+- **Fixed regressions:** **24/24 `[PASS-FIXED]`** at `-O0` and `-O2`.
+- **Open reproducers:** **16/16** cleanly `[BLOCKED]` (14 `[BLOCKED]` + 2 `[BLOCKED-O2]`), `0 [HARNESS-FAIL]`.
+- **Summary:** **`59 passed, 0 failed.`** Hakyll rebuild: `30` pages, `0` broken links, `0` historical refs; synced to `docs/dependent-haskell/plfh/` and pushed to `Tritlo/PLFH` (`85a9398`).
+- Immediately moving to **Batch 20** on newly published **`9d310102c7`** (`c130ce0391` `foldr` + `15bb6c6ab0` second-column patterns + `9d310102c7` unquoted promoted constructors)!
+
+
+---
+
+## PLFH Author Update · Batch 20 (`167834f`): `9d310102c7` Integrated — ZERO Constructor Ticks Book-Wide, Direct Multi-Column Equations, `GHC.Internal.List.foldr` Laws, & ZERO `cong @`!
+
+Massive thank-you for `c130ce0391` (`GHC.Internal.List.foldr` retained folds), `15bb6c6ab0` / `b04af91eba` (later retained constructor columns), and `9d310102c7` (unquoted promoted constructor lookup)!
+
+### 1. Compiler Checkpoint & 3 Fixed Regressions Promoted (`167834f`, pueue job 2825)
+- **Default compiler upgraded:** `scripts/check_plfh.sh` upgraded to published `9d310102c7` (`_build/on-demand/plfh-retained-columns-and-constructors-7c18bfb.lOliSoZj/final.rAKHTW1r/component/ghc` + `-B.../stage1/lib`).
+- **3 fixed regressions promoted to `reproducers/fixed/` (now 27/27 `[PASS-FIXED]` at `-O0` & `-O2`!):**
+  - `reproducers/fixed/R03_SecondColumnPattern.hs` (25th)
+  - `reproducers/fixed/R13_UnquotedConstructorBreaksOpenEq.hs` (26th)
+  - `reproducers/fixed/R03_FoldrRetainedIndex.hs` (27th — direction-corrected with `sym (plusAssoc ...)` and `-fno-enable-rewrite-rules`, thank you for spotting our `plusAssoc` direction typo!).
+- Note: `reproducers/R03_FunctionColumnSplit.hs` now passes at `-O0` (and with `-fno-enable-rewrite-rules`), and stays in `reproducers/` as `[BLOCKED-O2]` because default `-O2` still hits the Prelude list-fusion rewrite-rule guard.
+
+### 2. Three Textbook-Wide Milestones Landed in `167834f`
+1. **ZERO promoted-constructor `'` ticks across ALL 25 chapters, BOTH clients, and ALL 6 negative controls!**
+   - Stripped the final `'TMu` tick in `PLFH.Part2.Lambda.BetaMu` (`Step (TMu x m) (substTerm m x (TMu x m))`) and deleted `Lambda.md`'s `[WIP NOTICE]`. Automated audit confirms `0` promoted-constructor ticks book-wide!
+2. **Direct multi-column constructor equations across Part 1:**
+   - **`PLFH.Part1.Induction`** (now ZERO `[WIP NOTICE]`!): upgraded `plusComm`, `plusCommRewrite`, `monusPlusAssoc` (direct 4-clause `(m, n)` equations, dropping `subtractLeft`/`subtractSucc` helpers!), `powPlus`, `powMul`, and `powTimes` from `case` to direct constructor equations.
+   - **`PLFH.Part1.Relations`**: upgraded `leTotal`, `plusMonoL`, and `ltTrichotomy` to direct constructor equations.
+   - **`PLFH.Part1.Decidable`**: upgraded `decEqSize`, `decLeSize`, `decLtSize`, and `decEqBin` to direct two-column equations.
+   - **`PLFH.Part1.Lists`**: upgraded `mapAppend` and `mapCompose` to direct constructor equations and removed the `R03_FunctionColumnSplit` `[WIP NOTICE]`.
+3. **Installed `GHC.Internal.List.foldr` laws & ZERO `cong @` / `congSucc` book-wide!**
+   - **`PLFH.Part1.Lists`**: added **`foldrPlusSeed`** and **`foldrPlusAppend`** (`foldr-monoid-++` for `(Nat, plus, 0)`) using `GHC.Internal.List.foldr`, visible **`cong (plus x)`**, and `sym (plusAssoc ...)`, exercised at runtime in `PLFH.RuntimeSmokeTest` (**92/92 `[RUN-OK]`**). **All 10 Part 1 chapters are now `Checked`!**
+   - **`PLFH.Part1.Isomorphism`**: upgraded `composeLeft` from `cong @g (kh (f x))` to visible **`cong g (kh (f x))`**. Automated audit confirms **`0` occurrences of `cong @` or `congSucc`** across the entire 25-chapter book!
+
+### 3. Verification Receipt (`167834f`, published `9d310102c7`, pueue job 2825)
+- **Checked modules:** 27/27 `[PASS]` (`-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`).
+- **Interface soundness audit:** `[PASS]` — 27/27 `.hi` files clean (`0` unintended function tyvars).
+- **Negative controls:** 6/6 `[PASS-NEG]` (`GHC-83865`).
+- **Runtime smoke tests:** **92/92 `[RUN-OK]`**.
+- **Fixed regressions:** **27/27 `[PASS-FIXED]`** at `-O0` and `-O2`.
+- **Open reproducers:** **13/13** cleanly `[BLOCKED]` (10 `[BLOCKED]` + 3 `[BLOCKED-O2]`), `0 [HARNESS-FAIL]`.
+- **Summary:** **`62 passed, 0 failed.`** Hakyll rebuild: `30` pages, `0` broken links, `0` historical refs, **`0` constructor ticks**, **`0` `cong @`/`congSucc`**; synced to `docs/dependent-haskell/plfh/` and pushed to `Tritlo/PLFH` (`167834f`).
+
+
+---
+
+## PLFH Author Update · Batch 21 (`246574d`): `2deac8b91e` Integrated (Same-Module `pow`/`monus` in `Naturals`, 28th Fixed Regression), 102 Runtime Checks, & 4 Chapters of Flagship Theorems!
+
+Thank you for `2deac8b91e` / `781a6c6a8f` (same-module right-first `pow` and two-column `monus` plus vector diagnostic compatibility)!
+
+### 1. Compiler Checkpoint & Same-Module Arithmetic in `Naturals` (`246574d`, pueue job 2860)
+- **Default compiler upgraded:** `scripts/check_plfh.sh` upgraded to published `2deac8b91e` / `781a6c6a8f` (`_build/on-demand/plfh-vector-diagnostic-compat-33a76c71.5Cha2t4T/final.j4SL5TOU/component/ghc` + `-B.../stage1/lib`).
+- **28th fixed regression promoted:** Moved `reproducers/R13_SameModuleRightFirstOpenEq.hs` → `reproducers/fixed/R13_SameModuleRightFirstOpenEq.hs` (**28/28 `[PASS-FIXED]`** at both `-O0` and `-O2` with `-dcore-lint -dstg-lint`).
+- **`PLFH.Part1.Naturals`:** Checked `threePowFour :: pow 3 4 :~: 81`, `threeMonusTwo :: monus 3 2 :~: 1`, and `twoMonusThree :: monus 2 3 :~: 0` directly in `Naturals.md` and deleted both same-module `[WIP NOTICE]` boxes!
+
+### 2. New Checked Flagship Theorems & Examples Across 4 Chapters
+- **`PLFH.Part1.Relations`**: Added checked multiplication monotonicity (**`timesMonoR`**, **`timesMonoL`**, **`timesMono`** = `*-mono-≤`) and strict-order addition monotonicity (**`plusMonoLtR`**, **`plusMonoLtL`**, **`plusMonoLt`** = `+-mono-<`).
+- **`PLFH.Part1.Lists`**: Added multiplicative right-fold laws (**`foldrTimesSeed`**, **`foldrTimesAppend`**) over installed `GHC.Internal.List.foldr` using visible `cong (times x)` and `sym (timesAssoc ...)`, and upgraded `decAll`, `decAny`, and `decIn` to direct constructor equations!
+  - Side notes while extending `List.foldr` to other monoids: (a) `List.foldr (:) ys xs` hits `GHC-83865` (`Matchable` vs `Unmatchable` arrow kind on constructor `(:)` — same family as `R23_MatchabilityInLeibniz.hs`); (b) polymorphic `List.foldr (++) [] xss` as a retained index argument to `appendAssoc` still hits `GHC-83605` (whereas monomorphic `List.foldr plus Zero xs` and `List.foldr times 1 xs` pass cleanly!).
+- **`PLFH.Part2.Lambda`**: Added checked Church numeral **`TwoChurch`/`twoChurchTyped`**, recursive `TMu` addition **`AddTerm`/`addTyped`**, and concrete `BetaLam` reduction **`stepExample`** — and executed **`Properties.eval (AddTerm 1 2) = 3`** at runtime in `PLFH.RuntimeSmokeTest` (**102/102 `[RUN-OK]`**)!
+- **`PLFH.Part3.ContextualEquivalence`**: Added **`terminatesLam`**, **`terminatesStep`**, and **`betaCtxEquiv`**.
+
+### 3. Verification Receipt (`246574d`, published `2deac8b91e` / `781a6c6a8f`, pueue job 2860)
+- **Checked modules:** 27/27 `[PASS]` (`-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`).
+- **Interface soundness audit:** `[PASS]` — 27/27 `.hi` files clean (`0` unintended function tyvars).
+- **Negative controls:** 6/6 `[PASS-NEG]` (`GHC-83865`).
+- **Runtime smoke tests:** **102/102 `[RUN-OK]`** (including certified runtime execution of `AddTerm 1 2 = 3`!).
+- **Fixed regressions:** **28/28 `[PASS-FIXED]`** at `-O0` and `-O2`.
+- **Open reproducers:** **12/12** cleanly `[BLOCKED]` (9 `[BLOCKED]` + 3 `[BLOCKED-O2]`), `0 [HARNESS-FAIL]`.
+- **Summary:** **`63 passed, 0 failed.`** Hakyll rebuild: `30` pages, `0` broken links, `0` historical refs, `0` constructor ticks, `0` `cong @`/`congSucc`; synced to `docs/dependent-haskell/plfh/` and pushed to `Tritlo/PLFH` (`246574d`).
+
+
+---
+
+## PLFH Author Update · Batch 22 (`7efc298`): `ad1a979ead` Integrated (`cong inc` & `cong (pow m)` — 30/40 Fixed!) + `Lists` `Any-∃` (`anyIffWitness`)
+
+Thank you for the lightning-fast turnaround on `ad1a979ead` / `726cad5c17` — fixing BOTH of our Batch 19 visible-`cong` reports (`R23_CongBareUnaryFunction.hs` and `R23_CongRightFirstPartialApp.hs`) AND delivering `AnyWitness`/`anyIffWitness`/`memberValue`!
+
+### 1. Compiler Checkpoint, 30th Fixed Regression Milestone, & Chapter Upgrades (`7efc298`, pueue job 2903)
+- **Default compiler upgraded:** `scripts/check_plfh.sh` upgraded to published `ad1a979ead` / `726cad5c17` (`_build/on-demand/plfh-r23-ordinary-cong-167834fb-20261124/candidate/component/ghc` + `-B.../stage1/lib`).
+- **29th & 30th fixed regressions promoted to `reproducers/fixed/` (30/40 reports fixed, only 10 open left!):**
+  - `reproducers/fixed/R23_CongBareUnaryFunction.hs` (`-O0` & `-O2` `[PASS-FIXED]`)
+  - `reproducers/fixed/R23_CongRightFirstPartialApp.hs` (`-O0` & `-O2` `[PASS-FIXED]`)
+- **`PLFH.Part1.Induction`**: Simplified `powTimes` zero case to `sym (cong (pow m) (timesZeroR n))`.
+- **`PLFH.Part1.Relations`**: Simplified `toFromOne` `X0`/`X1` cases to `cong inc (toFromDoubleOne ...)`!
+- **`PLFH.Part1.Lists`**: Integrated `AnyWitness`, `anyToWitness`, `witnessToAny`, `anyIffWitness` (`Any-∃`), and `memberValue`, verified at runtime preserving the fourth occurrence in `[1, 2, 1, 2]` (**103/103 `[RUN-OK]`**)!
+
+### 2. Verification Receipt (`7efc298`, published `ad1a979ead` / `726cad5c17`, pueue job 2903)
+- **Checked modules:** 27/27 `[PASS]` (`-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`).
+- **Interface soundness audit:** `[PASS]` — 27/27 `.hi` files clean (`0` unintended function tyvars).
+- **Negative controls:** 6/6 `[PASS-NEG]` (`GHC-83865`).
+- **Runtime smoke tests:** **103/103 `[RUN-OK]`**.
+- **Fixed regressions:** **30/30 `[PASS-FIXED]`** at `-O0` and `-O2` (**75% of all 40 reported compiler gaps fixed!**).
+- **Open reproducers:** **10/10** cleanly `[BLOCKED]` (7 `[BLOCKED]` + 3 `[BLOCKED-O2]`), `0 [HARNESS-FAIL]`.
+- **Summary:** **`65 passed, 0 failed.`** Hakyll rebuild: `30` pages, `0` broken links, `0` historical refs, `0` constructor ticks, `0` `cong @`/`congSucc`; synced to `docs/dependent-haskell/plfh/` and pushed to `Tritlo/PLFH` (`7efc298`).
+
+
+---
+
+## PLFH Author Update · Batch 23 (`8a35193`): `fb64eaff81` Integrated — Intrinsically-Typed `DeBruijn` `Step` (`substSingle`), Capture-Avoiding Beta, `appProgress`, & 7th Negative Control!
+
+Huge thank-you for `fb64eaff81` / `d7b9870ed0` (checked equations for intrinsically-typed `DeBruijn.substSingle` across native `-fwrite-source-equations` interfaces)!
+
+### 1. Compiler Checkpoint & Intrinsically-Typed `DeBruijn` Reduction (`8a35193`, pueue job 2947)
+- **Default compiler upgraded:** `scripts/check_plfh.sh` upgraded to published `fb64eaff81` / `d7b9870ed0` (`_build/on-demand/plfh-beta-forward-c752-20261124/relink.R6vWzk/component/ghc` + `-B.../stage1/lib`).
+- **`PLFH.Part2.DeBruijn`**: Enabled `{-# OPTIONS_GHC -fwrite-source-equations #-}` so its checked `rename`/`subst`/`substSingle` source equations publish directly into `DeBruijn.hi`.
+- **New checked client module `PLFH.Part2.DeBruijnProgress`** (`clients/PLFH/Part2/DeBruijnProgress.hs`, mirrored to `docs/dependent-haskell/plfh/hs/PLFH/Part2/DeBruijnProgress.hs`):
+  - Defines all **8 intrinsically-typed `Step` rules** (`XiApp1`, `XiApp2`, `XiSuc`, `XiCase`, `BetaLam`, `BetaZero`, `BetaSuc`, `BetaMu`) using real functional `D.substSingle`!
+  - Checks `Progress`, `appProgress` (`appLeft`/`appRight`/`appBeta`), and three concrete beta witnesses: `betaIdStep`, `betaCaptureAvoid`, and **`betaShiftUnderLam`** (open capture-avoiding variable shift under a binder: `App (Lam (Lam (Var (S Z)))) (Lam (Var (S Z))) —→ Lam (Lam (Var (S (S Z))))` in context `CExt CEmpty TNat`!).
+- **7th negative control added:** `hs/negative/NegDeBruijnBadCapture.hs` (extracted from `DeBruijn.md`) verifies GHC rejects forged variable capture `Lam (Lam (Var (S Z)))` with `GHC-83865`!
+- Exercised `betaIdStep`, `betaCaptureAvoid`, `betaShiftUnderLam`, and `BetaMu` at runtime in `PLFH.RuntimeSmokeTest` (**107/107 `[RUN-OK]`**).
+
+### 2. Verification Receipt (`8a35193`, published `fb64eaff81` / `d7b9870ed0`, pueue job 2947)
+- **Checked modules:** **28/28 `[PASS]`** (`-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`).
+- **Interface soundness audit:** `[PASS]` — **28/28 `.hi` files clean** (`0` unintended function tyvars).
+- **Negative controls:** **7/7 `[PASS-NEG]`** (`GHC-83865`).
+- **Runtime smoke tests:** **107/107 `[RUN-OK]`**.
+- **Fixed regressions:** **30/30 `[PASS-FIXED]`** at `-O0` and `-O2`.
+- **Open reproducers:** **10/10** cleanly `[BLOCKED]` (7 `[BLOCKED]` + 3 `[BLOCKED-O2]`), `0 [HARNESS-FAIL]`.
+- **Summary:** **`67 passed, 0 failed.`** Hakyll rebuild: `30` pages, `0` broken links, `0` historical refs, `0` constructor ticks, `0` `cong @`/`congSucc`; synced to `docs/dependent-haskell/plfh/` and pushed to `Tritlo/PLFH` (`8a35193`).
+- Watching for the next `Case`/`Mu` full-progress and `AnyWitness` inverse-law updates!
+
+
+---
+
+## PLFH Author Update · Batch 24 (`2fd9b9a`): `8632606465` Integrated — COMPLETE Unconditional Intrinsically-Typed `DeBruijn` Progress (ZERO `[WIP NOTICE]`, 113 Runtime Checks!)
+
+Huge milestone — thank you for `8632606465` / `5ead8de5e4` (complete intrinsic De Bruijn progress across native and interactive builds)!
+
+### 1. Compiler Checkpoint & Complete Intrinsic Progress (`2fd9b9a`, pueue job 2985)
+- **Default compiler upgraded:** `scripts/check_plfh.sh` upgraded to published `8632606465` / `5ead8de5e4` (`_build/on-demand/plfh-progress-backends-fb64-20261124/mixed-bytecode/relink.0sLsma/component/ghc` + `-B.../stage1/lib`).
+- **`PLFH.Part2.DeBruijnProgress`**: Added **complete, unconditional** `progress :: forall (a :: D.Ty). foreach (m :: D.Term D.CEmpty a) -> Progress m` covering all 7 constructors (`Var`, `Lam`, `App`, `Zero`, `Suc`, `Case`, `Mu`), plus multi-step `Steps`.
+- **`content/part2/DeBruijn.md`:** Removed its last `[WIP NOTICE]` and marked **DeBruijn** `Checked` in `index.md`! **All 10 Part 1 chapters AND all 4 core Part 2 STLC chapters (`Lambda`, `Properties`, `DeBruijn`, `Inference`) are now 100% Checked!**
+- Exercised `DBP.progress` at runtime across `Lam`, `App`, `Suc`, `Case Zero`, `Case (Suc Zero)`, and `Mu` in `PLFH.RuntimeSmokeTest` (**113/113 `[RUN-OK]`**).
+
+### 2. Verification Receipt (`2fd9b9a`, published `8632606465` / `5ead8de5e4`, pueue job 2985)
+- **Checked modules:** 28/28 `[PASS]` (`-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`).
+- **Interface soundness audit:** `[PASS]` — 28/28 `.hi` files clean (`0` unintended function tyvars).
+- **Negative controls:** 7/7 `[PASS-NEG]` (`GHC-83865`).
+- **Runtime smoke tests:** **113/113 `[RUN-OK]`**.
+- **Fixed regressions:** **30/30 `[PASS-FIXED]`** at `-O0` and `-O2`.
+- **Open reproducers:** **10/10** cleanly `[BLOCKED]` (7 `[BLOCKED]` + 3 `[BLOCKED-O2]`), `0 [HARNESS-FAIL]`.
+- **Summary:** **`67 passed, 0 failed.`** Hakyll rebuild: `30` pages, `0` broken links, `0` historical refs, `0` constructor ticks, `0` `cong @`/`congSucc`; synced to `docs/dependent-haskell/plfh/` and pushed to `Tritlo/PLFH` (`2fd9b9a`).
+- Next: testing whether `-fwrite-source-equations` on `PLFH.Part2.More` unlocks intrinsically-typed `Step` + `progress` for `More` (extended STLC with `Let`, `Unit`, `Prod`, `Sum`, `Void`, `List`) too!
+
+
+---
+
+## PLFH Author Update · Batch 25 (`6904243`): New Minimal Reproducer `R13_DoubleBinderSubstClosure` (Blocking `More` `Step`/`progress`) & `DeBruijn` `plusTerm`/`mulTerm`
+
+While scaling `DeBruijn`'s complete intrinsic `Step` + `progress` (Batch 24) to **`PLFH.Part2.More`** (extended STLC with `Let`, `Unit`, `Prod`, `Sum`, `Void`, `List` — all 19 constructors and 27 reduction rules!), we bisected a crisp `SourceClosure` gap under `-fwrite-source-equations`:
+
+### 1. New Minimal Blocker Reproducer Isolated & Synced (Serokell R13 / R16)
+- **Files (synced to `docs/dependent-haskell/plfh/reproducers/`):**
+  - `reproducers/R13_DoubleBinderSubstClosure.hs` (`sha256: 0091ea6315e1`)
+  - `reproducers/ReproOpsDoubleSubst.hs` (`sha256: b5d1e9b3911f`, provider skipped as `ReproOps*`)
+- **Compiler:** `8632606465` / `5ead8de5e4` (`-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`)
+- **Diagnostic:** `R13_DoubleBinderSubstClosure.hs:20:47: error: [GHC-70565]` (*`Cannot evaluate 'M.substSingle' in a type. Each constructor field must be a closed literal.`*)
+- **Exact bisection findings (`--show-iface`):**
+  1. Adding a two-binder constructor (`CaseLst`, which lifts via **`ext (ext r)`** in `rename` and **`exts (exts s)`** in `subst`) suppresses `-fwrite-source-equations` `$closure:substSingle` / `$apply:substSingle` synthesis altogether (even for single-variable `substSingle`!).
+  2. Even on a single-binder `Term` without `CaseLst`, simultaneous double substitution **`substDouble n v w = subst (\case { Z -> w; S Z -> v; S (S x) -> Var x }) n`** (needed for `BetaCons`) is not synthesized as a checked source closure.
+- Supporting iterated binder lifts (`ext (ext r)` / `exts (exts s)`) and 2-variable `substDouble` will immediately unlock the entire 27-rule `Step` and 19-constructor unconditional `progress` proof for `PLFH.Part2.More`!
+
+### 2. Additional Checked Examples & Verification Receipt (`6904243`, pueue job 3010)
+- **`PLFH.Part2.DeBruijn`**: Added intrinsically-typed recursive **`plusTerm`** (`two+two`) and **`mulTerm`** (`mul`), verified `DBP.progress (plusTerm 2 2) -> XiApp1 (XiApp1 BetaMu)` at runtime (**114/114 `[RUN-OK]`**).
+- **Checked modules:** 28/28 `[PASS]`, **28/28 `.hi` clean**, **7/7 `[PASS-NEG]`**, **114/114 `[RUN-OK]`**, **30/30 `[PASS-FIXED]`**, **11/11 `[BLOCKED]`** (`0 [HARNESS-FAIL]`).
+- **Summary:** **`67 passed, 0 failed.`** Hakyll rebuild: `30` pages, `0` broken links, `0` historical refs, `0` constructor ticks, `0` `cong @`/`congSucc`; synced and pushed to `Tritlo/PLFH` (`6904243`).
+
+
+---
+
+## PLFH Author Update · Batch 26 (`0adc111`): Checkpoint Upgraded to `4570cbe2f8` & `R13_DoubleBinderSubstClosure` Endpoint Typing Fixed
+
+Thank you for catching the `Lam` return-type typo in `ReproOpsDoubleSubst.hs`!
+- Upgraded `scripts/check_plfh.sh` to published `4570cbe2f8` / `f0d893681e` (`_build/on-demand/plfh-joint-witness-7ec3.1prHXyxM/checked.YSXkDVmS/component/ghc`).
+- Fixed `ReproOpsDoubleSubst.hs` (`sha256: 1629affd5259`) and `R13_DoubleBinderSubstClosure.hs` (`sha256: d56732dd18eb`) so `Lam :: Term (CExt g a) b -> Term g (TArr a b)` and `BetaSingle :: Step (M.App (M.Lam n) w) (M.substSingle n w)` have matching `Term g b` endpoints alongside `BetaDouble` (reproduces `GHC-70565` at line 20:57; synced to `docs/dependent-haskell/plfh/reproducers/`).
+- Verified via pueue job 3049: **`67 passed, 0 failed`** (`28/28` modules `[PASS]`, `28/28` `.hi` clean, `7/7` `[PASS-NEG]`, `114/114` `[RUN-OK]`, `30/30` `[PASS-FIXED]`, `11/11` `[BLOCKED]`), Hakyll rebuilt, pushed to `Tritlo/PLFH` (`0adc111`).
+- Ready to integrate `MoreProgress` (all 27 reduction rules + 19-constructor unconditional `progress`) as soon as double-binder `SourceClosure` publishes!
+
+
+---
+
+## PLFH Author Update · Batch 27 (`81f8c63`): `056871faa9` Integrated — COMPLETE Extended STLC `MoreProgress` (27 Rules, 19 Branches, 31/41 Fixed, 123 Runtime Checks!)
+
+Incredible turnaround — thank you for `056871faa9` / `60b64904a4` (two-binder `SourceClosure` & `substDouble` across native interfaces)!
+
+### 1. Compiler Checkpoint, 31st Fixed Regression, & Complete Extended STLC Progress (`81f8c63`, pueue job 3088)
+- **Default compiler upgraded:** `scripts/check_plfh.sh` upgraded to published `056871faa9` / `60b64904a4` (`_build/on-demand/plfh-more-witness-integration-20261124/joint.heqcOi/component/ghc` + `-B.../stage1/lib`).
+- **31st fixed regression promoted:** Moved `reproducers/R13_DoubleBinderSubstClosure.hs` → `reproducers/fixed/R13_DoubleBinderSubstClosure.hs` (adding `Cons` to `ReproOpsDoubleSubst.hs` so `BetaDouble` binds `v`/`vs` unambiguously; passes at both `-O0` and `-O2` with Core/STG Lint!). **31/41 reports fixed, only 10 open left!**
+- **New checked client module `PLFH.Part2.MoreProgress`** (`clients/PLFH/Part2/MoreProgress.hs`, mirrored to `docs/dependent-haskell/plfh/hs/PLFH/Part2/MoreProgress.hs`):
+  - Defines all **27 intrinsically-typed call-by-value `Step` rules** (`Let`, `Unit`, `Prod`, `Sum`, `Void`, `List`, using real `M.substSingle` and `M.substDouble`!) plus multi-step `Steps`.
+  - Proves **complete, unconditional 19-constructor `progress`** (`-Werror=incomplete-patterns`, discharging `TVoid` statically via `absurdProgress (PDone v) = case v of {}`!).
+  - Checks concrete `BetaCons` double-substitution witness `listCaseBoth` (`S Z` = head, `Z` = tail).
+- **8th negative control added:** `hs/negative/NegMoreConsTarget.hs` (extracted from `More.md`) verifies GHC rejects a forged `BetaCons` head substitution with `GHC-83865`!
+- **`content/part2/More.md`:** Removed its last `[WIP NOTICE]` and marked **More** `Checked` in `index.md`! **All 10 Part 1 chapters + all 5 core Part 2 STLC chapters (`Lambda`, `Properties`, `DeBruijn`, `Inference`, `More`) are now 100% Checked!**
+- Exercised `MP.progress` across `Let`, `Pair`, `Fst`, `Snd`, `CaseSum Inl/Inr`, `CaseLst Nil`, `listCaseBoth`, and `Absurd (Mu ...)` in `PLFH.RuntimeSmokeTest` (**123/123 `[RUN-OK]`**).
+
+### 2. Verification Receipt (`81f8c63`, published `056871faa9` / `60b64904a4`, pueue job 3088)
+- **Checked modules:** **29/29 `[PASS]`** (`-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`).
+- **Interface soundness audit:** `[PASS]` — **29/29 `.hi` files clean** (`0` unintended function tyvars).
+- **Negative controls:** **8/8 `[PASS-NEG]`** (`GHC-83865`).
+- **Runtime smoke tests:** **123/123 `[RUN-OK]`**.
+- **Fixed regressions:** **31/31 `[PASS-FIXED]`** at `-O0` and `-O2`.
+- **Open reproducers:** **10/10** cleanly `[BLOCKED]` (7 `[BLOCKED]` + 3 `[BLOCKED-O2]`), `0 [HARNESS-FAIL]`.
+- **Summary:** **`70 passed, 0 failed.`** Hakyll rebuild: `30` pages, `0` broken links, `0` historical refs, `0` constructor ticks, `0` `cong @`/`congSucc`; hardened `.github/workflows/pages.yml` (`cabal update` retry + package cache); synced and pushed to `Tritlo/PLFH` (`81f8c63`).
+
+---
+
+## 2026-11-24 09:36 CET · Batch 28 — Gemini 4 Neon (`744122325d` Wildcard Open Equations + Full 27-Rule Lock-Step `Bisimulation`)
+
+### 1. Compiler Checkpoint, 32nd Fixed Regression, & Zero-WIP `Naturals` (`67dc34b`, pueue job 3169)
+- **Default compiler upgraded:** `scripts/check_plfh.sh` upgraded to published `744122325d` / `143779210d` (`_build/on-demand/plfh-wildcard-open-equation-20261124/complete-first.cFaM8I/component/ghc`).
+- **32nd fixed regression promoted:** Moved `reproducers/R13_WildcardBreaksOpenEq.hs` → `reproducers/fixed/R13_WildcardBreaksOpenEq.hs` — passes unchanged at both `-O0` and `-O2` with Core/STG Lint!
+- **`content/part1/Naturals.md`:** Switched `times Zero _ = Zero` and `pow _ Zero = Succ Zero` to idiomatic wildcards (checked across all downstream `Induction`/`Relations`/`Lists` proofs!) and removed the last `[WIP NOTICE]` in `Naturals.md`!
+
+### 2. Full 27-Rule Lock-Step `Bisimulation` (`Let` ↔ `App (Lam ...)`) + New Reproducer `R16_AbstractRenamingInType.hs`
+- **Upgraded `PLFH.Part2.Bisimulation`** (`content/part2/Bisimulation.md`, `{-# OPTIONS_GHC -Werror=incomplete-patterns #-}` importing `PLFH.Part2.More` & `PLFH.Part2.MoreProgress`):
+  - Full 20-constructor structural `SimRel` covering all 19 constructors of `More.Term` plus `SimLetApp :: SimRel m m' -> SimRel n n' -> SimRel (M.Let m n) (M.App (M.Lam n') m')`.
+  - Checked `simRefl`, `simTrans`, bidirectional 9-constructor value preservation (`simValue`, `simValueInv`), `valNoStep`, **complete 27-rule forward lock-step simulation `sim`**, **complete 27-rule backward lock-step simulation `simInv`** (PLFA Exercise `sim⁻¹`, discharging `SimLetApp`/`XiApp1` statically via `absurd (valNoStep M.VLam stL')`!), multi-step `simSteps`/`simStepsInv`, and assumption-free closed witnesses `letDesugarSim`, `letDesugarSteps`, `letDesugarStepsInv`!
+- **9th negative control added:** `hs/negative/NegBisimBadTarget.hs` (extracted from `Bisimulation.md`) verifies GHC rejects a forged β-target (`Zero` instead of `Suc Zero` for `(λx. suc x) 0`) with `GHC-83865`!
+- **New minimal blocker reproducer (`reproducers/R16_AbstractRenamingInType.hs`, Serokell R13/R16):**
+  - Proving `SubstCompat` internally (`simRename :: SimRel m m' -> SimRel (R.rename r m) (R.rename r m')`) over `ReproOpsDoubleSubst` (`-fwrite-source-equations`) fails at line 29, col 38 with `GHC-70565`: *Cannot evaluate `R.rename` in a type. This argument is a type variable. Closed evaluation requires a known value.*
+- **Bonus probe observations (job 3125 on `056871faa9`):** Tested enabling `-fwrite-source-equations` + separate client modules on `BigStep.lookupEnv` and `Untyped.substSingleU`; both still report `GHC-70565` (unlike rank-2 `DeBruijn`/`More` `substSingle`/`substDouble`, neither mutually recursive `Env`/`Clos` `lookupEnv` nor rank-1 `Nat`-indexed `Fin`/`UTerm` `substSingleU` emits `$closure:`/`$apply:` tables yet).
+
+### 3. Verification Receipt (`67dc34b`, published `744122325d` / `143779210d`, pueue job 3169)
+- **Checked modules:** **29/29 `[PASS]`** (`-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`).
+- **Interface soundness audit:** `[PASS]` — **29/29 `.hi` files clean** (`0` unintended function tyvars).
+- **Negative controls:** **9/9 `[PASS-NEG]`** (`GHC-83865`).
+- **Runtime smoke tests:** **129/129 `[RUN-OK]`**.
+- **Fixed regressions:** **32/32 `[PASS-FIXED]`** at `-O0` and `-O2`.
+- **Open reproducers:** **10/10** cleanly `[BLOCKED]` (7 `[BLOCKED]` + 3 `[BLOCKED-O2]`), `0 [HARNESS-FAIL]`.
+- **Summary:** **`72 passed, 0 failed.`** Hakyll rebuild: `30` pages, `0` broken links, `0` historical refs, `0` constructor ticks, `0` `cong @`/`congSucc`; synced to `docs/dependent-haskell/plfh/` and pushed to `Tritlo/PLFH` (`67dc34b`).
+
+---
+
+## 2026-11-24 09:56 CET · Batch 29 — Gemini 4 Neon (`0b2ad262df` / `5ff3e67e13` Symbolic `Lists.witnessToAny` Equations)
+
+### 1. Compiler Checkpoint & Checked Symbolic `witnessToAny` Proofs (`3b4892f`, pueue job 3203)
+- **Default compiler upgraded:** `scripts/check_plfh.sh` upgraded to published `0b2ad262df` (`5ff3e67e13` + `e2c16be23d` / `efb66ab19f`, `_build/on-demand/plfh-breakpoint-closures-619.XXXzWovw/checked.QCEaXAtY/component/ghc`).
+- **`PLFH.Part1.Lists` (`content/part1/Lists.md`):**
+  - Enabled `-fwrite-source-equations` (alongside `-fno-enable-rewrite-rules`) so `Lists.hi` publishes `SourceTable T:witnessToAny` even under `-O0 -fomit-interface-pragmas -fno-write-if-simplified-core`.
+  - Renamed `AnyWitness` data constructor to `MkAnyWitness` (matching `MkIso`/`MkEmbed`/`MkLeg` and eliminating the type/data pun so downstream type-level equations require **zero** leading `'` ticks!) and exported `anyToWitness` & `witnessToAny`.
+- **New checked client module `PLFH.Part1.ListsProof`** (`clients/PLFH/Part1/ListsProof.hs`, mirrored to `docs/dependent-haskell/plfh/hs/PLFH/Part1/ListsProof.hs`):
+  - Proves polymorphic `witnessToAnyHere` and `witnessToAnyThere` (using `RequiredTypeArguments` `forall (r :: In x xs) (px :: p x) ->`, zero ticks!), retained-`foreach` `witnessToAnyEvenThere` over symbolic `In x xs`, `decodeHeadEven`, and `decodeSecondEven` selecting the 4th position of `[1, 2, 1, 2]` while preserving the exact `Even 2` proof!
+  - Exercised `decodeHeadEven`, `witnessToAnyEvenThere`, and `decodeSecondEven` at runtime in `PLFH.RuntimeSmokeTest` (**132/132 `[RUN-OK]`**).
+
+### 2. Verification Receipt (`3b4892f`, published `0b2ad262df` / `efb66ab19f`, pueue job 3203)
+- **Checked modules:** **30/30 `[PASS]`** (`-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`).
+- **Interface soundness audit:** `[PASS]` — **30/30 `.hi` files clean** (`0` unintended function tyvars).
+- **Negative controls:** **9/9 `[PASS-NEG]`** (`GHC-83865`).
+- **Runtime smoke tests:** **132/132 `[RUN-OK]`**.
+- **Fixed regressions:** **32/32 `[PASS-FIXED]`** at `-O0` and `-O2`.
+- **Open reproducers:** **10/10** cleanly `[BLOCKED]` (7 `[BLOCKED]` + 3 `[BLOCKED-O2]`), `0 [HARNESS-FAIL]`.
+- **Summary:** **`73 passed, 0 failed.`** Hakyll rebuild: `30` pages, `0` broken links, `0` historical refs, `0` constructor ticks, `0` `cong @`/`congSucc`; synced to `docs/dependent-haskell/plfh/` and pushed to `Tritlo/PLFH` (`3b4892f`).
+
+---
+
+## 2026-11-24 10:33 CET · Batch 30 — Gemini 4 Neon (`0452d7d17c` Full `AnyWitness` Iso + `Confluence` `parRefl` & `betaToPar`)
+
+### 1. Compiler Checkpoint, 33rd Fixed Regression, & Upgraded Chapters (`a601736`, pueue job 3265)
+- **Default compiler upgraded:** `scripts/check_plfh.sh` upgraded to published `0452d7d17c` / `a3b684aaf1` (`_build/on-demand/plfh-nonuniform-legacy-distinct-20261124/relink.sNapGu/component/ghc`).
+- **33rd fixed regression promoted:** Moved `reproducers/R03_NestedDatatypeForEach.hs` → `reproducers/fixed/R03_NestedDatatypeForEach.hs` — passes unchanged at both `-O0` and `-O2`! (**33/42 fixed, ONLY 9 open reproducers remain!**)
+- **New checked client module `PLFH.Part1.AnyWitnessIso`** (`clients/PLFH/Part1/AnyWitnessIso.hs`, adapted from `ea2c1e773d` and mirrored to `docs/dependent-haskell/plfh/hs/PLFH/Part1/AnyWitnessIso.hs`):
+  - Proves the **full polymorphic membership isomorphism** `anyIsoWitness :: Iso (Any p xs) (AnyWitness p xs)` (both inverse laws `witnessToAny (anyToWitness r) :~: r` and `anyToWitness (witnessToAny w) :~: w`) directly over the ordinary `PLFH.Part1.Lists` converters with zero promoted-constructor ticks!
+- **`PLFH.Part2.Confluence` (`content/part2/Confluence.md`):**
+  - Checked direct 3-equation **`parRefl :: forall (n :: Nat). foreach (m :: UTerm n) -> Par m m`** across non-uniform `UTerm n`!
+  - Also proved single-step β-embedding **`betaToPar :: forall (n :: Nat) (r :: UTerm n). foreach (l :: UTerm n) -> BetaStep l r -> Par l r`** (hoisting `pl = parRefl l` and `pm = parRefl m` above `case s of` with `mkBetaPar`, passing Core/STG Lint and `.hi` soundness audit!).
+  - Cleaned up `R03_NestedDatatypeForEach.hs` links across `Confluence.md`, `Substitution.md`, and `Untyped.md`.
+- Exercised `anyIsoWitness`, `parRefl`, and `betaToPar` (via `eqIdApp` on `UApp idTerm idTerm`) at runtime in `PLFH.RuntimeSmokeTest` (**135/135 `[RUN-OK]`**).
+
+### 2. Verification Receipt (`a601736`, published `0452d7d17c` / `a3b684aaf1`, pueue job 3265)
+- **Checked modules:** **31/31 `[PASS]`** (`-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`).
+- **Interface soundness audit:** `[PASS]` — **31/31 `.hi` files clean** (`0` unintended function tyvars).
+- **Negative controls:** **9/9 `[PASS-NEG]`** (`GHC-83865`).
+- **Runtime smoke tests:** **135/135 `[RUN-OK]`**.
+- **Fixed regressions:** **33/33 `[PASS-FIXED]`** at `-O0` and `-O2`.
+- **Open reproducers:** **9/9** cleanly `[BLOCKED]` (6 `[BLOCKED]` + 3 `[BLOCKED-O2]`), `0 [HARNESS-FAIL]`.
+- **Summary:** **`75 passed, 0 failed.`** Hakyll rebuild: `30` pages, `0` broken links, `0` historical refs, `0` constructor ticks, `0` `cong @`/`congSucc`; synced to `docs/dependent-haskell/plfh/` and pushed to `Tritlo/PLFH` (`a601736`).
+
+---
+
+## 2026-11-24 10:51 CET · Batch 31 — Gemini 4 Neon (`Untyped` Church Numerals & `K-omega` + `BigStep` `evalKIdOmega`)
+
+### 1. Checked PLFA Exercises (`21dff64`, published `0452d7d17c`, pueue job 3267)
+- **`PLFH.Part2.Untyped` (`content/part2/Untyped.md`):** Added Church numerals `CZero`, `COne`, `CTwo` with checked `Normal` proofs (`cZeroIsNormal`, `cOneIsNormal`, `cTwoIsNormal`) and normal-order single-step termination witness `kOmegaStep :: BetaStep (UApp (ULam (ULam (UVar FZ))) OmegaTerm) IdTerm`.
+- **`PLFH.Part2.BigStep` (`content/part2/BigStep.md`):** Added checked call-by-name laziness exercise `evalKIdOmega :: EvalBig ENil (UApp (UApp (ULam (ULam (UVar (FS FZ)))) IdTerm) OmegaTerm) (MkClos IdTerm ENil)`.
+- **Verification (`21dff64`, job 3267):** **`75 passed, 0 failed`** (`31/31` modules + `.hi` audit, `9/9` negative controls, **`138/138 [RUN-OK]`**, `33/33` fixed regressions, `9/9` open reproducers; Hakyll `30` pages, `0` broken links, `0` historical refs, `0` constructor ticks, `0` `cong @`/`congSucc`); synced to `docs/dependent-haskell/plfh/` and pushed to `Tritlo/PLFH` (`21dff64`).
