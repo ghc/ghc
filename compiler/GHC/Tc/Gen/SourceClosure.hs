@@ -230,6 +230,11 @@ resulting kind. A cast can disappear only if its specialized endpoints
 agree and its evidence comes from those alternatives. The equations
 use the original closed family mechanism. They preserve a recursive
 call whose argument is still abstract.
+
+First check for a unary function with a case body. An ordinary exported
+value can construct a retained package with an unused witness. Computing
+the type of its optimized application would require an index for that
+witness. The value has no traversal equations to publish.
 -}
 
 data IndexedPattern
@@ -344,8 +349,8 @@ indexedEncoder bindings owner rhs = do
 -- | Check the ordinary unary telescope before reading case branches.
 indexedFunction :: Id -> CoreExpr -> Maybe ([TyVar], Id, CoreExpr)
 indexedFunction owner rhs = do
+    (parameters, [input], body@Core.Case{}) <- function rhs
     guard (exprType rhs `eqType` varType owner)
-    (parameters, [input], body) <- function rhs
     let (_, tau) = splitForAllTyVars (exprType rhs)
     (_, [Scaled mult input_kind], output_kind) <- pure (splitFunTys tau)
     guard (isManyTy mult && input_kind `eqType` varType input &&
