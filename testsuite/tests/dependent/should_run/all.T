@@ -31,6 +31,10 @@ test('NativeCheckedClosure',
                    'NativeCheckedClosureDoubleRule.hs', 'NativeCheckedLookupProvider.hs',
                    'NativeCheckedLookup.hs'])],
      run_command, ['bash NativeCheckedClosure.sh "{compiler}" "{libdir}"'])
+test('NativeCheckedPlugSubstU',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeCheckedPlugSubstUProvider.hs', 'NativeCheckedPlugSubstU.hs'])],
+     run_command, ['bash NativeCheckedPlugSubstU.sh "{compiler}" "{libdir}"'])
 test('NativeLocalBooleanResult',
      [req_host_target_ghc, only_ways(['normal']), extra_files(['NativeLocalBooleanResult.hs'])],
      run_command, ['bash NativeLocalBooleanResult.sh "{compiler}" "{libdir}"'])

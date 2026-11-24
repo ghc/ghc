@@ -1144,12 +1144,12 @@ rnHsTyKi env tyLit@(HsTyLit src lit)
        ; return (HsTyLit src (convertLit lit), emptyFNs) }
 
 rnHsTyKi env (HsAppTy _ ty1 ty2)
-  = rnHsAppTy env True ty1 ty2
+  = rnHsAppTy env (True, False) ty1 ty2
 
 rnHsTyKi env (HsAppKindTy _ ty k)
   = do { kind_app <- xoptM LangExt.TypeApplications
        ; unless kind_app (addErr (typeAppErr KindLevel k))
-       ; (ty', fvs1) <- rnLHsAppHead env False ty
+       ; (ty', fvs1) <- rnLHsAppHead env (False, False) ty
        ; (k', fvs2) <- rnLHsTyKi (env {rtke_level = KindLevel }) k
        ; return (HsAppKindTy noExtField ty' k', fvs1 `plusFN` fvs2) }
 
@@ -1440,21 +1440,27 @@ throw an error accordingly.
 
 --------------
 -- | Preserve ordinary lookup for closed unqualified source equations.
--- Only a spine of symbolic operands can request local open evaluation.
+-- Only a spine of symbolic/constructor operands with at least one variable
+-- can request local open evaluation.
 -- See Note [Unquoted constructors in symbolic source operands].
-rnHsAppTy :: RnTyKiEnv -> Bool -> LHsType GhcPs -> LHsType GhcPs -> RnM (HsType GhcRn, FreeNames)
-rnHsAppTy env open fun arg = do
+rnHsAppTy :: RnTyKiEnv -> (Bool, Bool) -> LHsType GhcPs -> LHsType GhcPs -> RnM (HsType GhcRn, FreeNames)
+rnHsAppTy env (eligible, has_sym) fun arg = do
   dependent <- xoptM LangExt.ExperimentalDependentTypes
   let parsed_open = isOpenTypeOperandWith isRdrTyVar (isDataOcc . rdrNameOcc) arg
-  checked_arg <- if dependent && open && not parsed_open
+      parsed_closed_con = isClosedConOperand (isDataOcc . rdrNameOcc) arg
+  checked_arg <- if dependent && eligible && not parsed_open && not parsed_closed_con
                    && maybe False (isRdrTyVar . unLoc) (hsTyGetAppHead_maybe fun)
-                   && isOpenTypeOperandWith isRdrTyVar possible_constructor arg
+                   && (isOpenTypeOperandWith isRdrTyVar possible_constructor arg
+                       || isClosedConOperand possible_constructor arg)
                  then Just <$> checkNoErrs (rnLHsTyKi env arg)
                  else pure Nothing
-  let symbolic = case checked_arg of
-        Just (ty, _) -> isOpenTypeOperandWith (isTyVarName . unwrapUserRdr) (isDataConName . unwrapUserRdr) ty
-        Nothing -> parsed_open
-  (fun', fun_fvs) <- rnLHsAppHead env (open && symbolic) fun
+  let (arg_ok, arg_sym) = case checked_arg of
+        Just (ty, _) ->
+          let sym = isOpenTypeOperandWith (isTyVarName . unwrapUserRdr) (isDataConName . unwrapUserRdr) ty
+              con = isClosedConOperand (isDataConName . unwrapUserRdr) ty
+          in (sym || con, sym)
+        Nothing -> (parsed_open || parsed_closed_con, parsed_open)
+  (fun', fun_fvs) <- rnLHsAppHead env (eligible && arg_ok, has_sym || arg_sym) fun
   (arg', arg_fvs) <- case checked_arg of
     Just renamed -> pure renamed
     Nothing | sourceCallHead fun' -> rn_operand arg
@@ -1463,6 +1469,19 @@ rnHsAppTy env open fun arg = do
   where
     possible_constructor rdr = isDataOcc occ || isTcOcc occ
       where occ = rdrNameOcc rdr
+
+    isClosedConOperand :: (IdOccP (GhcPass p) -> Bool) -> LHsType (GhcPass p) -> Bool
+    isClosedConOperand constructor ty = case unLoc (ignoreParens ty) of
+      HsKindSig _ operand _ -> isClosedConOperand constructor operand
+      HsExplicitTupleTy _ _ [x, y] -> all (isClosedConOperand constructor) [x, y]
+      _ -> case app_spine ty [] of
+        (HsTyVar _ _ (L _ name), fields) ->
+          constructor name && all (isClosedConOperand constructor) fields
+        _ -> False
+
+    app_spine ty fields = case unLoc (ignoreParens ty) of
+      HsAppTy _ f field -> app_spine f (field : fields)
+      head_ty -> (head_ty, fields)
 
     sourceCallHead :: LHsType GhcRn -> Bool
     sourceCallHead (L _ (HsAppTy _ head_ty _)) = sourceCallHead head_ty
@@ -1502,15 +1521,15 @@ already uses the ordinary operand renamer in either case.
 -}
 
 -- | Carry the operand test to the head of a parenthesized application.
-rnLHsAppHead :: RnTyKiEnv -> Bool -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames)
-rnLHsAppHead env open (L l tv@(HsTyVar _ ip name)) = setSrcSpanA l $ do
-  (tv', fvs) <- rnHsTyVar (lookupTypeAppHeadRn open) env tv ip name
+rnLHsAppHead :: RnTyKiEnv -> (Bool, Bool) -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames)
+rnLHsAppHead env (eligible, has_sym) (L l tv@(HsTyVar _ ip name)) = setSrcSpanA l $ do
+  (tv', fvs) <- rnHsTyVar (lookupTypeAppHeadRn (eligible && has_sym)) env tv ip name
   return (L l tv', fvs)
-rnLHsAppHead env open (L l (HsAppTy _ fun arg)) = setSrcSpanA l $ do
-  (ty', fvs) <- rnHsAppTy env open fun arg
+rnLHsAppHead env state (L l (HsAppTy _ fun arg)) = setSrcSpanA l $ do
+  (ty', fvs) <- rnHsAppTy env state fun arg
   return (L l ty', fvs)
-rnLHsAppHead env open (L l (HsParTy _ ty)) = do
-  (ty', fvs) <- rnLHsAppHead env open ty
+rnLHsAppHead env state (L l (HsParTy _ ty)) = do
+  (ty', fvs) <- rnLHsAppHead env state ty
   return (L l (HsParTy noAnn ty'), fvs)
 rnLHsAppHead env _ ty = rnLHsTyKi env ty
 

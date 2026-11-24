@@ -3724,8 +3724,7 @@ nativeIndexedGadtSpecs_maybe = eligible True
       = Just specs
       | otherwise = Nothing
 
-    supports_ordinary_sibling con =
-      not (isNativeIndexedDiagonalCon con) && isJust (eligible False con)
+    supports_ordinary_sibling = isJust . eligible False
 
 -- | Identify a nullary branch that needs diagonal index evidence.
 -- See Note [Native indexed branch evidence].
@@ -3768,10 +3767,11 @@ equality from the actual alternative to cast the promoted constructor
 to the scrutinee kind. The case forces the equality proof itself.
 Use a distinct interface feature for such alternatives. An older
 reader cannot reconstruct the dependent case proof. Keep diagonal branches
-out of the older simple indexed operand and ordinary sibling tests. The
-general indexed operand form already supports a constructed diagonal
-value. An ordinary sibling still needs a previously supported indexed
-constructor.
+out of the older simple indexed operand test. The general indexed operand
+form already supports a constructed diagonal value, and a diagonal sibling
+such as CHole :: UCtx n n also makes ordinary siblings such as
+CLam :: UCtx m (Succ n) -> UCtx m n eligible for ordinary branch evidence
+and promoted retained field indices.
 
 An ordinary constructor can be a sibling of an eligible GADT constructor.
 For example, Mu :: Term (Ext g a) a -> Term g a has no EqSpec or

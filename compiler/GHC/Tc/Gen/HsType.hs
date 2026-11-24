@@ -3134,6 +3134,18 @@ tc_app_ty_external mode rn_ty exp_kind
                , equalLength domains args, all is_local_open_operand args
                -> do { result <- tcOpenTypeCall mode name instantiated result_kind (zip args domains)
                      ; checkExpKind mode rn_ty result result_kind exp_kind }
+             (_, Just (fun, _), Just args)
+               | isTypeLevel (mode_tyki mode), ordinary_call
+               , all (\arg -> known_constructor arg || isOpenTypeOperand arg) args
+               , any known_constructor args, any open_indexed_operand args
+               , Just telescope <- indexedOpenTypeFunction fun
+               , let (_, inputs, _) = telescope
+               , equalLength inputs args
+               -> do { observed <- tcIndexedOpenTypeCall mode fun telescope args
+                     ; case observed of
+                         Just (result, result_kind) ->
+                           checkExpKind mode rn_ty result result_kind exp_kind
+                         Nothing -> unsupported name }
              (_, Just _, Just [arg])
                | isTypeLevel (mode_tyki mode), ordinary_call
                , isJust (closedCallLiteralKind arg)
@@ -3539,9 +3551,10 @@ indexedOpenTypeFunction fun = do
     pure (tvs, domains, result)
   where
     indexed_domain ty
-      | Just (tc, _) <- splitTyConApp_maybe ty
+      | Just (tc, args) <- splitTyConApp_maybe ty
       , isBoxedDataTyCon tc
-      = any (not . isVanillaDataCon) (tyConDataCons tc)
+      = any (not . isVanillaDataCon) (tyConDataCons tc) ||
+        any (not . isLiftedTypeKind . typeKind) args
       | otherwise = False
 
 -- | Solve the operand kinds before interpreting one indexed observation.

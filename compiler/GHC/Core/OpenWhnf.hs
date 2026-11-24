@@ -318,6 +318,11 @@ evaluate local_families indexed limit obtain local record unsolved first_type (S
     Let (NonRec binder rhs) body
       | liftedBinder binder ->
           recur (Suspension (extendVarEnv env binder (Suspension env rhs)) body)
+      | indexed, isCoVar binder, Coercion co <- rhs
+      , varType binder `eqType` coercionType co ->
+          let inScope = mkInScopeSet (exprFreeVars body `unionVarSet` exprFreeVars rhs)
+              subst = extendCvSubst (mkEmptySubst inScope) binder co
+          in recur (Suspension env (substExpr subst body))
     Let (Rec bindings) body
       | all (liftedBinder . fst) bindings ->
           let recEnv = extendVarEnvList env [(binder, Suspension recEnv rhs) | (binder, rhs) <- bindings]
@@ -475,7 +480,8 @@ openIndexedDataCon con kind source_args = do
     guard (tc == dataConTyCon con && isBoxedDataTyCon tc && not (isTypeDataCon con) &&
            null (dataConRepArgBinders con) && null (dataConStupidTheta con) &&
            all (not . isBanged) (dataConImplBangs con))
-    guard (not (null exs && null specs) && length univ == length universals &&
+    guard ((not (null exs && null specs) || user_vars /= univ) &&
+           length univ == length universals &&
            all isTyVar exs && length user_vars == length source_args)
     local_tys <- traverse (`lookup` zip user_vars source_args) exs
     let tys = universals ++ local_tys
