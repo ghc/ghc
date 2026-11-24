@@ -599,6 +599,8 @@ abi-test-nightly:
 
 doc-tarball:
   stage: packaging
+  rules:
+    - if: '$ONLY_JOBS == null || $ONLY_JOBS =~ /.*\bdoc-tarball(\s|$).*/'
   needs:
     - job: x86_64-linux-deb13-numa-slow-validate
       optional: true
@@ -1162,7 +1164,10 @@ ghc-wasm-meta-unreg:
 
 pages:
   stage: deploy
-  needs: [doc-tarball]
+  needs:
+    - job: doc-tarball
+      # May be absent, depending on ONLY_JOBS.
+      optional: true
   dependencies: null
   image: "debian:13"
   # See #18973
