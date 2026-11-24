@@ -7292,6 +7292,28 @@ interface records the equations that the compiler verified.
 [Haskell decoder](examples/open-evaluation/BookAnyWitness.hs),
 [equality over the decoder](examples/open-evaluation/BookAnyWitnessProof.hs).
 
+PLFA asks for an isomorphism between `Any P xs` and an existential
+membership carrying evidence for `P`. PLFH's two ordinary functions
+now have inverse proofs. Encoding a tail position inspects the recursive
+package before returning its new position. The private family in the
+compiler records that case. It reduces when the constructor is known.
+The compiler compares the equations with both the original and optimized
+Core. See `Note [Checked cases on recursive results]`.
+[PLFA Lists](https://plfa.github.io/Lists/),
+[Haskell proof](examples/open-evaluation/BookAnyWitnessProof.hs),
+[verifier](../../compiler/GHC/Tc/Gen/SourceClosure.hs).
+
+PLFA proves that parallel reduction is reflexive by induction on a
+lambda term. Under a lambda the context has one more variable. In PLFH,
+`ULam :: UTerm (Succ n) -> UTerm n` makes that change part of the
+field type. The fork checks the field at its instantiated type and
+introduces an equality between the retained scrutinee and its constructor.
+See `Note [Native indexed branch evidence]`. The Showcase includes the
+three congruence cases used by the proof. The book relation also has a
+beta rule. [PLFA Confluence](https://plfa.github.io/Confluence/),
+[Haskell proof](examples/open-evaluation/BookParallel.hs),
+[branch evidence](../../compiler/GHC/Core.hs).
+
 PLFA eliminates a reflexive equality proof by matching on its
 constructor. In the fork, a retained match gives a branch equality for
 the actual proof value. A `case` still forces that Haskell value. The

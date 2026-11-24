@@ -8,6 +8,26 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
+Compiler `0452d7d17c` checks both inverse laws for the ordinary Lists
+functions `anyToWitness` and `witnessToAny`. It also checks PLFH's
+`parRefl` under a lambda, where the body has one more variable in
+scope. The two proofs are available together on batch 29. In the book
+checkout, fetch the handoff with
+`git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/membership-confluence-3b4892f`.
+
+Job 3231 checked all 30 modules of unmodified batch 29 in four modes.
+Both native builds matched 132 observations. Of the 42 standalone
+reports, 36 compile at `-O0` and 33 at default `-O2`. The newly
+accepted report is `R03_NestedDatatypeForEach`. On the book handoff
+`ea2c1e773d`, job 3217 checked all 31 modules at both native optimization
+levels and against their native interfaces. Each run rejected the nine
+negative programs. Both native executables and default GHCi (job 3234)
+matched all 134 observations. Job 3206 matched all 621 Showcase
+observations in the three modes.
+[Published book](https://github.com/Tritlo/PLFH/tree/3b4892fce5b2ca7f38f05d1023c212e14e0e35e2),
+[membership induction](examples/open-evaluation/BookAnyWitnessProof.hs),
+[parallel reduction](examples/open-evaluation/BookParallel.hs).
+
 At `0b2ad262df`, default GHCi runs the entire batch 27 book in
 bytecode. All 123 observations match the native run. This includes
 the **More** progress proof with the debugger enabled. A separate
@@ -75,10 +95,10 @@ Job 2996 matched the 113 book observations at native `-O0`, default
 - R16. Check the new batch 28 Bisimulation report. The result of
   `simRename` mentions the ordinary renamer applied to an abstract
   function that must work at every object-language type.
-- For **Lists**, review both inverse laws for the pair of ordinary
-  converters. The published decoder accepts an unknown membership tail.
-  For **Confluence**, review how retained case matching refines a
-  recursive field whose context grows under a lambda.
+- Review the CorePrep correction for a proof applied to `encode proof`.
+  The compiler can name that expression during lowering. The result
+  type must still refer to the index the typechecker assigned to it.
+  Job 3211 reproduced the Core Lint mismatch in book commit `c4943a42d7`.
 - A no-code reader can use a separately compiled native provider. A fresh
   no-code provider withholds the substitution equation. Job 2968 reproduced
   GHC-70565 at the beta endpoint at both optimization levels. Publication
@@ -86,7 +106,9 @@ Job 2996 matched the 113 book observations at native `-O0`, default
 - Job 2983 built both stages of the 615 checkpoint at `2c9b9b286e`.
   All 15 qualification gates and 234/234 compatibility tests passed.
   The focused suite passed 137/138 with the known `MTrans` diagnostic.
-  Job 3106 is building the 617 checkpoint from the 615 donor. The previous
+  Job 3106 built both stages of the 617 checkpoint and passed 54 selected
+  registrations and the three Showcase modes. Job 3222 will build the
+  621 checkpoint after the 617 compatibility and focused suites. The previous
   build at `781a6c6a8f` passed all 15 gates, including 52 selected tests
   and all three modes of the 612-line Showcase. Job 2837 also passed
   234/234 compatibility cases and 136/138 focused tests. The two failures

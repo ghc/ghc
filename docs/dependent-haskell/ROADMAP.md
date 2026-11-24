@@ -31,12 +31,15 @@ ordinary substitution function in its result type. The published **More**
 chapter checks all 19 constructors of the extended language.
 Its list case replaces two distinct variables under two binders. Both
 proofs work in native code and in default GHCi with breakpoints enabled.
-The latest Lists example also preserves the selected occurrence when it
-decodes an existential witness. R03 and R16 remain partial. The next
-Bisimulation report needs an abstract renaming function in a type.
+Lists now proves both inverse laws between a predicate witness and an
+existential membership at a particular position. Confluence proves
+reflexivity of parallel reduction by induction under a lambda. R03 and
+R16 remain partial. The Bisimulation report needs an abstract renaming
+function in a type.
 [DeBruijn proof](examples/open-evaluation/BookBetaReduction.hs),
 [More proof](https://github.com/Tritlo/PLFH/blob/81f8c63afdb722766d5ea6a1163f7d20345105d9/clients/PLFH/Part2/MoreProgress.hs),
 [Lists proof](examples/open-evaluation/BookAnyWitnessProof.hs),
+[Confluence proof](examples/open-evaluation/BookParallel.hs),
 [Bisimulation report](https://github.com/Tritlo/PLFH/blob/67dc34b68d1dfcf4d379594986281831c20ae7fd/reproducers/R16_AbstractRenamingInType.hs),
 [R16](roadmap/R16-open-term-evaluator.md#typed-substitution-under-a-binder).
 

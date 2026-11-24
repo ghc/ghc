@@ -15,6 +15,21 @@ The upstream graph relates R03 to R05 and the completed visible-forall card
 R39. Each local increment needs the relevant Core rule. It need not wait for
 all Core transformations. Normal optimization remains a broader release gate.
 
+## Parallel reduction under a binder
+
+In the PLFH Confluence proof, matching `ULam b` refines a retained term
+of type `UTerm n` to that constructor. Its field has type `UTerm (Succ n)`.
+The recursive call can therefore prove `Par b b` in the extended context.
+Job 3177 checked the book's original report at both optimization levels.
+An independently compiled client forced the application proof beneath
+two lambdas. A swapped application field failed. The old and new readers
+agreed on all four combinations of structural interfaces at the concrete
+`Swap Bool Bool` instantiation. The interface marks the new case when
+the ordinary structural encoding cannot represent it.
+[Proof](../examples/open-evaluation/BookParallel.hs),
+[compiler regression](../../../testsuite/tests/dependent/should_run/NativeIndexedGadtFields.sh),
+[PLFA Confluence](https://plfa.github.io/Confluence/).
+
 ## Using an imported function in an index
 
 A provider on the published compiler can name an imported function in a result

@@ -8,6 +8,25 @@ to qualified local calls handled by the open evaluator.
 [declaration analysis](https://serokell.io/blog/dependency-analysis-haskell),
 and [declaration scheduling](../../../compiler/GHC/Tc/Module.hs).
 
+## Declaration order in PLFH Lists
+
+On PLFH batch 28, the signatures and proofs of `shuntAppend`,
+`shuntRev` and `revInvolutive` can precede the signatures and
+definitions of `shunt` and `rev`. Job 3201 checked both orders at
+`-O0` and default `-O2`, including fresh no-code builds. A separate
+client forced all three proofs through native interfaces. Job 3205 also
+checked an earlier type synonym whose right-hand side calls `rev`.
+
+The two original optimized Lists reports have a separate dependency on
+rewrite rules. GHC first desugars `[x]` to `build` at `-O2`. In job
+3208 an imported rule for that builder changed `rev [True]` to `[]`.
+Writing `x : []` preserved the singleton and the provider's equations.
+The optimized reader still needed the equations for the append helper.
+Changing declaration order left both results unchanged. The chapter
+checks its list proofs with rewrite rules disabled.
+[Chapter](https://github.com/Tritlo/PLFH/blob/67dc34b68d1dfcf4d379594986281831c20ae7fd/content/part1/Lists.md),
+[reverse report](https://github.com/Tritlo/PLFH/blob/67dc34b68d1dfcf4d379594986281831c20ae7fd/reproducers/R13_RevOpenEq.hs).
+
 ## M126 source check
 
 ```haskell
