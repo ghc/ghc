@@ -2095,7 +2095,8 @@ sourceCaseTables binds = do
       final_candidate owner = isJust (list_case_position owner) || indexed_candidate owner ||
                               structural_candidate owner || partial_case_candidate owner
       binary_list_candidate owner = list_case_position owner == Just 0
-      fold_candidate owner = generates_code && isJust (listFoldType (varType owner))
+      fold_candidate owner = (generates_code || no_code_structural) &&
+                             isJust (listFoldType (varType owner))
       zip_candidate owner = generates_code && isJust (listZipWithType (varType owner))
       reverse_wrapper_candidate owner =
         generates_code && isJust (listReverseWrapperType (varType owner))
@@ -3986,6 +3987,10 @@ result, the callback application, and the recursive call. The executable
 Core keeps these ticks. Rules that can replace the fold call remain a
 separate obligation. In particular the type of a build producer does
 not justify fold/build when the producer can use seq.
+
+The exact fold shape can supply an interface in a fresh no-code build.
+Use the same guard as other structural cases. Local rules, Core plugins
+and simplified Core output still require the final Core path.
 -}
 
 -- | Check both defining equations against the actual binding.
