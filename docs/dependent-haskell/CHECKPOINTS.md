@@ -6,6 +6,40 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Copy one field between records after comparing their lengths
+
+```haskell
+copyFlagsAtSameLength :: NamedColumns -> NamedColumns -> Maybe NamedColumns
+copyFlagsAtSameLength p q =
+    case sameNat (storedLength p) (storedLength q) of
+        Just Refl -> Just (p { storedLength = storedLength q, namedFlags = namedFlags q })
+        Nothing -> Nothing
+```
+
+The caller keeps the letters from `p` and copies the flags from `q`.
+The equality from `sameNat` justifies keeping the letters when assigning
+the second record's length. The ordinary importing module needs only
+`GADTs`. Equal lengths produced `Just [('x',False)]` after reading the
+result. Unequal lengths produced `Nothing`.
+[Ordinary record client](examples/packed-vector/NamedSiblingColumnsClient.hs)
+and [dependent sums](roadmap/R04-dependent-sums.md#named-fields-at-one-stored-length).
+
+A second example proves `Map (Prefixes ('Just e)) rows :~:
+Map (\cells -> Prefixes ('Just e) cells) rows` for an unknown list of
+column groups. The proof uses the equation of the forwarding lambda.
+R16 also distinguishes a rule on `Nothing` from one on `Just True`
+when checking a source equation.
+[Schema proof](examples/open-evaluation/TypeLambdaSchema.hs),
+[lambda conversion](roadmap/R17-type-level-lambdas.md) and
+[constructor tests](roadmap/R16-open-term-evaluator.md#constructor-clashes-with-different-field-counts).
+
+The two-stage compiler was built from `d15cbd41fe`. Job 2027 checked
+588 observations in native `-O0`, default `-O2` and GHCi, 20 selected
+registrations, four upgrade checks, HaskLib, first-class-families and
+234 compatibility cases. Job 2125 ran the published fusion regression
+on the same compiler. See the [current handoff](HANDOFF.md) for the
+focused-suite result and the publication check.
+
 ## Change the length of a dependent record
 
 An ordinary importing module can clear both vectors of a nonempty
