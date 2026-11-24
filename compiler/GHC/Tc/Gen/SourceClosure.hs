@@ -33,7 +33,7 @@ import GHC.Core.Type
   , mkTyVarTys, splitForAllTyVars, splitFunTys, splitTyConApp_maybe, substTyUnchecked
   , tyCoVarsOfTypes, typeKind )
 import GHC.Core.Unify (tcMatchTys)
-import GHC.Core.Utils (exprType)
+import GHC.Core.Utils (exprType, stripTicksE)
 import GHC.Driver.Config (initSimpleOpts)
 import GHC.Driver.DynFlags (HasDynFlags(getDynFlags))
 import GHC.Tc.Gen.SourceTable
@@ -94,6 +94,11 @@ Keep the actual owner and all reachable original and final helper
 Names in IdDetails. Withhold publication if any Name is absent after
 Tidy or if a visible rule can rewrite a checked function. See
 Note [Checked closure dependencies] in GHC.Tc.Gen.SourceTable.
+
+GHCi inserts breakpoint ticks at source spans, including in the middle
+of an application. Inspect the Core with only those ticks removed.
+The certificate describes evaluation of the Haskell term. The bytecode
+generator still sees the original ticks and their debugger variables.
 -}
 
 data FamilyInputs = FamilyInputs Id Kind Kind TyCon TyCon TyCon
@@ -110,8 +115,11 @@ publishCheckedSourceClosures original_binds final_binds final_types = do
         exported = availsToNameSet (tcg_exports env)
         imported name = isWiredInName name || ordinaryImport rdr_env name
         public = publicCaseType env exported imported
-        original = [(v, simpleOptExpr opts rhs) | (v, rhs) <- Core.flattenBinds original_binds]
-        final = Core.flattenBinds final_binds
+        original = [(v, simpleOptExpr opts rhs) | (v, rhs) <- inspect original_binds]
+        final = inspect final_binds
+        inspect binds = [(v, stripTicksE breakpoint rhs) | (v, rhs) <- Core.flattenBinds binds]
+        breakpoint Breakpoint{} = True
+        breakpoint _ = False
         lookupLocal name = case lookupTypeEnv final_types name of
           Just (AnId actual) | idName actual == name
                              , nameModule_maybe name == here -> Just actual
@@ -271,7 +279,7 @@ extendedCallback callback captured = do
 -- Check the function used when a renaming crosses a binder.
 checkRenameExtension :: DC.DataCon -> DC.DataCon -> CoreExpr -> Maybe ()
 checkRenameExtension hit miss rhs = do
-    let (binders, body) = Core.collectBinders (strip rhs)
+    let (binders, body) = Core.collectBinders rhs
     [g, d, b, capture, sort_var, argument] <- pure binders
     guard (all isTyVar [g,d,b,sort_var] && all isValueVar [capture,argument])
     rows <- caseOn argument body
@@ -336,7 +344,7 @@ checkedExtension :: [(Id, CoreExpr)]
                  -> DC.DataCon -> DC.DataCon -> DC.DataCon
                  -> CoreExpr -> Maybe Id
 checkedExtension bindings var hit miss rhs = do
-    let (binders, body) = Core.collectBinders (strip rhs)
+    let (binders, body) = Core.collectBinders rhs
     [g, d, b, capture, sort_var, argument] <- pure binders
     guard (all isTyVar [g,d,b,sort_var] && all isValueVar [capture,argument])
     rows <- caseOn argument body
@@ -383,22 +391,22 @@ outcomes capture (hit, hit_binders, hit_rhs) (miss, miss_binders, miss_rhs) = do
 
 function :: CoreExpr -> Maybe ([TyVar], [Id], CoreExpr)
 function expr = do
-    let (binders, body) = Core.collectBinders (strip expr)
+    let (binders, body) = Core.collectBinders expr
         (ty_binders, tm_binders) = span isTyVar binders
     guard (all isValueVar tm_binders)
-    pure (ty_binders, tm_binders, strip body)
+    pure (ty_binders, tm_binders, body)
 
 application :: CoreExpr -> Maybe (CoreExpr, [CoreExpr])
 application expr = do
-    let (head_expr, args) = Core.collectArgs (strip expr)
+    let (head_expr, args) = Core.collectArgs expr
         (_, values) = span Core.isTyCoArg args
     guard (all (not . Core.isTyCoArg) values)
-    pure (head_expr, map strip values)
+    pure (head_expr, values)
 
 caseOn :: Id -> CoreExpr
        -> Maybe [(DC.DataCon, [Var], CoreExpr)]
 caseOn target expr = do
-    Core.Case (Core.Var scrutinee) _ _ alts <- pure (strip expr)
+    Core.Case (Core.Var scrutinee) _ _ alts <- pure expr
     guard (target == scrutinee)
     traverse dataAlt alts
   where
@@ -406,7 +414,7 @@ caseOn target expr = do
     dataAlt _ = Nothing
 
 branchBody :: [Var] -> CoreExpr -> Maybe CoreExpr
-branchBody binders expr = case strip expr of
+branchBody binders expr = case expr of
     Core.Cast body co
       | caseCoercion (filter isCoVar binders) co -> branchBody binders body
       | otherwise -> Nothing
@@ -422,10 +430,6 @@ caseCoercion scope co = case co of
     SymCo c -> caseCoercion scope c
     SelCo _ c -> caseCoercion scope c
     _ -> False
-
-strip :: CoreExpr -> CoreExpr
-strip (Core.Tick Breakpoint{} expr) = strip expr
-strip expr = expr
 
 isValueVar :: Id -> Bool
 isValueVar v = isId v && not (isCoVar v)
