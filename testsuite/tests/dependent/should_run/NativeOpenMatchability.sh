@@ -191,20 +191,24 @@ HS
 cat >../provider/CongNat.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
 {-# OPTIONS_GHC -fwrite-source-equations #-}
-module CongNat (Nat(..), add) where
+module CongNat (Nat(..), add, addRight) where
 
 data Nat = Z | S Nat
 
 add :: Nat -> Nat -> Nat
 add Z n = n
 add (S m) n = S (add m n)
+
+addRight :: Nat -> Nat -> Nat
+addRight m Z = m
+addRight m (S n) = S (addRight m n)
 HS
 cat >RequiredCong.hs <<'HS'
 {-# LANGUAGE AllowAmbiguousTypes, DataKinds, ExperimentalDependentTypes #-}
 {-# LANGUAGE GADTs, Modifiers, PolyKinds, RequiredTypeArguments, TypeOperators #-}
 module RequiredCong where
 
-import CongNat (Nat(..), add)
+import CongNat (Nat(..), add, addRight)
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Matchability (Matchability)
 
@@ -221,9 +225,28 @@ assoc (S m) n p = cong S (assoc m n p)
 outer :: foreach (m :: Nat) -> foreach (n :: Nat) -> foreach (p :: Nat)
       -> foreach (q :: Nat) -> add m (add (add n p) q) :~: add m (add n (add p q))
 outer m n p q = cong (add m) (assoc n p q)
+
+data Bin = Nil | O Bin | I Bin
+
+inc :: Bin -> Bin
+inc Nil = I Nil
+inc (O x) = I x
+inc (I x) = O (inc x)
+
+incBase :: inc Nil :~: I Nil
+incBase = Refl
+
+underInc :: foreach (x :: Bin) -> foreach (y :: Bin) -> x :~: y -> inc x :~: inc y
+underInc _ _ eq = cong inc eq
+
+underRight :: foreach (m :: Nat) -> foreach (x :: Nat) -> foreach (y :: Nat)
+           -> x :~: y -> addRight m x :~: addRight m y
+underRight m _ _ eq = cong (addRight m) eq
 HS
 sed -e 's/^module RequiredCong where$/module WrongCong where/' \
     -e 's/cong S (assoc m n p)/cong S (assoc n m p)/' RequiredCong.hs >WrongCong.hs
+sed -e 's/^module RequiredCong where$/module WrongSourceCallback where/' \
+    -e 's/cong (addRight m) eq/cong (add m) eq/' RequiredCong.hs >WrongSourceCallback.hs
 for opt in -O0 -O2; do
     (cd ../provider && "${ghc[@]}" "$opt" -fomit-interface-pragmas -fforce-recomp -c CongNat.hs)
     cp ../provider/CongNat.hi .
@@ -232,6 +255,11 @@ for opt in -O0 -O2; do
     if "${ghc[@]}" "$opt" -fforce-recomp -c WrongCong.hs >wrong-cong.log 2>&1 ||
        ! grep -Fq '[GHC-05617]' wrong-cong.log; then
         cat wrong-cong.log >&2
+        exit 1
+    fi
+    if "${ghc[@]}" "$opt" -fforce-recomp -c WrongSourceCallback.hs >wrong-source.log 2>&1 ||
+       ! grep -Fq '[GHC-83865]' wrong-source.log; then
+        cat wrong-source.log >&2
         exit 1
     fi
     rm -f ../provider/CongNat.hi CongNat.hi
