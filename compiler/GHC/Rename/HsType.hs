@@ -34,7 +34,7 @@ module GHC.Rename.HsType (
         bindHsOuterTyVarBndrs, bindHsForAllTelescope, bindHsGadtTelescopes,
         bindLHsTyVarBndr, bindLHsTyVarBndrs, WarnUnusedForalls(..),
         rnImplicitTvOccs, bindSigTyVarsFV, bindHsQTyVars, hsQTyVarKindOccs,
-        FreeKiTyVars, filterInScopeM, filterSourceTableNames,
+        FreeKiTyVars, filterInScopeM, filterGadtConTyVars,
         extractHsTyRdrTyVars, extractHsTyRdrTyVarsKindVars,
         extractHsTysRdrTyVars, extractRdrKindSigVars,
         extractConDeclGADTDetailsTyVars, extractDataDefnKindVars,
@@ -2853,9 +2853,35 @@ filterInScopeNonClassM cls_tvs vars
        ; envs <- getRdrEnvs
        ; filterSourceTableNames envs (filterInScopeNonClass cls_tvs tvc envs vars) }
 
+-- | Collect implicit constructor binders after resolving names in both namespaces.
+-- See Note [Implicit quantification in dependent constructor signatures].
+filterGadtConTyVars :: FreeKiTyVars -> RnM FreeKiTyVars
+filterGadtConTyVars vars = do
+  dependent <- xoptM LangExt.ExperimentalDependentTypes
+  if dependent
+    then do { envs <- getRdrEnvs
+            ; return (filterInScope CaptureTermVars envs vars) }
+    else return vars
+
+{- Note [Implicit quantification in dependent constructor signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a module that defines a term function step and declares
+
+  data Witness (target :: Term) where
+    W :: Witness (step t)
+
+With ExperimentalDependentTypes, step refers to the existing function.
+Only t is implicitly quantified if its name is free in both namespaces.
+Quantifying step as well would let a caller choose a different function
+with visible type application. Resolve names before checking whether GHC
+can use the function in the type. A missing set of checked equations
+must not change the type of the exported constructor.
+
+An explicit forall still binds its names. Modules that do not enable
+ExperimentalDependentTypes keep the usual GADT implicit binders.
+-}
+
 -- | Exclude finite source functions before binding implicit type variables.
--- GADT constructor signatures use this filter with an empty local environment.
--- An implicit binder would hide the source table and give all calls one kind.
 -- Keep the earlier implicit binding for a newly certified identity.
 -- See Note [Names of finite source functions] in GHC.Rename.Env.
 filterSourceTableNames :: (GlobalRdrEnv, LocalRdrEnv) -> FreeKiTyVars -> RnM FreeKiTyVars

@@ -5382,8 +5382,7 @@ rnConDecl _ (ConDeclGADT { con_names   = names
                 extractConDeclGADTDetailsTyVars args        $
                 extractHsTysRdrTyVars [res_ty] []
 
-        ; envs <- getRdrEnvs
-        ; implicit_bndrs <- filterSourceTableNames envs free_vars
+        ; implicit_bndrs <- filterGadtConTyVars free_vars
         ; let ctxt = ConDeclCtx (toList new_names)
         ; case args of
             PrefixConGADT{} -> checkEmptyGadtRequiredGroups ctxt inner_bndrs res_ty
