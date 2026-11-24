@@ -36,3 +36,4 @@ substitute (Nest term) y replacement = Nest (substitute term y replacement)
 
 data Step (name :: Index) (body :: Syntax) (argument :: Syntax) (result :: Syntax) where
     Reduce :: Step x t v (substitute t x v)
+    Unfold :: forall x t. Step x t (Nest t) (substitute t x (Nest t))
