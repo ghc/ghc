@@ -7,7 +7,7 @@ ghc+=("$@")
 src=$PWD
 out=$(mktemp -d)
 trap 'rm -rf -- "$out"' EXIT
-mkdir "$out"/{producer,proof}
+mkdir "$out"/{producer,proof,no-code}
 cd "$out/producer"
 cp "$src"/PreludeMapLength{Size,Source,Proof}.hs "$src"/PreludeAppendLengthSource.hs \
    "$src"/ListFoldrSource.hs "$src"/NativeOpenListFoldrProducer.hs .
@@ -26,7 +26,12 @@ absent() { ! grep -Eq "(SourceTable|type family) T:$2\b" "$1.iface"; }
 "${ghc[@]}" -O1 "${strip[@]}" -c PreludeMapLengthSize.hs PreludeMapLengthSource.hs \
     PreludeMapLengthProof.hs PreludeAppendLengthSource.hs ListFoldrSource.hs
 build no-code -O1 -fno-code -fwrite-interface
-for term in direct local foldBits foldChars; do absent no-code "$term"; done
+for term in direct local foldBits foldChars; do certified no-code "$term"; done
+for term in wrongHead wrongTail wrongSeed wrongCallback wrongOwner \
+            forceStep forceSeed forceResult forceBitStep forceBitSeed; do
+    absent no-code "$term"
+done
+cp ./*.hi ../no-code/
 build changed -O1 -DCHANGE_FOLD
 grep -Fq 'Rule fired: foldr/nil' changed.rules
 absent changed direct
@@ -42,6 +47,7 @@ module UserProof where
 import Data.Proxy (Proxy)
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Exts (U)
+import PreludeMapLengthSize (Nat(..), plus)
 import qualified NativeOpenListFoldrProducer as F
 
 directNil :: forall a b (k :: a %U -> b %U -> b) (z :: b).
@@ -57,6 +63,12 @@ localCons :: forall a b (k :: a %U -> b %U -> b) (z :: b) (x :: a) (xs :: [a]).
              Proxy k -> Proxy z -> Proxy x -> Proxy xs
           -> F.local k z (x ': xs) :~: k x (F.local k z xs)
 localCons _ _ _ _ = Refl
+
+retained :: foreach (n :: Nat) -> n :~: n
+retained _ = Refl
+
+retainedFold :: foreach (xs :: [Nat]) -> F.direct plus 'Zero xs :~: F.direct plus 'Zero xs
+retainedFold xs = retained (F.direct plus Zero xs)
 
 #ifdef BAD_RULE
 {-# RULES "foldr/nil" [~1] forall k z xs. F.local k z xs = z #-}
@@ -92,6 +104,8 @@ main = do
     putStrLn showConcreteFold
 HS
 cp ../producer/*.hi .
+cp UserProof.hs ../no-code/
+(cd ../no-code && "${ghc[@]}" -O0 -fno-code -fwrite-interface -c UserProof.hs)
 for optimization in -O0 -O2; do
     (cd ../producer && build "valid$optimization" "$optimization")
     cp ../producer/"$producer.hi" .
