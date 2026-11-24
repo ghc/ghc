@@ -972,6 +972,7 @@ hsTyKindSig lty =
 ---------------------
 -- | Recognize a symbolic operand. A constructor spine must contain at least
 -- one variable. Leave fully closed constructor operands on the closed path.
+-- The caller identifies constructors from the Names available in its phase.
 isOpenTypeOperandWith :: (IdOccP (GhcPass p) -> Bool) -> (IdOccP (GhcPass p) -> Bool)
                       -> LHsType (GhcPass p) -> Bool
 isOpenTypeOperandWith variable constructor = (== Just True) . symbolic
@@ -981,7 +982,7 @@ isOpenTypeOperandWith variable constructor = (== Just True) . symbolic
       HsTyVar _ NotPromoted (L _ name) | variable name -> Just True
       HsExplicitTupleTy _ _ [x, y] -> or <$> traverse symbolic [x, y]
       _ -> case spine ty [] of
-        (HsTyVar _ IsPromoted (L _ name), fields) | constructor name ->
+        (HsTyVar _ _ (L _ name), fields) | constructor name ->
           or <$> traverse symbolic fields
         _ -> Nothing
 

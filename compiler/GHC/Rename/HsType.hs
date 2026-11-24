@@ -1441,14 +1441,30 @@ throw an error accordingly.
 --------------
 -- | Preserve ordinary lookup for closed unqualified source equations.
 -- Only a spine of symbolic operands can request local open evaluation.
+-- See Note [Unquoted constructors in symbolic source operands].
 rnHsAppTy :: RnTyKiEnv -> Bool -> LHsType GhcPs -> LHsType GhcPs -> RnM (HsType GhcRn, FreeNames)
 rnHsAppTy env open fun arg = do
-  (fun', fun_fvs) <- rnLHsAppHead env (open && isOpenTypeOperandWith isRdrTyVar (isDataOcc . rdrNameOcc) arg) fun
-  (arg', arg_fvs) <- if sourceCallHead fun'
-                    then rn_operand arg
-                    else rnLHsTyKi env arg
+  let parsed_open = isOpenTypeOperandWith isRdrTyVar (isDataOcc . rdrNameOcc) arg
+  checked_arg <- if open && not parsed_open
+                   && isOpenTypeOperandWith isRdrTyVar possible_constructor arg
+                 then do
+                   dependent <- xoptM LangExt.ExperimentalDependentTypes
+                   if dependent then Just <$> checkNoErrs (rnLHsTyKi env arg)
+                                else pure Nothing
+                 else pure Nothing
+  let symbolic = case checked_arg of
+        Just (ty, _) -> isOpenTypeOperandWith (isTyVarName . unwrapUserRdr) (isDataConName . unwrapUserRdr) ty
+        Nothing -> parsed_open
+  (fun', fun_fvs) <- rnLHsAppHead env (open && symbolic) fun
+  (arg', arg_fvs) <- case checked_arg of
+    Just renamed -> pure renamed
+    Nothing | sourceCallHead fun' -> rn_operand arg
+            | otherwise -> rnLHsTyKi env arg
   return (HsAppTy noExtField fun' arg', fun_fvs `plusFN` arg_fvs)
   where
+    possible_constructor rdr = isDataOcc occ || isTcOcc occ
+      where occ = rdrNameOcc rdr
+
     sourceCallHead :: LHsType GhcRn -> Bool
     sourceCallHead (L _ (HsAppTy _ head_ty _)) = sourceCallHead head_ty
     sourceCallHead (L _ (HsParTy _ ty)) = sourceCallHead ty
@@ -1464,6 +1480,26 @@ rnHsAppTy env open fun arg = do
       (ty', fvs) <- rn_operand ty
       return (L l (HsParTy noAnn ty'), fvs)
     rn_operand ty = rnLHsTyKi env ty
+
+{- Note [Unquoted constructors in symbolic source operands]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A same-module call such as `f m x (TMu x m)` can request the checked
+equations for f before its consumer's kind is checked. The parser puts
+bare TMu in the type namespace. The normal type renamer can resolve it
+to a data constructor by demotion, or to a type constructor with the
+same spelling.
+
+If a compound operand could supply an open constructor spine, rename it
+before requesting the equations. Use the resolved data constructor Name
+and keep the renamed operand and its free names. This uses ordinary
+DataKinds lookup and preserves its warnings and errors. In particular,
+the tick remains necessary when a type constructor shadows the data
+constructor. A fully closed spine still cannot request open evaluation.
+
+Bare variables keep the existing head-first path. The head determines
+whether a bare operand can name a source callback. A compound operand
+already uses the ordinary operand renamer in either case.
+-}
 
 -- | Carry the operand test to the head of a parenthesized application.
 rnLHsAppHead :: RnTyKiEnv -> Bool -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames)
