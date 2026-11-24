@@ -5066,7 +5066,8 @@ tcRetainedArgWith reify domain arg
                      Just v | isNativeIndexFunctionId v -> do
                        fun_id <- liftZonkM (zonkId v)
                        pure (Core.Var fun_id, fun)
-                     _ -> setSrcSpanA (getLoc fun) unsupported
+                     _ -> setSrcSpanA (getLoc fun) $
+                       failWithTc (TcRnRetainedQuantificationError (RetainedUncheckedSourceCall n))
                Just (n, written) -> do
                      certified <- if isExternalName n
                        then tcLookupIdMaybe n >>= maybe (pure Nothing) tcLookupSourceTableId
