@@ -26,6 +26,11 @@ inspectAnonymous xs = case xs of
     VNil -> Nothing
     VCons _ _ -> Just ConsSeen
 
+{-# INLINE inspectEquations #-}
+inspectEquations :: foreach (xs :: Vec Bool n) -> Maybe (Shape n xs)
+inspectEquations VNil = Nothing
+inspectEquations (VCons _ _) = Just ConsSeen
+
 {-# INLINE inspectKnown #-}
 inspectKnown :: foreach (xs :: Vec Bool ('S n)) -> Shape ('S n) xs
 inspectKnown xs = case xs of
