@@ -2697,7 +2697,8 @@ nativeDeferredArgIndex :: CoreExpr -> Maybe Type
 nativeDeferredArgIndex e
   | containsIndexedOperand (\con -> isJust (nativeIndexedOperandSignature_maybe con)
                                  || isNativeDataFamilyCon con) e
-  = snd <$> computedIndexExpr e
+  , Just (_, index) <- computedIndexExpr e
+  = Just index
   | Just index <- nativeComputedIndex e = Just index
   | (_, args) <- collectArgs e
   , any isValArg args
