@@ -64,7 +64,7 @@ import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Utils ( applyTypeToArgs, exprType, isVacuousRetainedBinder )
 import GHC.Core.FVs ( exprFreeVarsList )
 import GHC.Core.InstEnv ( lookupUniqueInstEnv, instanceDFunId )
-import GHC.Core.Predicate ( classMethodInstTy )
+import GHC.Core.Predicate ( classMethodInstTy, getEqPredTys_maybe )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
@@ -1953,11 +1953,54 @@ tcRetainedKnownValuePlan declared expected sigma values
   = case coreFullView tau of
       DepFunTy DepFunInvisible binder body ->
         fmap (fmap snd) (tcInferInvisibleRetained tvs binder body values)
-      _ -> choose_erased scoped_preds tvs theta tau values (retainedDeclaredDomains (length values) tau)
+      _ -> choose_erased scoped_preds tvs theta tau (retainedDeclaredDomains (length values) tau)
   where
-    choose_erased scoped_preds tvs theta tau values (domains, result, masked)
+    choose_erased scoped_preds tvs theta tau shape@(domains, result, _)
       = do { pairs <- fmap catMaybes $ mapM (declared_arg tvs) (zip domains values)
-         ; let actuals = map snd pairs
+           ; exact <- choose pairs expected
+           ; case exact of
+               Nothing
+                 | null scoped_preds, null theta
+                 , isTauTy tau
+                 , domains `equalLength` values
+                 , Just (_, result_ty) <- result, not (isFunTy result_ty)
+                 , all (maybe False (not . fst)) domains
+                 , any (hasNativeDependentExpr . Core.Type . snd) pairs
+                 -> do { givens <- getNativeGivens
+                       ; firstJustsM (map (retry_with_given pairs) givens) }
+               _ -> return exact }
+      where
+        choose = select_erased scoped_preds tvs theta tau shape
+
+        -- See Note [Nominal branch equalities in declared argument inference].
+        retry_with_given pairs given
+          | isCoVar given
+          = do { given <- liftZonkM (zonkId given)
+               ; case getEqPredTys_maybe (varType given) of
+                   Just (Nominal, lhs@(TermVarTy from), rhs@(TermVarTy to))
+                     | from /= to, isNativeIndexId from, isNativeIndexId to
+                     , typeKind lhs `eqType` typeKind rhs
+                     , any (mentions from) (map snd pairs ++ maybeToList expected)
+                     -> do { valid <- tcRetainedInstScope [lhs, rhs]
+                           ; if not valid then return Nothing else do
+                           { name <- newSysName (mkTyVarOcc "retained_argument")
+                           ; let template = mkTyVar name (typeKind lhs)
+                                 view ty
+                                   | mentions from ty =
+                                       substTyWith [template] [rhs]
+                                         <$> abstractNativeIndices [(lhs, template)] ty
+                                   | otherwise = Just ty
+                           ; case (traverse (traverse view) pairs, traverse view expected) of
+                               (Just pairs', Just expected') -> choose pairs' expected'
+                               _ -> return Nothing } }
+                   _ -> return Nothing }
+          | otherwise = return Nothing
+
+        mentions v = anyFreeVarsOfType (== v)
+
+    select_erased scoped_preds tvs theta tau (domains, result, masked) pairs expected
+      = do
+         { let actuals = map snd pairs
                seed | length domains == length values
                     , Just (bound, result_ty) <- result
                     , Just rho <- expected
@@ -2648,6 +2691,27 @@ Use the ordinary nominal injective variable analysis and treat user type
 families as opaque. A capture under an unannotated family Hide is still
 ambiguous. This selects type applications; final subsumption and the
 ordinary field checks must still succeed.
+-}
+
+{- Note [Nominal branch equalities in declared argument inference]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In `case proof of Refl -> App lArr m`, the declarations can give
+`lArr :: Term g ('TArr a b)` and `m :: Term g a'`. The immutable selector
+matches the repeated parameter syntactically. Its ordinary fallback
+cannot assign a type metavariable to either retained index.
+
+If exact selection fails for a saturated ordinary call, try a view from a
+lexical nominal equality between two runtime indices. Replace its left
+endpoint with the right endpoint in each declared actual and the expected
+result. Use the existing scoped index abstraction. Retry with one actual
+Given at a time. Require the same complete, scoped choices and exact
+matching in that view.
+
+The view selects type applications only. The original argument types, the
+expected result and the evidence checks stay in the ordinary application
+checker. It must still prove the conversion at each use. In particular an
+unrelated Refl cannot justify the other operand, and an absent declaration
+does not acquire a type from the view. No type metavariable is filled.
 -}
 
 {- Note [Declared retained-domain choices]
