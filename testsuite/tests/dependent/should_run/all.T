@@ -52,7 +52,8 @@ test('NativeOpenConstructor',
                                          open_eval_dir + 'SpineWorker.hs'])],
      run_command, ['bash NativeOpenConstructor.sh "{compiler}" "{libdir}"'])
 test('NativeOpenConstructorHelpers',
-     [only_ways(['normal']), extra_files([open_eval_dir + 'SpineWorker.hs'])],
+     [only_ways(['normal']),
+      extra_files([open_eval_dir + 'SpineWorker.hs', 'NativeOpenIndexedSubst.sh'])],
      run_command, ['bash NativeOpenConstructorHelpers.sh "{compiler}" "{libdir}"'])
 test('NativeOpenBuild',
      [only_ways(['normal']), extra_files([open_eval_dir + 'OpenBuildWorker.hs',

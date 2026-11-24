@@ -3189,6 +3189,12 @@ tc_app_ty_external mode rn_ty exp_kind
                          , all isOpenTypeOperand args
                          -> do { result <- tcOpenTypeCall mode name instantiated result_kind (zip args domains)
                                ; checkExpKind mode rn_ty result result_kind exp_kind }
+                         | ordinary_call, lengthIs args 2
+                         , all (\arg -> known_constructor arg || isOpenTypeOperand arg) args
+                         , any known_constructor args, any open_indexed_operand args
+                         , Just telescope <- indexedOpenTypeFunction fun
+                         -> do { (result, result_kind) <- tcIndexedOpenTypeCall mode fun telescope args
+                               ; checkExpKind mode rn_ty result result_kind exp_kind }
                          -- See Note [Function values and executable type calls].
                          | not (null args)
                          , ordinary_call || (isQual rdr && ready_partial_call && length args == 1)
@@ -3212,6 +3218,11 @@ tc_app_ty_external mode rn_ty exp_kind
       HsExplicitTupleTy _ _ fields -> any open_indexed_operand fields
       HsExplicitListTy _ _ fields -> any open_indexed_operand fields
       _ -> False
+
+    known_constructor operand =
+      case splitHsAppTys (unLoc (indexed_operand operand)) of
+        (L _ (HsTyVar _ _ (L _ (WithUserRdr _ name))), _) -> isDataConName name
+        _ -> False
 
     -- Inspect the constructor head for routing. Check the original operand
     -- and its annotation when applying the selected kind.
@@ -3292,7 +3303,7 @@ tc_app_ty_external mode rn_ty exp_kind
       case instantiateOpenMethod worker (typeKind checked_callback) (typeKind checked_receiver) of
         Nothing -> reportOpenTypeFailure name InvalidInput
         Just (method, result_kind) -> do
-          result <- tcObserveOpenTypeCall local name method result_kind [checked_callback, checked_receiver]
+          result <- tcObserveOpenTypeCall local False name method result_kind [checked_callback, checked_receiver]
           checkExpKind mode rn_ty result result_kind exp_kind
 
     -- An inner checked call can return a constructor as its source type.
@@ -3431,7 +3442,7 @@ tcOpenTypeCall :: TcTyMode -> Name -> Core.CoreExpr -> Kind -> [(LHsType GhcRn, 
 tcOpenTypeCall mode name instantiated result_kind args = do
   local <- tcOpenTypeContext mode name
   operands <- mapM (checkOperand local) args
-  tcObserveOpenTypeCall local name instantiated result_kind operands
+  tcObserveOpenTypeCall local False name instantiated result_kind operands
   where
     checkOperand local (arg, kind) = setSrcSpanA (getLoc arg) $ do
       let check = tc_check_lhs_type mode arg kind
@@ -3439,6 +3450,58 @@ tcOpenTypeCall mode name instantiated result_kind args = do
       -- A cast with an unsolved kind equality is not an opaque Type.
       checked <- if local then solveEqualities "tcOpenTypeCall operand" check else check
       liftZonkM (zonkTcType checked)
+
+-- | Find the erased telescope of a binary indexed source call with ordinary arrows.
+-- See Note [Known indexed operands in source calls].
+indexedOpenTypeFunction :: Id -> Maybe ([TyVar], [Kind], Kind)
+indexedOpenTypeFunction fun = do
+    let (_, binders, rho) = splitInvisPiTys (varType fun)
+        (_, arrows, result) = splitFunTys rho
+        domains = map scaledThing arrows
+    tvs <- traverse namedPiTyBinder_maybe binders
+    guard (all isTyVar tvs && any (not . isLiftedTypeKind . varType) tvs &&
+           lengthIs domains 2 && rho `tcEqType` foldr mkVisFunTyManyU result domains)
+    guard (any indexed_domain domains)
+    pure (tvs, domains, result)
+  where
+    indexed_domain ty
+      | Just (tc, _) <- splitTyConApp_maybe ty
+      , isBoxedDataTyCon tc
+      = any (not . isVanillaDataCon) (tyConDataCons tc)
+      | otherwise = False
+
+-- | Solve the operand kinds before interpreting one indexed observation.
+tcIndexedOpenTypeCall :: TcTyMode -> Id -> ([TyVar], [Kind], Kind) -> [LHsType GhcRn]
+                      -> TcM (Type, Kind)
+tcIndexedOpenTypeCall mode fun (tvs, domains, result) args = do
+    let name = idName fun
+    local <- tcOpenTypeContext mode name
+    (variables, result_kind, operands) <- solveEqualities "indexed source call" $ do
+      (subst, variables) <- newMetaTyVars tvs
+      let inputs = map (Subst.substTy subst) domains
+      operands <- zipWithM (tc_check_lhs_type mode) args inputs
+      pure (mkTyVarTys variables, Subst.substTy subst result, operands)
+    checked <- liftZonkM (zonkTcTypes variables)
+    kind <- liftZonkM (zonkTcType result_kind)
+    checked_operands <- liftZonkM (zonkTcTypes operands)
+    when (anyVarSet isMetaTyVar (tyCoVarsOfTypes checked)) $
+      reportOpenTypeFailure name InvalidInput
+    let applied = foldl Core.App (Core.Var fun) (map Core.Type checked)
+    (, kind) <$> tcObserveOpenTypeCall local True name applied kind checked_operands
+
+{- Note [Known indexed operands in source calls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ordinary open observer instantiates its universals at Type. This
+does not work for a term indexed by a syntax type or context. Use the
+actual checked operand kinds to instantiate the invisible telescope of
+a binary indexed function.
+
+Require a known constructor and a symbolic operand. The existing
+closed path still owns fully closed calls. Do not turn a case blocked on
+a symbolic term into an opaque call. Use the same staging, readback and
+definition tracking restrictions as the other open observer paths.
+See Note [Observing indexed constructor cases] in GHC.Core.OpenWhnf.
+-}
 
 -- | Check the staging restrictions and tell whether the call is local.
 tcOpenTypeContext :: TcTyMode -> Name -> TcM Bool
@@ -3458,10 +3521,10 @@ tcOpenTypeContext mode name = do
     reject = failWithTc . TcRnOpenTypeEval name Nothing
 
 -- | Observe checked operands and record every definition used for readback.
-tcObserveOpenTypeCall :: Bool -> Name -> Core.CoreExpr -> Kind -> [Type] -> TcM Type
-tcObserveOpenTypeCall local name instantiated result_kind operands = do
+tcObserveOpenTypeCall :: Bool -> Bool -> Name -> Core.CoreExpr -> Kind -> [Type] -> TcM Type
+tcObserveOpenTypeCall local indexed name instantiated result_kind operands = do
   env <- getGblEnv
-  outcome <- observeOpenType local instantiated result_kind operands
+  outcome <- observeOpenType local indexed instantiated result_kind operands
   case outcome of
     Left reason -> reportOpenTypeFailure name reason
     Right (result, used, constructors) -> do

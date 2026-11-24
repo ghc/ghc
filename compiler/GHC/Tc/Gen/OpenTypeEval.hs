@@ -21,7 +21,7 @@ import GHC.Core.Class (classAllSelIds)
 import GHC.Core (CoreExpr, Expr(..))
 import GHC.Core.Coercion (mkSubCo)
 import GHC.Core.Reduction (Reduction(..))
-import GHC.Core.DataCon (DataCon, dataConName, dataConTyCon, dataConWorkId)
+import GHC.Core.DataCon (DataCon, dataConName, dataConTyCon, dataConUserTyVars, dataConWorkId)
 import GHC.Core.TyCon (isBoxedDataTyCon, isPromotedDataCon_maybe, isTupleTyCon, tyConName)
 import GHC.Core.Make (mkCoreBoxedTuple)
 import GHC.Core.Predicate (classMethodInstTy, getClassPredTys_maybe)
@@ -45,7 +45,7 @@ import GHC.Tc.Utils.Monad (TcM, getGblEnv, getTopEnv, initIfaceLcl, initIfaceTcR
                            liftIO, newTcRef, newUnique, readTcRef, tcg_imports,
                            tcg_rdr_env, tcg_semantic_mod, tcg_local_open_defs, tcg_local_open_owners, updTcRef)
 import GHC.Tc.Utils.TcType (TcTyVarDetails(SkolemTv), isTyFamFree, noFreeVarsOfType, tcEqType)
-import GHC.Types.Basic (Boxity(Boxed))
+import GHC.Types.Basic (Boxity(Boxed), mkIntWithInf)
 import GHC.Types.Id (Id, idName, idType, isClassOpId_maybe, mkSysLocal)
 import GHC.Types.Name (Name, getOccString, nameModule_maybe, stableNameCmp)
 import GHC.Types.Name.Env (emptyNameEnv, extendNameEnv_C, lookupNameEnv, nonDetNameEnvElts)
@@ -81,15 +81,18 @@ data OpenArgument
   = OpenRigid TyVar [OpenArgument]
   | OpenGroundType Type
   | OpenPair TyVar TyVar
-  | OpenConstructor DataCon [Type] [OpenArgument]
+  | OpenConstructor DataCon [CoreExpr] [OpenArgument]
 
 -- | Apply the instantiated function to symbolic operands of the checked kind.
 observeOpenType :: Bool -- ^ Permit opaque ground types for a checked local definition.
+                -> Bool -- ^ Check known indexed constructor cases.
                 -> CoreExpr -> Kind -> [Type]
                 -> TcM (Either OpenTypeFailure (Type, [(Name, Maybe Name)], NameSet))
-observeOpenType local_call instantiated result_kind operands
+observeOpenType local_call indexed instantiated result_kind operands
   | Just args <- traverse checkedOperand operands = runExceptT $ do
-      limit <- reductionDepth <$> lift getDynFlags
+      depth <- reductionDepth <$> lift getDynFlags
+      let limit | indexed = min depth (mkIntWithInf 2048)
+                | otherwise = depth
       ((_, origins), revArgs) <- lift $
         foldM buildArgument ((emptyVarEnv, emptyVarEnv), []) args
       let coreArgs = reverse revArgs
@@ -137,7 +140,7 @@ observeOpenType local_call instantiated result_kind operands
               visible con = pure $ case constructorGRE con of
                 Just gre -> isLocalGRE gre || any ((== NotBoot) . is_isboot . is_decl) (gre_imp gre)
                 Nothing -> False
-          outcome <- openReadbackM local_call limit obtain local origin visible result_kind application
+          outcome <- openReadbackM local_call indexed limit obtain local origin visible result_kind application
           case outcome of
             Left (ReadbackEvaluation failure) -> throwE (CannotReduce failure)
             Left (ReadbackHidden con) -> throwE (HiddenConstructor (tyConName (dataConTyCon con)))
@@ -185,7 +188,15 @@ observeOpenType local_call instantiated result_kind operands
       , length prefix == length parameters, length fields == length field_types
       , and (zipWith tcEqType prefix parameters)
       , and (zipWith tcEqType (map typeKind fields) field_types)
-      = OpenConstructor con parameters <$> traverse checkedOperand fields
+      = OpenConstructor con (map Type parameters) <$> traverse checkedOperand fields
+      | indexed
+      , Just (promoted, args) <- splitTyConApp_maybe ty
+      , Just con <- isPromotedDataCon_maybe promoted
+      , let (source, fields) = splitAt (length (dataConUserTyVars con)) args
+      , Just (worker, proofs, field_types) <- openIndexedDataCon con (typeKind ty) source
+      , length fields == length field_types
+      , and (zipWith tcEqType (map typeKind fields) field_types)
+      = OpenConstructor con (map Type worker ++ map Coercion proofs) <$> traverse checkedOperand fields
       | local_call, isLiftedTypeKind (typeKind ty)
       , noFreeVarsOfType ty, isTyFamFree ty
       = Just (OpenGroundType ty)
@@ -215,9 +226,9 @@ observeOpenType local_call instantiated result_kind operands
       (state', first) <- symbolFor state x
       (state'', second) <- symbolFor state' y
       pure (state'', mkCoreBoxedTuple [first, second])
-    buildOperand state (OpenConstructor con parameters fields) = do
+    buildOperand state (OpenConstructor con erased fields) = do
       (state', revFields) <- foldM buildArgument (state, []) fields
-      pure (state', foldl App (Var (dataConWorkId con)) (map Type parameters ++ reverse revFields))
+      pure (state', foldl App (Var (dataConWorkId con)) (erased ++ reverse revFields))
 
     symbolFor state@(symbols, origins) skolem =
       case lookupVarEnv symbols skolem of
@@ -230,7 +241,7 @@ observeOpenType local_call instantiated result_kind operands
     freshSymbol kind = do
       unique <- newUnique
       pure (mkSysLocal (fsLit "open-type-operand") unique manyDataConTy kind)
-observeOpenType _ _ _ _ = pure (Left InvalidInput)
+observeOpenType _ _ _ _ _ = pure (Left InvalidInput)
 
 {- Note [Ground type operands of local calls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
