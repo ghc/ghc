@@ -603,6 +603,18 @@ opens the proof and uses the predecessor to index the vector tail.
 The bound also lets `indexVec` use the checked position with another
 vector of the same length.
 
+## Identify a retained equality proof
+
+A retained match on `Refl` can identify the equality proof itself.
+For `p :: x :~: x`, the `Refl` branch can return evidence of
+`p :~: 'Refl`. Entering the branch forces `p`. It supplies no
+equality to a second, unrelated proof. An interface that exports this
+branch records the feature `indexed-diagonal-constructor-case`. Job 3041
+forced the old and new unfoldings. The new reader reconstructed the old
+one, and the old reader rejected the new header with GHC-47808.
+[Maintained regression](../../../testsuite/tests/dependent/should_run/NativeNestedRetainedCase.sh),
+[PLFA Equality](https://plfa.github.io/Equality/).
+
 ## Expression annotations and proof arguments
 
 Within a `foreach` definition, a complete expression annotation can

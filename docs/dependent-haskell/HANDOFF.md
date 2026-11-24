@@ -8,29 +8,32 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
-A closed term in PLFH's intrinsically typed language now has a checked
-progress theorem. The proof covers all seven term constructors. It returns
-a value witness or a reduction to a term of the same type. Beta reduction
-and fixed-point unfolding use the book's capture-avoiding `substSingle` in
-the result type. Job 2939 matched all 615 Showcase outputs at native
-`-O0`, default `-O2` and in default GHCi. The provider enables
-`-fwrite-source-equations`. Job 2960 checked the corresponding native
-and interactive compiler regression.
-[Public compiler](https://github.com/Tritlo/ghc/commit/5ead8de5e4c2ed43194ff26c4521719ef3bd1c6e),
-[progress proof](examples/open-evaluation/BookBetaReduction.hs),
-[provider requirements](roadmap/R16-open-term-evaluator.md#typed-substitution-under-a-binder).
+Compiler `056871faa9` checks the list-case step in PLFH's **More** chapter.
+The case binds the head and the tail. The step's result type calls the
+ordinary `substDouble` function with those two values. Replacing one
+with a different value or shifting a free variable by only one binder
+fails at both native optimization levels. Job 3073 matched all 617
+Showcase outputs at native `-O0`, default `-O2` and in GHCi.
+The existential predicate witness example compiles its provider to
+object code in the interactive run.
+[Public compiler](https://github.com/Tritlo/ghc/commit/056871faa94d6fcb5907fe136d7f47b00d55a84e),
+[replacement-order proof](examples/open-evaluation/BookBetaReduction.hs),
+[R16 requirements](roadmap/R16-open-term-evaluator.md#typed-substitution-under-a-binder).
 
-[PLFH batch 25](https://github.com/Tritlo/PLFH/tree/69042437df9b44a099e44e1e53c981045cf0ee29)
-includes the complete proof, a negative capture test, and addition and
-multiplication in the object language. Job 3021 checked 28 modules at
-native `-O0` and default `-O2`. Each module also compiled against the
-native interfaces of its dependencies at both levels, with no source
-available for those dependencies. All four runs rejected the seven
-negative programs. The native runs matched 114 book observations.
-Of the 41 original reports, 33 compiled at `-O0` and 30 at default
-`-O2`. The additional report isolates the two-binder substitution gap.
-Job 3000 also matched all 615 Showcase outputs in both native modes
-and default GHCi on the compiler in `4570cbe2f8`.
+Private book patch `2a77c6f976`, based on batch 25, proves progress for
+all 19 constructors of the extended language. Job 3072 checked all 29
+patched modules from native providers at both optimization levels. Both
+runs matched 123 observations and rejected eight negative programs.
+From a book checkout, fetch
+`refs/yardsticks/plfh/more-progress-6904243` from `/home/tritlo/Code/ghc`.
+Default GHCi cannot yet publish the equations for this chapter.
+
+On [published PLFH batch 26](https://github.com/Tritlo/PLFH/tree/0adc1118387d8228ba54bf332a395bfb70ba9c4b),
+job 3074 checked all 28 modules at native `-O0` and default `-O2`.
+Each module also compiled against the native interfaces of its dependencies
+at both levels. All four runs rejected the seven negative programs. The
+native runs matched 114 observations. Of the 41 original reports, 33
+compiled at `-O0` and 30 at default `-O2`.
 [Book verification instructions](#build-and-verify).
 
 [HaskLib.Nat.plusComm](hasklib/HaskLib/Nat.hs) proves that addition
@@ -42,20 +45,21 @@ Job 2996 matched the 113 book observations at native `-O0`, default
 
 ## Next compiler work
 
-- Extend checked substitution to the **More** chapter's list case. It
-  substitutes both a head and a tail under two binders. Job 3009 found
-  that the provider omits the equation for `substDouble`. A separate
-  client then gets GHC-70565 at the target of `BetaCons`.
-- In **Lists**, job 2994 checked an existential package containing a
-  proof at a hidden index. Its source-hidden readers preserved the
-  original proof at both optimization levels and rejected a different
-  proof of the same proposition. Check the ordinary converter at a
-  recursive membership path whose position is unknown.
+- The published standalone double-substitution report now reaches
+  GHC-83865 at `BetaDouble`. Its replacements occur only in the result
+  of a non-injective family. Job 3084 checked a variant that supplies
+  `Proxy v` and `Proxy vs` at both native optimization levels. The
+  actual chapter's step fixes the indices in the scrutinee `Cons v vs`.
+- For **Lists**, the ordinary converter now preserves the exact proof
+  and position for known memberships in a source-hidden native interface.
+  The general `There` equation still needs a certificate for recursive
+  calls on the unknown membership tail.
 - A no-code reader can use a separately compiled native provider. A fresh
   no-code provider withholds the substitution equation. Job 2968 reproduced
   GHC-70565 at the beta endpoint at both optimization levels. Publication
   requires an account of imported rewrite rules for no-code interfaces.
-- Job 2983 is rebuilding the 615 checkpoint at `2c9b9b286e`. The previous
+- Job 2983 built both stages of the 615 checkpoint at `2c9b9b286e`.
+  Its qualification is in progress. The previous
   build at `781a6c6a8f` passed all 15 gates, including 52 selected tests
   and all three modes of the 612-line Showcase. Job 2837 also passed
   234/234 compatibility cases and 136/138 focused tests. The two failures

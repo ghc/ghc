@@ -842,14 +842,22 @@ Publishing the same equations from a fresh no-code provider remains
 open. Its simple interfaces must account for relevant imported rewrite
 rules before a client can use their equations.
 
-PLFH batch 25 isolates a separate native-provider gap. A list pattern
-binds the head and the tail. Renaming its body extends the renaming
-twice, and substitution extends the substitution twice. The current
-compiler then withholds even the single-substitution equation for this
-term type. A double substitution must also map the two new indices to
-the correct values. The published DeBruijn example exercises one binder.
+PLFH batch 25 exposed a native-provider gap under a pattern that binds
+both the head and the tail of a list. At `056871faa9`, the verifier
+checks how many binders each recursive field introduces in both the
+renaming and the substitution. It also checks each replacement in the
+lookup case. For the list case, `Z` selects the tail, `S Z` selects the
+head, and `S (S x)` refers to the outer variable `x`.
+
+Both native optimization levels check the extended language's `BetaCons`
+rule through the provider's interface. Job 3050 rejected a result that
+shifted a free variable across only one of the two binders. An active
+rewrite rule on a reachable renaming helper also prevented reduction.
+Job 3070 checked the order of two replacements of the same type and
+rejected the well-kinded swap. [Showcase proof](../examples/open-evaluation/BookBetaReduction.hs),
+[compiler regression](../../../testsuite/tests/dependent/should_run/NativeCheckedClosureDouble.hs),
 [PLFA More, Single and double substitution](https://plfa.github.io/More/#single-and-double-substitution),
-[book reproducer and expected diagnostic](https://github.com/Tritlo/PLFH/blob/69042437df9b44a099e44e1e53c981045cf0ee29/reproducers/R13_DoubleBinderSubstClosure.hs).
+[original book report](https://github.com/Tritlo/PLFH/blob/69042437df9b44a099e44e1e53c981045cf0ee29/reproducers/R13_DoubleBinderSubstClosure.hs).
 
 ## M155. Reachable helper chains
 

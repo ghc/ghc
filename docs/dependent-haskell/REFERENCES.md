@@ -92,7 +92,9 @@ a comparison implementation. External solvers remain later work.
   case binds the head and tail in the same way. The newest variable has
   index `Z`, the other has index `S Z`, and an outer variable crosses
   both binders. This gives three distinct cases for checking double
-  substitution.
+  substitution. The Showcase uses two replacements of the same type.
+  Exchanging them changes its equality even though the result still has
+  the right type. [Haskell proof](examples/open-evaluation/BookBetaReduction.hs),
   [PLFA More, Single and double substitution](https://plfa.github.io/More/#single-and-double-substitution),
   [PLFH batch 25 reproducer](https://github.com/Tritlo/PLFH/blob/69042437df9b44a099e44e1e53c981045cf0ee29/reproducers/ReproOpsDoubleSubst.hs).
 - **Representing a checked callback.** Danvy and Nielsen describe
@@ -7271,6 +7273,13 @@ substituted a different proof of the same proposition.
 [PLFA Lists, Any](https://plfa.github.io/Lists/#any),
 [proposal #242, inference](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#inference),
 [worker regression](../../testsuite/tests/dependent/should_run/NativeOpenIndexedSubst.sh).
+
+PLFA eliminates a reflexive equality proof by matching on its
+constructor. In the fork, a retained match gives a branch equality for
+the actual proof value. A `case` still forces that Haskell value. The
+interface capability that records the extra branch evidence is specific
+to the fork. [PLFA Equality](https://plfa.github.io/Equality/),
+[retained equality proof](roadmap/R03-dependent-products.md#identify-a-retained-equality-proof).
 
 ### Inferring nested applications and exporting pair equations
 
