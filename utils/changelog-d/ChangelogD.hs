@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# OPTIONS_GHC -Wall #-}
@@ -36,6 +37,18 @@ import qualified Distribution.Parsec             as C
 import qualified Distribution.Pretty             as C
 import qualified Distribution.Utils.Generic      as C
 import qualified Text.PrettyPrint                as PP
+
+#if MIN_VERSION_Cabal_syntax(3,18,0)
+type ParseResult = C.ParseResult ()
+
+perror :: C.PErrorWithSource () -> C.PError
+perror = C.perror
+#else
+type ParseResult = C.ParseResult
+
+perror :: C.PError -> C.PError
+perror = id
+#endif
 
 -------------------------------------------------------------------------------
 -- CLI
@@ -87,7 +100,7 @@ parseArgs = go defaultOpts
 -------------------------------------------------------------------------------
 
 parseWith
-    :: ([C.Field C.Position] -> C.ParseResult a)
+    :: ([C.Field C.Position] -> ParseResult a)
     -> FilePath
     -> BS.ByteString
     -> Either String a
@@ -104,7 +117,7 @@ parseWith parser fp bs = case C.readFields' bs of
             Right x            -> Right x
             Left (_mver, errs) -> Left $ unlines
                 [ fp ++ ":" ++ C.showPos pos ++ ": " ++ msg
-                | C.PError pos msg <- toList errs
+                | C.PError pos msg <- map perror (toList errs)
                 ]
 
 -------------------------------------------------------------------------------
@@ -354,7 +367,7 @@ data Cfg = Cfg
     }
   deriving (Show)
 
-parseConfig :: [C.Field C.Position] -> C.ParseResult Cfg
+parseConfig :: [C.Field C.Position] -> ParseResult Cfg
 parseConfig fields0 = do
     traverse_ warnSection $ concat sections
     raw <- C.parseFieldGrammar C.cabalSpecLatest fields cfgRawGrammar
@@ -368,7 +381,7 @@ parseConfig fields0 = do
   where
     (fields, sections) = C.partitionFields fields0
 
-    warnSection :: C.Section C.Position -> C.ParseResult ()
+    warnSection :: C.Section C.Position -> ParseResult ()
     warnSection (C.MkSection (C.Name pos name) _ _) =
         C.parseWarning pos C.PWTUnknownSection $ "Unknown section " ++ C.fromUTF8BS name
 
@@ -457,7 +470,7 @@ parseEntryFile fp contents =
     reportParseError err = exitWithExc $ PlainError $
       err ++ "\nChangelog entries use Cabal field syntax; see utils/changelog-d/README.md for details."
 
-parseEntry :: [C.Field C.Position] -> C.ParseResult Entry
+parseEntry :: [C.Field C.Position] -> ParseResult Entry
 parseEntry fields0 = do
     traverse_ warnSection $ concat sections
     e <- C.parseFieldGrammar C.cabalSpecLatest fields entryGrammar
@@ -467,7 +480,7 @@ parseEntry fields0 = do
   where
     (fields, sections) = C.partitionFields fields0
 
-    warnSection :: C.Section C.Position -> C.ParseResult ()
+    warnSection :: C.Section C.Position -> ParseResult ()
     warnSection (C.MkSection (C.Name pos name) _ _) =
         C.parseWarning pos C.PWTUnknownSection $ "Unknown section " ++ C.fromUTF8BS name
 
