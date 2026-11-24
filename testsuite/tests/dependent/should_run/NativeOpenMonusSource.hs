@@ -4,6 +4,9 @@ module NativeOpenMonusSource
 #ifdef MIXED_PROVIDER
   , reflexivity
 #endif
+#ifdef LOCAL_PROOF
+  , monusZero
+#endif
   ) where
 
 #ifdef MIXED_PROVIDER
@@ -19,4 +22,9 @@ monus (Succ m) (Succ n) = monus m n
 #ifdef MIXED_PROVIDER
 reflexivity :: foreach (n :: Nat) -> n :~: n
 reflexivity _ = Refl
+#endif
+
+#ifdef LOCAL_PROOF
+monusZero :: foreach (n :: Nat) -> monus n 'Zero :~: n
+monusZero _ = Refl
 #endif

@@ -12,8 +12,10 @@ NativeSourceTableWrong.hs:19:13: error: [GHC-83865]
     • In the expression: atBit (flipBit False)
       In an equation for ‘wrongCall’: wrongCall = atBit (flipBit False)
 
-NativeSourceTableWrong.hs:22:24: error: [GHC-83605]
-    • No checked source equations are available for ‘f’ in this retained argument.
+NativeSourceTableWrong.hs:22:17: error: [GHC-83865]
+    • Couldn't match type ‘f False’ with ‘True’
+      Expected: Flag True
+        Actual: Flag (f False)
     • In the expression: atBit (f False)
       In an equation for ‘unknownCall’: unknownCall f = atBit (f False)
 

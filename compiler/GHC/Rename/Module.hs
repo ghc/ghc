@@ -2633,11 +2633,13 @@ callback's input with its output leaves every other datatype argument in
 place. Use the renamed variables in this comparison. The typed check
 verifies the same shape before reading the function body.
 
-For a binary function such as plus (S n) m = S (plus n m), the second
-domain is also a declaration dependency. The general source row passes
-the second pattern's variable unchanged. Only fields of the first pattern
-can supply the decreasing argument. A list worker with one element type
-can also push the head onto the accumulator while recursing on the tail.
+For a binary function, include both domains in the declaration dependencies.
+The source row passes the carried variable unchanged. For example, in
+`plus (S n) m = S (plus n m)` the first operand decreases. In
+`pow m (S n) = times m (pow m n)` the second operand decreases. Only
+fields of the scrutinized pattern can supply the decreasing argument.
+A list worker with one element type can also push the head onto the
+accumulator while recursing on the tail.
 See Note [Checked list reverse] in GHC.Tc.Gen.SourceTable. Check the
 recursive operands before constructing an axiom. Return all requested
 names so the caller can report an uncertified table at the source binding.
@@ -2660,6 +2662,8 @@ localSourceTableBinders binds sigs =
         , isExternalName n, nameOccName n `elemOccSet` signed
         , all (constructor_row n False) rows ||
           (any matches_second rows && all (constructor_row n True) rows) ||
+          all (right_constructor_row n) rows ||
+          right_structural_rows n rows ||
           all (mapping_row n) rows ||
           all pair_swap_row rows ]
   where
@@ -2680,8 +2684,30 @@ localSourceTableBinders binds sigs =
       , all plain_field fields
       , Just carried <- carried_binders structural rest
       , GRHSs _ (L _ (GRHS _ [] rhs) :| []) (L _ EmptyLocalBinds{}) <- rhss
-      = row_result self (collectPatsBinders CollNoDictBinders fields) carried rhs
+      = row_result self [] (collectPatsBinders CollNoDictBinders fields) carried rhs
     constructor_row _ _ _ = False
+
+    right_constructor_row :: Name -> LMatch GhcPs (LHsExpr GhcPs) -> Bool
+    right_constructor_row self (L _ Match{m_pats = L _ [left, right], m_grhss = rhss})
+      | Just carried <- carried_binder left
+      , Just fields <- constructor_fields (unparen right)
+      , all plain_field fields
+      , GRHSs _ (L _ (GRHS _ [] rhs) :| []) (L _ EmptyLocalBinds{}) <- rhss
+      = row_result self [carried] (collectPatsBinders CollNoDictBinders fields) [] rhs
+    right_constructor_row _ _ = False
+
+    -- The first row of a right-first split carries its left operand.
+    -- The remaining rows inspect both operands. See Note [Local structural
+    -- case equations] in GHC.Tc.Gen.SourceTable.
+    right_structural_rows self rows@[base, next, recur]
+      | Just [(Nothing, Just []), (Just [], Just [_]), (Just [_], Just [_])]
+          <- traverse constructor_columns rows
+      = right_constructor_row self base && all (constructor_row self True) [next, recur]
+    right_structural_rows _ _ = False
+
+    constructor_columns (L _ Match{m_pats = L _ [left, right]}) =
+      Just (constructor_fields (unparen left), constructor_fields (unparen right))
+    constructor_columns _ = Nothing
 
     mapping_row :: Name -> LMatch GhcPs (LHsExpr GhcPs) -> Bool
     mapping_row self (L _ Match{m_pats = L _ [callback, pat], m_grhss = rhss})
@@ -2749,8 +2775,8 @@ localSourceTableBinders binds sigs =
     constructor_fields (ListPat _ []) = Just []
     constructor_fields _ = Nothing
 
-    row_result :: Name -> [RdrName] -> [RdrName] -> LHsExpr GhcPs -> Bool
-    row_result self fields carried = check []
+    row_result :: Name -> [RdrName] -> [RdrName] -> [RdrName] -> LHsExpr GhcPs -> Bool
+    row_result self leading fields trailing = check []
       where
         check :: [LHsExpr GhcPs] -> LHsExpr GhcPs -> Bool
         check args expr = case unLoc (stripParensLHsExpr expr) of
@@ -2758,16 +2784,18 @@ localSourceTableBinders binds sigs =
           OpApp _ left op right -> check (left : right : args) op
           ExplicitList _ items -> null args && all (check []) items
           HsAppType _ fun _
-            | null carried -> case unLoc (stripParensLHsExpr fun) of
+            | null leading, null trailing -> case unLoc (stripParensLHsExpr fun) of
                 HsAppType{} -> check args fun
                 HsVar _ (L _ r) | is_self r -> check args fun
                 _ -> False
           HsVar _ (L _ r)
             | isRdrDataCon r -> all (check []) args
-            | r `elem` fields || r `elem` carried -> null args
-            | is_self r, Just (field : rest) <- traverse variable args
-            -> field `elem` fields && rest == carried
-            | is_self r, [next, pushed] <- args, [x, xs] <- fields, [acc] <- carried
+            | r `elem` fields || r `elem` leading || r `elem` trailing -> null args
+            | is_self r, Just operands <- traverse variable args
+            , (before, field : after) <- splitAt (length leading) operands
+            -> before == leading && field `elem` fields && after == trailing
+            | is_self r, null leading, [next, pushed] <- args
+            , [x, xs] <- fields, [acc] <- trailing
             -> variable next == Just xs && cons_onto x acc pushed
             | not (is_self r), not (null args) -> all (check []) args
           _ -> False
