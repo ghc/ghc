@@ -2663,6 +2663,7 @@ localSourceTableBinders binds sigs =
           all (mapping_row n) rows ||
           all pair_swap_row rows ]
   where
+    -- See Note [Reservation for pair swap equations].
     pair_swap_row (L _ Match{m_pats = L _ [pat], m_grhss = rhss})
       | TuplePat _ [first, second] Boxed <- unparen pat
       , VarPat _ (L _ x) <- unparen first
@@ -2791,6 +2792,25 @@ localSourceTableBinders binds sigs =
       VarPat{} -> True
       WildPat{} -> True
       _ -> False
+
+{- Note [Reservation for pair swap equations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Reserve a private source family name only for the direct pair swap.
+This happens before checking the signature. The reserved name takes
+precedence over the ordinary open evaluator at a local symbolic call.
+The early declaration scheduler can check the parameter permutation.
+
+If the general constructor-row scan reserves names for boxed tuple
+patterns, it also reserves names for projections and pair rebuilding.
+For example, the ordinary evaluator accepts
+  rebuild :: (a, b) -> (a, b)
+  rebuild (x, y) = (x, y)
+  law :: forall a b. rebuild '(a, b) :~: '(a, b)
+The early scheduler cannot publish this equation, so reserving the
+name makes the formerly accepted law fail with GHC-68947. Keep these
+functions on the ordinary path. The typed pair case checker verifies
+the swap and supplies its exact equation.
+-}
 
 -- | A type use requires equations before type declarations; a value use can wait.
 -- A missing arity marks a domain applied to the worker's bound parameters.
