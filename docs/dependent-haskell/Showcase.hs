@@ -175,6 +175,7 @@ import qualified OrdinaryFamilyBranches
 import qualified PreludeFoldrProof
 import qualified PreludeZipProof
 import qualified HaskLib
+import qualified SumOfSizes
 import qualified Client as HaskLibClient
 import qualified PreludeZipWithLengthProof
 import qualified PreludeZipWithProof
@@ -1952,6 +1953,8 @@ main = do
     prefixBound <- newIORef (HaskLib.Succ HaskLib.Zero) >>= readIORef
     observe "apply the same partially applied addition to equal sizes"
         (HaskLibClient.addUnder prefixBound prefixBound HaskLib.Zero)
+    case SumOfSizes.plusExists prefixBound prefixBound of
+        Sigma.Pair k Refl -> observe "read the sum with its equality proof" k
     prefixInput <- newIORef (True : error "forced the list beyond the prefix") >>= readIORef
     observe "take a runtime-bounded prefix and prove its length"
         (HaskLib.takeSize prefixBound prefixInput, HaskLib.lengthTakeSize prefixBound prefixInput)
