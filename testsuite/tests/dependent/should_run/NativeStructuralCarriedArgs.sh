@@ -8,12 +8,31 @@ ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-
 
 cat >"$work/Worker.hs" <<'HS'
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
-module Worker (Term(..), Label(..), decorate, decorateLast) where
+module Worker (Term(..), Label(..), decorate, decorateLast,
+               Nat(..), timesWild, timesNamed, pow) where
 
 import Data.Type.Equality ((:~:)(Refl))
 
 data Term = Empty | Atom Label | Next Term
 data Label = Here | There Label
+
+data Nat = Zero | Succ Nat
+
+plus :: Nat -> Nat -> Nat
+plus Zero n = n
+plus (Succ m) n = Succ (plus m n)
+
+timesWild :: Nat -> Nat -> Nat
+timesWild Zero _ = Zero
+timesWild (Succ m) n = plus n (timesWild m n)
+
+timesNamed :: Nat -> Nat -> Nat
+timesNamed Zero n = Zero
+timesNamed (Succ m) n = plus n (timesNamed m n)
+
+pow :: Nat -> Nat -> Nat
+pow m Zero = Succ Zero
+pow m (Succ n) = timesNamed m (pow m n)
 
 decorate :: Term -> Label -> Label -> Term
 decorate Empty left right = Empty
@@ -52,6 +71,12 @@ nextLast :: foreach (l :: Label) -> foreach (t :: Term)
          -> decorateLast l ('Next t) :~: 'Next (decorateLast l t)
 nextLast _ _ = Refl
 
+wildZero :: foreach (n :: Nat) -> timesWild 'Zero n :~: 'Zero
+wildZero _ = Refl
+
+namedZero :: foreach (n :: Nat) -> timesNamed 'Zero n :~: 'Zero
+namedZero _ = Refl
+
 #ifdef WRONG
 wrong :: foreach (l :: Label) -> foreach (r :: Label) -> decorate 'Empty l r :~: 'Atom r
 wrong _ _ = Refl
@@ -64,7 +89,10 @@ wrong _ _ = Refl
 main :: IO ()
 main = case decorate Empty (error "left label") (error "right label") of
     Empty -> case decorateLast (error "label") Empty of
-        Atom _ -> print True
+        Atom _ ->
+            case (wildZero Zero, namedZero Zero, timesWild Zero (error "multiplier")) of
+                (Refl, Refl, Zero) -> print True
+                _ -> print False
         _ -> print False
     _ -> print False
 HS
@@ -74,7 +102,7 @@ for opt in -O0 -O2; do
     mkdir -p "$base/provider" "$base/client"
     cd "$base/provider"
     cp "$work/Worker.hs" .
-    "${ghc[@]}" "$opt" -fomit-interface-pragmas -c Worker.hs
+    "${ghc[@]}" "$opt" -fomit-interface-pragmas -fno-write-if-simplified-core -c Worker.hs
     cp Worker.{hi,o} ../client/
     if "${ghc[@]}" "$opt" -DWRONG_LOCAL -fforce-recomp -c Worker.hs >wrong.log 2>&1 ||
        ! grep -Fq 'error: [GHC-83865]' wrong.log; then

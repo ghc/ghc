@@ -709,7 +709,12 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
           let binds = tcg_binds tcg_env'
           tables <- if tables_enabled || write_equations
                     then sourceTableTyCons False binds else pure []
-          (cases, fields) <- sourceCaseTables binds
+          -- Keep complete source equations ahead of partial final-Core
+          -- equations for the same owner.
+          let nominal_owners = if tables_enabled
+                then mkNameSet (map (idName . fst) tables)
+                else emptyNameSet
+          (cases, fields) <- sourceCaseTables nominal_owners binds
           -- Keep the existing ordinary certificates when both checkers
           -- accept the same owner. Enumeration cases retain executable origin.
           let case_owners = mkNameSet (map (idName . fst) cases)
