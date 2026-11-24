@@ -8,7 +8,7 @@ ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-
 
 cat >"$work/Worker.hs" <<'HS'
 {-# LANGUAGE ExperimentalDependentTypes #-}
-module Worker (Term(..), Label(..), decorate) where
+module Worker (Term(..), Label(..), decorate, decorateLast) where
 
 data Term = Empty | Atom Label | Next Term
 data Label = Here | There Label
@@ -17,6 +17,11 @@ decorate :: Term -> Label -> Label -> Term
 decorate Empty left right = Empty
 decorate (Atom _) left right = Next (Atom right)
 decorate (Next term) left right = Next (decorate term left right)
+
+decorateLast :: Label -> Term -> Term
+decorateLast label Empty = Atom label
+decorateLast label (Atom _) = Empty
+decorateLast label (Next term) = Next (decorateLast label term)
 HS
 cat >"$work/Main.hs" <<'HS'
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
@@ -29,14 +34,24 @@ next :: foreach (t :: Term) -> foreach (l :: Label) -> foreach (r :: Label)
      -> decorate ('Next t) l r :~: 'Next (decorate t l r)
 next _ _ _ = Refl
 
+nextLast :: foreach (l :: Label) -> foreach (t :: Term)
+         -> decorateLast l ('Next t) :~: 'Next (decorateLast l t)
+nextLast _ _ = Refl
+
 #ifdef WRONG
 wrong :: foreach (l :: Label) -> foreach (r :: Label) -> decorate 'Empty l r :~: 'Atom r
+wrong _ _ = Refl
+#elif defined(WRONG_LAST)
+wrong :: foreach (l :: Label) -> foreach (t :: Term)
+      -> decorateLast l ('Next t) :~: 'Next (decorateLast ('There l) t)
 wrong _ _ = Refl
 #endif
 
 main :: IO ()
 main = case decorate Empty (error "left label") (error "right label") of
-    Empty -> print True
+    Empty -> case decorateLast (error "label") Empty of
+        Atom _ -> print True
+        _ -> print False
     _ -> print False
 HS
 
@@ -54,9 +69,11 @@ for opt in -O0 -O2; do
     ./check >actual
     printf 'True\n' | cmp - actual
 
-    if "${ghc[@]}" "$opt" -DWRONG -fforce-recomp -c Main.hs >wrong.log 2>&1 ||
-       ! grep -Fq 'error: [GHC-83865]' wrong.log; then
-        cat wrong.log >&2
-        exit 1
-    fi
+    for wrong in WRONG WRONG_LAST; do
+        if "${ghc[@]}" "$opt" -D"$wrong" -fforce-recomp -c Main.hs >wrong.log 2>&1 ||
+           ! grep -Fq 'error: [GHC-83865]' wrong.log; then
+            cat wrong.log >&2
+            exit 1
+        fi
+    done
 done
