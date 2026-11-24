@@ -376,7 +376,8 @@ evidenceSuffix requirements
     || needs OrderedRepPolyNewtypeEvidence || needs OrderedTypeDataTelescopeEvidence
     || needs NamedRetainedCallbackEvidence || needs ScopedSumDomainEvidence
     || needs ComposedScopedSumDomainEvidence || needs RetainedSiblingFieldsEvidence
-    || needs RetainedNamedRecordEvidence || needs RetainedRecordParametersEvidence = feature_set
+    || needs RetainedNamedRecordEvidence || needs RetainedRecordParametersEvidence
+    || needs CheckedClosureSourceTableEvidence = feature_set
   | needs RetainedDefaultEvidence
   , needs ErasedExistentialEvidence || needs ScopedSigmaEvidence || needs ImplicitExistentialEvidence
   = feature_set
@@ -449,6 +450,7 @@ legacyEvidenceSuffix ComposedScopedSumDomainEvidence = featureSetPrefix ++ "scop
 legacyEvidenceSuffix RetainedSiblingFieldsEvidence = featureSetPrefix ++ "retained-sibling-fields-v1"
 legacyEvidenceSuffix RetainedNamedRecordEvidence = featureSetPrefix ++ "retained-named-record-v1"
 legacyEvidenceSuffix RetainedRecordParametersEvidence = featureSetPrefix ++ "retained-record-parameters-v1"
+legacyEvidenceSuffix CheckedClosureSourceTableEvidence = featureSetPrefix ++ "checked-closure-source-table"
 legacyEvidenceSuffix NamedRetainedCallbackEvidence = featureSetPrefix ++ "named-retained-callback-v1"
 legacyEvidenceSuffix DepFunCoEvidence           = "-retained-depfunco-v1"
 legacyEvidenceSuffix ConstructorCaseEvidence   = "-retained-constructor-case-v1"
@@ -529,7 +531,8 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("scoped-sum-domain-v2", ComposedScopedSumDomainEvidence)
                       , ("retained-sibling-fields-v1", RetainedSiblingFieldsEvidence)
                       , ("retained-named-record-v1", RetainedNamedRecordEvidence)
-                      , ("retained-record-parameters-v1", RetainedRecordParametersEvidence) ]
+                      , ("retained-record-parameters-v1", RetainedRecordParametersEvidence)
+                      , ("checked-closure-source-table", CheckedClosureSourceTableEvidence) ]
 
 -- | Accept the old suffixes and the canonical spelling of a new feature set.
 parseEvidenceSuffix :: String -> Maybe IfaceEvidenceVersion

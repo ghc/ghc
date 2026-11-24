@@ -230,6 +230,10 @@ data IdDetails
       Name
         -- ^ 'Name' of the dictionary function the instance method belongs to.
 
+  -- | A checked indexed closure family and the source Names of its helpers.
+  -- See Note [Checked closure dependencies] in GHC.Tc.Gen.SourceTable.
+  | CheckedClosureSourceTableId Name TyCon [Name]
+
 data RecSelInfo
   = RSI { rsi_def   :: [ConLike]   -- Record selector defined for these
         , rsi_undef :: [ConLike]   -- Record selector not defined for these
@@ -461,6 +465,8 @@ pprIdDetails other     = brackets (pp other)
              NominalSourceTable -> "SourceTable"
              ExecutableSourceTable -> "ExecutableSourceTable"
              FinalCoreSourceTable -> "FinalCoreSourceTable"
+   pp (CheckedClosureSourceTableId _ table helpers) =
+     text "CheckedClosureSourceTable" <+> ppr table <+> ppr helpers
    pp (WorkerLikeId dmds)     = text "StrictWorker" <> parens (ppr dmds)
    pp (DataConWorkId _)       = text "DataCon"
    pp (DataConWrapId _)       = text "DataConWrapper"

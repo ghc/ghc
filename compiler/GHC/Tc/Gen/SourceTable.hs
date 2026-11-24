@@ -1824,6 +1824,22 @@ sourceRuleOwnersWith zonk arg rules = unionNameSets <$> sequence
     first_arg (WpSubType w) = first_arg w
     first_arg _ = Nothing
 
+{- Note [Checked closure dependencies]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A checked closure interpreter can inline or combine its source helpers.
+Their Names need not occur in a generated equation. The interface's
+checked-closure source-table details therefore store the helper Names
+alongside the private family. These Names are part of the owner's
+interface fingerprint.
+
+Keep this information in the source-table details. The ordinary term Id
+must not become a source proof at every runtime occurrence. The reader
+for a checked closure table must check the helper Rules before using the
+equations. The selective header feature makes a reader without that
+payload reject a closure interface before decoding it. Other source
+tables keep their existing interface format.
+-}
+
 {- Note [Closed source tables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For a definition such as
