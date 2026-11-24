@@ -2132,6 +2132,20 @@ sourceCaseTables binds = do
             table <- publishConstructorRows owner telescope domains result [row]
             pure (Just (finalOwner owner table, table), [])
           _ -> pure (Nothing, [])
+      let final_entries = catMaybes (map fst final)
+          checked_predicates = mkNameEnv [(idName v, v) | (v, _) <- final_entries,
+                                                         isFinalStructuralSource v]
+          predicate callee =
+            checkedBranchPredicate (fromMaybe callee (lookupNameEnv checked_predicates (idName callee)))
+      boolean_cases <- forM
+        [ (owner, signature, rows)
+        | (owner, body, _, Nothing) <- prepared
+        , partial_case_candidate owner
+        , Just (signature, rows) <- [checkedBooleanConstructorCase public predicate owner (prepare body)]
+        ] $ \(owner, signature@(ConstructorCaseType _ _ _ _ _ result), rows) -> do
+          select <- publishBooleanSelector owner result
+          table <- publishConstructorCase owner signature (selectConstructorRows select rows)
+          pure ((finalOwner owner table, table), select)
       let reverse_workers = mkNameEnv
             [(idName worker, table) | (Just (worker, table), _) <- final,
                                       isReverseWorkerTable table]
@@ -2182,9 +2196,11 @@ sourceCaseTables binds = do
         \(owner, (telescope, domains, result, row)) -> do
           table <- publishConstructorRows owner telescope domains result [row]
           pure (finalOwner owner table, table)
-      let (final_tables, guard_tables) = unzip final
-      pure (catMaybes final_tables ++ reverse_wrappers ++ identities ++ roots ++ used_helpers,
-            concat guard_tables ++ concat fields)
+      let (boolean_tables, boolean_selectors) = unzip boolean_cases
+          boolean_owners = mkNameSet (map (idName . fst) boolean_tables)
+          other_final = filter (\(v, _) -> not (idName v `elemNameSet` boolean_owners)) final_entries
+      pure (other_final ++ boolean_tables ++ reverse_wrappers ++ identities ++ roots ++ used_helpers,
+            concatMap snd final ++ boolean_selectors ++ concat fields)
   where
     finalOwner owner table = setIdDetails owner
       (SourceTableId (idName owner) table FinalCoreSourceTable)
@@ -3072,6 +3088,7 @@ data ConstructorCaseTree
   | CaseCall TyCon [Type] [ConstructorCaseTree]
   | CaseSelf [Type] [ConstructorCaseTree]
   | CaseApply Id [ConstructorCaseTree]
+  | CaseBoolean ConstructorCaseTree ConstructorCaseTree ConstructorCaseTree
 
 -- | A complete path through the Core cases and its checked result.
 data ConstructorCaseRow = ConstructorCaseRow [ConstructorCaseTree] ConstructorCaseTree
@@ -4344,7 +4361,7 @@ verifyFinalCoreMapper binds original =
 isFinalCoreCaseTable :: TyCon -> Bool
 isFinalCoreCaseTable table =
     isFinalCoreListCaseTable table || isTwoStructuralCaseTable table ||
-    isPartialConstructorCaseTable table
+    isPartialConstructorCaseTable table || isJust (booleanSelector table)
 
 isFinalCoreListCaseTable :: TyCon -> Bool
 isFinalCoreListCaseTable table =
@@ -4387,6 +4404,13 @@ checkedFinalCaseTable bindings table = isJust $ do
                   check Nothing <|> do
                     worker <- checkedSpecConstrWorker bindings table owner
                     check (Just worker)
+              | Just select <- booleanSelector table ->
+                  let predicate callee =
+                        checkedBranchPredicate (fromMaybe callee (fst <$> find ((== callee) . fst) bindings))
+                  in do
+                    (signature, rows) <- checkedBooleanConstructorCase (const True) predicate owner rhs
+                    guard (matchesConstructorCase table signature (selectConstructorRows select rows))
+                    pure (signature, rows)
               | isTwoStructuralCaseTable table || isSizeListCaseTable table -> do
                   (signature, rows) <- checkedStructuralCase (const True) owner rhs
                   guard (matchesConstructorCase table signature rows)
@@ -4412,7 +4436,7 @@ checkedTwoListCaseWith :: Maybe Id -> (TyCon -> Bool) -> Id -> Core.CoreExpr
                        -> Maybe (ConstructorCaseType, [ConstructorCaseRow])
 checkedTwoListCaseWith specialized public owner rhs = do
     (signature, rows) <-
-      checkedConstructorCaseWith False specialized public (const Nothing) owner
+      checkedConstructorCaseWith CompleteConstructorCase specialized public (const Nothing) owner
         (stripTicksE isSourceBreakpoint rhs) <|>
       (guard (isNothing specialized) *> checkedListZip public owner rhs)
     guard (isTwoListCase signature)
@@ -4436,7 +4460,7 @@ checkedPartialConstructorCase :: (TyCon -> Bool) -> Id -> Core.CoreExpr
                               -> Maybe (ConstructorCaseType, [ConstructorCaseRow])
 checkedPartialConstructorCase public owner rhs = do
     checked@(ConstructorCaseType _ root _ _ _ _, rows) <-
-      checkedConstructorCaseWith True Nothing public (const Nothing) owner
+      checkedConstructorCaseWith IndependentConstructorCase Nothing public (const Nothing) owner
         (stripTicksE isSourceBreakpoint rhs)
     guard (not (null rows) && length rows < length (tyConDataCons root))
     pure checked
@@ -4469,6 +4493,61 @@ isPartialConstructorCaseTable table = isJust $ do
              eqTypes (fields ++ carried) (mkTyVarTys (coAxBranchTyVars branch)))
       pure con
 
+-- | Use only the existing checked predicate on two structural operands.
+checkedBranchPredicate :: Id -> Maybe TyCon
+checkedBranchPredicate callee = do
+    guard (isFinalStructuralSource callee)
+    table <- sourceTableId_maybe callee
+    guard (tyConResKind table `eqType` boolTy)
+    pure table
+
+checkedBooleanConstructorCase :: (TyCon -> Bool) -> (Id -> Maybe TyCon) -> Id -> Core.CoreExpr
+                              -> Maybe (ConstructorCaseType, [ConstructorCaseRow])
+checkedBooleanConstructorCase public predicate owner rhs = do
+    checked@(_, rows) <- checkedConstructorCaseWith BooleanConstructorCase Nothing public predicate owner
+                          (stripTicksE isSourceBreakpoint rhs)
+    guard (any checked_guard rows)
+    pure checked
+  where
+    checked_guard (ConstructorCaseRow _ CaseBoolean{}) = True
+    checked_guard _ = False
+
+-- | Recover the private selector of an ordinary constructor case.
+booleanSelector :: TyCon -> Maybe TyCon
+booleanSelector table = do
+    _ <- partialConstructorCaseType (tyConKind table)
+    callees <- sourceTableCallees table
+    select <- find (isFilterGuardFor table) callees
+    let result = tyConResKind table
+    (domains, selected) <- ordinaryArrows (tyConKind select)
+    guard (eqTypes domains [boolTy, result, result] && selected `eqType` result)
+    pure select
+
+-- | Keep a Boolean scrutinee even when both branches have the same result.
+publishBooleanSelector :: Id -> Type -> TcM TyCon
+publishBooleanSelector owner result = do
+    let term = idName owner
+        loc = nameSrcSpan term
+    binders <- traverse (uncurry fresh) [("test", boolTy), ("no", result), ("yes", result)]
+    no <- fresh "no" result
+    yes <- fresh "yes" result
+    name <- newImplicitBinder term filterGuardOcc
+    axiom <- newImplicitBinder name mkInstTyCoOcc
+    let choose con selected _ =
+          mkCoAxBranch [no, yes] [] [] (mkTyConTy (promoteDataCon con) : mkTyVarTys [no, yes])
+                        (mkTyVarTy selected) [Nominal, Nominal] loc
+    pure (buildSourceFamily name axiom (mkAnonTyConBinders binders) result
+                            [choose falseDataCon no, choose trueDataCon yes])
+  where
+    fresh occ ty = flip mkTyVar ty <$> newSysName (mkTyVarOcc occ)
+
+selectConstructorRows :: TyCon -> [ConstructorCaseRow] -> [ConstructorCaseRow]
+selectConstructorRows select = map select_row
+  where
+    select_row (ConstructorCaseRow lhs (CaseBoolean test rejected accepted)) =
+      ConstructorCaseRow lhs (CaseCall select [] [test, rejected, accepted])
+    select_row row = row
+
 {- Note [Independent constructor equations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 One alternative may compute a guard even though another returns a constructor
@@ -4488,6 +4567,19 @@ equation, even if both of its branches return the same value.
 
 Publish the checked subset only with the exact term owner. Check the same
 rows against the final Core and use its usual rule checks in clients.
+
+An ordinary case on a checked Boolean call can also retain both branches.
+Use the exact saturated predicate. All three expressions must pass the
+same scope, kind and recursion checks. Return the original case pattern
+if a branch returns the root case binder. Simplification can replace a
+constructor reconstruction with this binder. It has already been forced
+by the outer case.
+
+The private selector has an equation for each Boolean constructor.
+A scrutinee that is still unknown leaves the selector stuck, even when
+both arms are equal. Keep the predicate's family in the equation so that
+the rule-dependency walk checks it. Check the same call and alternatives
+in final Core. The guard and the root leave the interface together.
 -}
 
 {- Note [Checked constructor specialization]
@@ -4562,7 +4654,7 @@ checkedSpecConstrWorker bindings table owner = do
     guard (eqTypes (map varType fields) (map instantiate [mkTyVarTy a, left, right]) &&
            maybe True null (idCbvMarks_maybe worker))
     guard (lazySpecConstrFields (tidyCbvInfoTop emptyNameSet worker rhs))
-    rows <- checkedConstructorRows False True False (const True) Nothing (const Nothing)
+    rows <- checkedConstructorRows CompleteConstructorCase True False (const True) Nothing (const Nothing)
               (checkedSpecializedCall worker other parameters)
               parameters (instantiate result) [pattern, CaseField other] other body
     axiom <- closedFamilyTyConCoAxiom_maybe table
@@ -4642,11 +4734,17 @@ matchesConstructorRows table telescope rows branches = isJust $ do
 -- | Read exhaustive cases on exact bound operands and check each result.
 checkedConstructorCase :: (TyCon -> Bool) -> (Id -> Maybe TyCon) -> Id -> Core.CoreExpr
                        -> Maybe (ConstructorCaseType, [ConstructorCaseRow])
-checkedConstructorCase = checkedConstructorCaseWith False Nothing
+checkedConstructorCase = checkedConstructorCaseWith CompleteConstructorCase Nothing
 
-checkedConstructorCaseWith :: Bool -> Maybe Id -> (TyCon -> Bool) -> (Id -> Maybe TyCon) -> Id -> Core.CoreExpr
+data ConstructorCaseMode
+  = CompleteConstructorCase
+  | IndependentConstructorCase
+  | BooleanConstructorCase
+  deriving Eq
+
+checkedConstructorCaseWith :: ConstructorCaseMode -> Maybe Id -> (TyCon -> Bool) -> (Id -> Maybe TyCon) -> Id -> Core.CoreExpr
                            -> Maybe (ConstructorCaseType, [ConstructorCaseRow])
-checkedConstructorCaseWith partial specialized visible helper owner rhs = do
+checkedConstructorCaseWith mode specialized visible helper owner rhs = do
     let rhs_type = exprType rhs
     guard (rhs_type `eqType` varType owner)
     signature@(ConstructorCaseType telescope tc args domains position result) <-
@@ -4676,7 +4774,8 @@ checkedConstructorCaseWith partial specialized visible helper owner rhs = do
               checkedSpecializedCall worker other (mkTyVarTys (binderVars telescope))
                                      patterns aliases expr)
     let tail_recursive_predicate = isTwoStructuralCase signature && result `eqType` boolTy
-    rows <- checkedConstructorRows partial (partial || multipleCaseOperands signature) tail_recursive_predicate
+    rows <- checkedConstructorRows mode (mode /= CompleteConstructorCase || multipleCaseOperands signature)
+                                  tail_recursive_predicate
                                   public witness_root helper recursive kinds result
                                   (map CaseField terms) scrutinee body
     forM_ witness_root $ \con -> do
@@ -4693,7 +4792,7 @@ checkedConstructorCaseWith partial specialized visible helper owner rhs = do
     is_field _ = False
 
     signature_type ty
-      | partial = partialConstructorCaseType ty
+      | mode /= CompleteConstructorCase = partialConstructorCaseType ty
       | otherwise = constructorCaseType ty <|> (snd <$> monomorphicRetainedWitnessType ty)
     checked_signature = signature_type (exprType rhs)
 
@@ -4741,12 +4840,12 @@ multipleCaseOperands signature =
     isTwoListCase signature || isTwoStructuralCase signature || isSizeListCase signature
 
 -- | Check the remaining cases from the supplied operand patterns.
-checkedConstructorRows :: Bool -> Bool -> Bool -> (TyCon -> Bool) -> Maybe DataCon -> (Id -> Maybe TyCon)
+checkedConstructorRows :: ConstructorCaseMode -> Bool -> Bool -> (TyCon -> Bool) -> Maybe DataCon -> (Id -> Maybe TyCon)
                        -> ([ConstructorCaseTree] -> [(Id, Id)] -> Core.CoreExpr -> Maybe ConstructorCaseTree)
                        -> [Type] -> Type -> [ConstructorCaseTree] -> Id -> Core.CoreExpr
                        -> Maybe [ConstructorCaseRow]
-checkedConstructorRows partial bind_aliases tail_self public witness_root helper recursive parameters result patterns scrutinee =
-    checkBody patterns [] (Just scrutinee)
+checkedConstructorRows mode bind_aliases tail_self public witness_root helper recursive parameters result patterns root =
+    checkBody patterns [] (Just root)
   where
     checkCase partial_root patterns aliases scrutinee
               (Core.Case (Core.Var actual) binder case_result alternatives) = do
@@ -4809,7 +4908,7 @@ checkedConstructorRows partial bind_aliases tail_self public witness_root helper
 
     checkBody patterns aliases first_case body = case body of
       Core.Case (Core.Var next) _ _ _ ->
-        checkCase (partial && isJust first_case) patterns aliases
+        checkCase (mode == IndependentConstructorCase && isJust first_case) patterns aliases
           (fromMaybe (resolveCaseAlias aliases next) first_case) body
       Core.Let (Core.NonRec binder (Core.Var target)) rest
         | isId binder, binder /= target, not (scoped binder)
@@ -4818,17 +4917,34 @@ checkedConstructorRows partial bind_aliases tail_self public witness_root helper
         , let selected = resolveCaseAlias aliases target
         , scoped selected ->
             checkBody patterns ((binder, selected) : aliases) first_case rest
+      Core.Case test binder ty
+        [ Core.Alt (Core.DataAlt rejected) [] no, Core.Alt (Core.DataAlt accepted) [] yes ]
+        | mode == BooleanConstructorCase, isNothing first_case
+        , rejected == falseDataCon, accepted == trueDataCon
+        , ty `eqType` result, varType binder `eqType` boolTy -> do
+            predicate@CaseCall{} <- checkCaseResult public public_kind helper select
+                                       (const Nothing) boolTy test
+            on_false <- check_result no
+            on_true <- check_result yes
+            pure [ConstructorCaseRow patterns (CaseBoolean predicate on_false on_true)]
       _ -> do
         guard (isNothing first_case)
-        let check_self = recursive patterns aliases
-        value <- (guard tail_self *> check_self body) <|>
-                 checkCaseResult public (casePublicKind public parameters) helper
-                    (\v -> let selected = resolveCaseAlias aliases v
-                           in selected <$ guard (scoped selected))
-                    check_self result body
+        value <- check_result body
         pure [ConstructorCaseRow patterns value]
       where
         scoped v = any (hasCaseField v) patterns
+        public_kind = casePublicKind public parameters
+        select v = let selected = resolveCaseAlias aliases v
+                   in selected <$ guard (scoped selected)
+        check_self = recursive patterns aliases
+        check_result (Core.Var v)
+          | mode == BooleanConstructorCase
+          , resolveCaseAlias aliases v == root
+          , varType v `eqType` result
+          , pattern@CaseConstructor{} : _ <- patterns
+          = Just pattern
+        check_result rhs = (guard tail_self *> check_self rhs) <|>
+          checkCaseResult public public_kind helper select check_self result rhs
 
 recursiveCaseOperand :: (Id, ConstructorCaseTree) -> Id -> Maybe (Bool, ConstructorCaseTree)
 recursiveCaseOperand (original, pattern) field
@@ -4973,6 +5089,7 @@ constructorCaseTreeType family instantiate fields = translate
     translate (CaseCall table args children) = application table args children
     translate (CaseSelf args operands) = application family args operands
     translate (CaseApply fun args) = mkAppTys (fieldType fun) (map translate args)
+    translate CaseBoolean{} = panic "constructorCaseTreeType: untranslated Boolean case"
 
     application tc args children = mkTyConApp tc (map instantiate args ++ map translate children)
     fieldType selected = case lookup selected fields of
