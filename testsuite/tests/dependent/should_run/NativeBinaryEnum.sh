@@ -59,8 +59,12 @@ flags=("-B$lib" -v0 -O0 -package-env - -fexternal-interpreter -dcore-lint -dstg-
     "$compiler" "${flags[@]}" --show-iface Cert.hi >cert.iface
     grep -Fq 'SourceTable T:flipBit' cert.iface
     grep -Fq 'ExecutableSourceTable T:choose' cert.iface
-    for worker in bothDemanded secondFirst explicitStrict three guarded; do
+    for worker in secondFirst three guarded; do
         if grep -Fq "SourceTable T:$worker" cert.iface; then exit 1; fi
+    done
+    # Only the False branch of these workers has a checked Core equation.
+    for worker in bothDemanded explicitStrict; do
+        if grep -Fq "ExecutableSourceTable T:$worker" cert.iface; then exit 1; fi
     done
     "$compiler" "${flags[@]}" -XNoExperimentalDependentTypes -c ImplicitStrict.hs
     "$compiler" "${flags[@]}" --show-iface ImplicitStrict.hi >strict.iface
@@ -81,6 +85,9 @@ type family Finish (f :: Bool %U -> Bool) (b :: Bool) where
 type Skipped b = Finish (C.choose 'True) b
 type Carried b = Finish (C.choose 'False) b
 type Unary = Finish C.flipBit 'False
+type BothFalse b = C.bothDemanded 'False b
+type StrictFalse b = C.explicitStrict 'False b
+type StrictTrue b = C.explicitStrict 'True b
 HS
 "$compiler" "${flags[@]}" -c Prefix.hs
 rm Prefix.hs
@@ -99,8 +106,30 @@ carried = Refl
 
 unary :: Unary :~: 'True
 unary = Refl
+
+bothFalse :: BothFalse b :~: b
+bothFalse = Refl
+
+strictFalse :: StrictFalse b :~: b
+strictFalse = Refl
 HS
 "$compiler" "${flags[@]}" -c Proof.hs
+cat >Demand.hs <<'HS'
+{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
+module Demand where
+
+import Data.Proxy (Proxy)
+import Data.Type.Equality ((:~:)(Refl))
+import Prefix
+
+bad :: Proxy b -> StrictTrue b :~: 'False
+bad _ = Refl
+HS
+if "$compiler" "${flags[@]}" -c Demand.hs >demand.log 2>&1 ||
+   ! grep -Fq '[GHC-83865]' demand.log || ! grep -Fq 'bad _ = Refl' demand.log; then
+    cat demand.log >&2
+    exit 1
+fi
 cat >Ruled.hs <<'HS'
 {-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeOperators #-}
 module Ruled where
