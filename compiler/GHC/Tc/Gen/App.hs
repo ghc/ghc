@@ -1799,10 +1799,11 @@ Compute one capability for the application. Enable it when the source flag is
 set, when the zonked head or an available expected type contains native syntax,
 or when tcRetainedInferableArg finds a declared native value anchor. A record
 selector with a retained receiver is such an anchor. The renamer gives it a
-separate expression form. This selection only reads existing types. It does
-not infer arguments, instantiate a signature, record occurrences or usage, or
-expand source syntax. Read an available expected type without allocating an
-inference cell.
+separate expression form. A generated selector can quantify the datatype
+parameters before taking its retained receiver. This selection reads only
+existing types. It does not infer arguments, instantiate a signature, record
+occurrences or usage, or expand source syntax. Read an available expected type
+without allocating an inference cell.
 
 Pass the capability to the existing application helpers and evidence capture.
 Keep their Quick Look modes, complete immutable choices, scope checks, typed
@@ -6153,7 +6154,9 @@ tcRetainedInferableArg (L _ expr)
       XExpr (HsRecSelRn (FieldOcc _ (L _ name)))
         -> do { mb_id <- tcLookupIdMaybe name
               ; return $ case mb_id of
-                  Just sel | DepFunTy DepFunVisible _ _ <- coreFullView (varType sel)
+                  Just sel
+                    | (_, body) <- tcSplitForAllInvisTyVars (varType sel)
+                    , DepFunTy DepFunVisible _ _ <- coreFullView body
                     -> (True, True)
                   _ -> (False, False) }
       HsApp _ fun arg -> application fun [arg]
