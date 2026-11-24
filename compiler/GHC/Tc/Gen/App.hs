@@ -881,7 +881,9 @@ tcOrdinaryAppScoped fields checked_prefix rn_expr rn_head@(rn_fun, fun_lspan) tc
               -- at value arguments. Preserve the checked leading prefix.
               -- See Note [Quick Look for particular Ids].
               vta_cache <- case do_ql of
-                NoQL | native_app, not (null [() | ETypeArg{} <- rn_args])
+                NoQL | native_app
+                     , let (_, _, head_ty) = tcRetainedInstTelescope fun_sigma
+                     , any is_type_arg rn_args || has_required_prefix head_ty
                   -> Just <$> newTcRef Nothing
                 _ -> return Nothing
             ; let instantiate =
@@ -903,6 +905,14 @@ tcOrdinaryAppScoped fields checked_prefix rn_expr rn_head@(rn_fun, fun_lspan) tc
             ; finishAppWithScopedCache fields (arg_cache ++ extra_cache) prepare do_ql rn_expr fun_lspan
                 source_fun tc_fun inst_args app_res_rho written_res_ty } }
   where
+    is_type_arg ETypeArg{} = True
+    is_type_arg _ = False
+
+    has_required_prefix ty
+      | Just (_, tvb, _) <- tcSplitForAllTyVarBinder_maybe ty
+      = isVisibleForAllTyFlag (binderFlag tvb)
+      | otherwise = False
+
     -- See Note [Type arguments before an implicit package head].
     source_fun
       | HsVar _ name <- rn_fun
@@ -3791,7 +3801,7 @@ codomain to Size. Zonk the remaining telescope before selecting erased
 arguments from the proof. Apply the choices to that same telescope so
 the binder-kind check sees the assignments made by the type argument.
 
-ITYARG checks each written type argument once. After leading type arguments,
+ITYARG and ITVDQ check each written type argument once. After leading type arguments,
 use the substituted signature to infer native arguments before IALL
 allocates the remaining type variables. Keep the original head and checked
 type arguments. Pass immutable choices to IALL so that type applications and
@@ -3806,7 +3816,11 @@ matching fails. The public tcInstFun caller cannot consume a cache and leaves
 this step disabled. The optional reference records whether inference was
 attempted, so further IALL steps cannot infer an argument again. The mode
 argument gives the diagnostic offset of the consumed written type arguments.
-Calls without type arguments do not allocate the reference.
+Only a written type application or a leading required forall needs the
+reference. After ITVDQ checks its argument, keep it in the type-argument
+spine. It is erased, so it does not advance the value argument position.
+For example, in `cong Succ (assoc m n p)`, the argument `Succ` fixes the
+kinds and the recursive proof supplies the retained endpoints.
 
 Cache keys count value arguments. Diagnostic positions also count written type
 arguments. Keep separate counters in tcValArgsWithCache; otherwise a written
@@ -4154,14 +4168,15 @@ tcInstFunWithPrefix look_arg prefix_only prefix vta_cache expected_rho inst_plan
            ; go plan fun_orig (pos + 1) (arg' : acc) body_ty rest_args }
 
     -- Rule ITVDQ from the GHC Proposal #281
-    go1 plan fun_orig pos acc fun_ty ((EValArg { ea_arg = arg }) : rest_args)
+    go1 plan fun_orig pos acc fun_ty (EValArg { ea_arg = arg, ea_loc_span = ctxt } : rest_args)
       | Just (ma, tvb, body) <- tcSplitForAllTyVarBinder_maybe fun_ty
       = assertPpr (isVisibleForAllTyFlag (binderFlag tvb)) (ppr fun_ty $$ ppr arg) $
         -- Any invisible binders have been instantiated by IALL above,
         -- so this forall must be visible (i.e. Required)
-        do { (ty_arg, inst_body) <- tcVDQ fun_conc_tvs (ma, tvb, body) arg
-           ; let wrap = mkWpTyApps [ty_arg]
-           ; go plan fun_orig (pos+1) (addArgWrap wrap acc) inst_body rest_args }
+        do { (hs_ty, ty_arg, inst_body) <- tcVDQ fun_conc_tvs (ma, tvb, body) arg
+           ; let arg' = ETypeArg { ea_loc_span = ctxt, ea_hs_ty = hs_ty
+                                 , ea_ty_source = Nothing, ea_ty_arg = ty_arg }
+           ; go plan fun_orig pos (arg' : acc) inst_body rest_args }
 
     go1 plan fun_orig pos acc fun_ty (EWrap w : args)
       = go1 plan fun_orig pos (EWrap w : acc) fun_ty args
@@ -7966,10 +7981,11 @@ tcVTA conc_tvs fun_ty source hs_ty
 tcVDQ :: ConcreteTyVars              -- See Note [Representation-polymorphism checking built-ins]
       -> (Matchability, ForAllTyBinder, TcType)    -- Function type
       -> LHsExpr GhcRn               -- Argument type
-      -> TcM (TcType, TcType)
+      -> TcM (LHsWcType GhcRn, TcType, TcType)
 tcVDQ conc_tvs (ma, tvb, inner_ty) arg
   = do { hs_wc_ty <- expr_to_type arg
-       ; tc_inst_forall_arg conc_tvs (ma, tvb, inner_ty) Nothing hs_wc_ty }
+       ; (ty_arg, inst_ty) <- tc_inst_forall_arg conc_tvs (ma, tvb, inner_ty) Nothing hs_wc_ty
+       ; return (hs_wc_ty, ty_arg, inst_ty) }
 
 -- Convert a HsExpr into the equivalent HsType.
 -- See [RequiredTypeArguments and the T2T mapping]
@@ -8143,7 +8159,7 @@ so we are expecting a type argument. More precisely, this happens in tcVDQ in GH
   tcVDQ :: ConcreteTyVars              -- See Note [Representation-polymorphism checking built-ins]
         -> (Matchability, ForAllTyBinder, TcType)    -- Function type
         -> LHsExpr GhcRn               -- Argument type
-        -> TcM (TcType, TcType)
+        -> TcM (LHsWcType GhcRn, TcType, TcType)
 
 What we want is a type to instantiate the forall-bound variable. But what we have is an HsExpr,
 and we need to convert it to an HsType in order to reuse the same code paths as we use for
