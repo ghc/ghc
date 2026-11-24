@@ -1444,13 +1444,12 @@ throw an error accordingly.
 -- See Note [Unquoted constructors in symbolic source operands].
 rnHsAppTy :: RnTyKiEnv -> Bool -> LHsType GhcPs -> LHsType GhcPs -> RnM (HsType GhcRn, FreeNames)
 rnHsAppTy env open fun arg = do
+  dependent <- xoptM LangExt.ExperimentalDependentTypes
   let parsed_open = isOpenTypeOperandWith isRdrTyVar (isDataOcc . rdrNameOcc) arg
-  checked_arg <- if open && not parsed_open
+  checked_arg <- if dependent && open && not parsed_open
+                   && maybe False (isRdrTyVar . unLoc) (hsTyGetAppHead_maybe fun)
                    && isOpenTypeOperandWith isRdrTyVar possible_constructor arg
-                 then do
-                   dependent <- xoptM LangExt.ExperimentalDependentTypes
-                   if dependent then Just <$> checkNoErrs (rnLHsTyKi env arg)
-                                else pure Nothing
+                 then Just <$> checkNoErrs (rnLHsTyKi env arg)
                  else pure Nothing
   let symbolic = case checked_arg of
         Just (ty, _) -> isOpenTypeOperandWith (isTyVarName . unwrapUserRdr) (isDataConName . unwrapUserRdr) ty
@@ -1489,12 +1488,13 @@ bare TMu in the type namespace. The normal type renamer can resolve it
 to a data constructor by demotion, or to a type constructor with the
 same spelling.
 
-If a compound operand could supply an open constructor spine, rename it
-before requesting the equations. Use the resolved data constructor Name
-and keep the renamed operand and its free names. This uses ordinary
-DataKinds lookup and preserves its warnings and errors. In particular,
-the tick remains necessary when a type constructor shadows the data
-constructor. A fully closed spine still cannot request open evaluation.
+For an ordinary identifier in the application head, rename a possible
+open constructor operand before requesting the equations. Use the
+resolved data constructor Name and keep the renamed operand and its free
+names. This uses ordinary DataKinds lookup and preserves its warnings
+and errors. The tick remains necessary when a type constructor shadows
+the data constructor. A fully closed spine still cannot request open
+evaluation.
 
 Bare variables keep the existing head-first path. The head determines
 whether a bare operand can name a source callback. A compound operand
