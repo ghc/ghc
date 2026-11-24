@@ -190,7 +190,8 @@ sourceTableOwner table
                isJust (indexedProjectionSource fun))
         guard (tyConName actual == tyConName table ||
                (finalCoreMapperOwner fun && isFilterGuardFor actual table &&
-                maybe False (any ((== tyConName table) . tyConName)) (sourceTableCallees actual)))
+                maybe False (any ((== tyConName table) . tyConName)) (sourceTableCallees actual)) ||
+               (isNominalStructuralSource fun && booleanSelector actual == Just table))
         pure fun
   | otherwise = pure Nothing
 
@@ -2414,8 +2415,9 @@ publishRetainedRecordWitness con owner
        ; publishConstructorCase owner signature [ConstructorCaseRow [lhs] (CaseField witness)] }
   | otherwise = pprPanic "publishRetainedRecordWitness: invalid selector" (ppr owner)
 
--- | Validate the exports that were unavailable when checking local witnesses.
--- See Note [Retained field kinds in source equations].
+-- | Validate the exports that were unavailable when checking local cases.
+-- See Note [Retained field kinds in source equations] and
+-- Note [Local Boolean constructor equations].
 checkLocalRetainedWitnessExports :: TcGblEnv -> [Id] -> TcM ()
 checkLocalRetainedWitnessExports env owners = do
     let exported = availsToNameSet (tcg_exports env)
@@ -2434,7 +2436,29 @@ checkLocalRetainedWitnessExports env owners = do
                            ++ occNameString (nameOccName (dataConName con)) ++ " to make it available."
               setSrcSpan (nameSrcSpan (fromMaybe name dependent)) $
                 addErr (TcRnOpenTypeEval name dependent reason)
+          | isNominalStructuralSource owner
+          , isJust (booleanSelector table)
+          , hidden : _ <- unexported_case_types exported table -> do
+              let name = idName owner
+                  reason = "The dependent type needs this equation. Export the constructors of "
+                           ++ occNameString (nameOccName hidden) ++ " to make it available."
+              setSrcSpan (nameSrcSpan name) $
+                addErr (TcRnOpenTypeEval name Nothing reason)
         _ -> pure ()
+  where
+    unexported_case_types exported table =
+      sortBy stableNameCmp $
+        [ name | tc <- nonDetEltsUniqSet (tyConsOfTypes (concatMap equation_types tables))
+               , let parent = maybe tc dataConTyCon (isPromotedDataCon_maybe tc)
+                     name = tyConName parent
+               , isAlgTyCon parent, nameModule_maybe name == Just (tcg_semantic_mod env)
+               , not (publicCaseType env exported (const False) parent) ]
+      where
+        tables = table : fromMaybe [] (sourceTableCallees table)
+        equation_types tc = tyConKind tc :
+          [ ty | axiom <- maybeToList (closedFamilyTyConCoAxiom_maybe tc)
+               , branch <- fromBranches (coAxiomBranches axiom)
+               , ty <- coAxBranchRHS branch : coAxBranchLHS branch ++ map tyVarKind (coAxBranchTyVars branch) ]
 
 -- | The early witness path only considers signatures accepted by this rule.
 isMonomorphicRetainedWitness :: Id -> Bool
