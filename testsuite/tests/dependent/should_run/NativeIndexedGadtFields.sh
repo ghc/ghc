@@ -43,6 +43,17 @@ for opt in O0 O2; do
     "${ghc[@]}" "-$opt" NativeIndexedGadtFields.o \
         ../provider/{PackedVecLibrary,NativeIndexedGadtFieldsProvider,NativeNonuniformGadtFieldsProvider}.o -o run
     test "$(./run)" = $'(True,True,False,True)\n(True,True,True,True,True,True)'
+
+    mkdir iso
+    cd iso
+    cp "$src/NativeIndexedIsoOperand.hs" .
+    "${ghc[@]}" "-$opt" NativeIndexedIsoOperand.hs -o run
+    test "$(./run)" = True
+    if "${ghc[@]}" "-$opt" -fforce-recomp -DWRONG_INDEX -c NativeIndexedIsoOperand.hs >wrong.log 2>&1 ||
+       ! grep -Fq '[GHC-83865]' wrong.log; then
+        cat wrong.log >&2
+        exit 1
+    fi
 done
 
 cd "$out/O2/provider"
