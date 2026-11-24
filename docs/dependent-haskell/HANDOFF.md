@@ -20,21 +20,47 @@ focused suite passed 137 of 138. The remaining failure was the known
 `MTrans` diagnostic. The verification script is in
 `_build/on-demand/r17-schema-transformer-post-588-20261124`.
 
+HaskLib exports the Peano datatype as `HaskLib.Nat.Nat`. Import
+`Nat(..)` for constructor patterns and `type (+)` for infix proofs.
+Job 2295 checked the installed package at `-O0` and `-O2`.
+`plusZero 3` and `(2 + 3 :: Nat) :~: 5` both checked. HaskLib also
+exports `rewrite` to use an equality in a proof body. Job 2307 checked
+all 590 Showcase observations at both optimization levels and in GHCi
+with the library at `54d74a0067`.
+
 ## Next compiler work
 
 Read [PLFH-NOTES.md](../../PLFH-NOTES.md) on resuming work and after each
 compiler batch. Reply with the compiler revision and the result of running
 the PLFH author's example.
 
-The book's current baseline is the 588 compiler at `d15cbd41fe`.
-Job 2236 confirmed the same 23 failures on the 590 compiler at
-`1a02a866e7`. Both results apply to PLFH revision `d0e4fa73df`.
+The book's current baseline is the 590 compiler at `1a02a866e7`.
+Job 2300 checked PLFH revision `1ffcd4df52` and reproduced its 27
+compiler reports. Job 2309 migrated a copy of those 26 modules to
+`Nat` and `rewrite`, checked them at both optimization levels and ran
+an ordinary client. All three negative controls reported GHC-83865.
+Job 2236 confirmed that the 23 reports in the older book revision
+`d0e4fa73df` also reproduced on 590.
 
 The next combined compiler is `984647892b`. Job 2209 follows job 2080.
 It builds both stages and checks 594 Showcase observations, 24 selected
 test registrations, package clients, compatibility tests and upgrade tests.
 The inputs are in `_build/on-demand/r03-plfh-after-590-20261124`.
 Git retains the source at `refs/spikes/plfh-proof-sums-594`.
+
+Job 2312 follows job 2209. It builds `c8e9df9278` from
+`refs/spikes/plfh-nat-indexed-proofs-597`. It checks the canonical Nat
+library with the indexed proof changes, 597 Showcase observations and 35
+test registrations. The inputs are in
+`_build/on-demand/plfh-nat-integrated-post594-20261124`.
+
+Check the exported types of the named Lambda chapter's beta constructors
+before using them for preservation. Job 2310 found that each constructor
+implicitly bound a fresh `substTerm`. An ordinary client could choose an
+incorrect target for `BetaMu` on component `09bc6546ca`. Job 2313
+checked the repair. Put the producer in a separate module and use its
+qualified name in each constructor result. The correct target then
+checked and the incorrect target failed with GHC-83865.
 
 Jobs 2196 and 2213 reproduced the first 21 PLFH examples on the
 published compiler at both optimization levels. They include two compiler
@@ -93,8 +119,10 @@ and 562 build products have been retired. Their Git revisions and test
 receipts remain available. The exact 7.81 GB inventory is in
 `_build/on-demand/retirement-560-562-for-plfh-20261124`.
 
-The GHC queue has two slots. Other benchmark jobs take priority and freeze
-the GHC slice. Jobs 1947 and 1949 were exploratory allocation measurements.
+The GHC queue has two slots. Local benchmark jobs take priority and freeze
+the GHC slice. The remote Colab benchmark uses the
+`colab-inkling-graded-*` label in the `build` group and runs alongside GHC.
+Jobs 1947 and 1949 were exploratory allocation measurements.
 Both pilot harnesses are retired. Their prompts, draft code and measurements
 are archived for reference under `_build/reference-only`. Active performance
 work needs independently written benchmarks. OpenCode reviews stopped on 24 November 2026. The coordinator and the

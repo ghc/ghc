@@ -1,4 +1,4 @@
-"""Give runnable jobs in other Pueue groups priority over GHC."""
+"""Give runnable local jobs in other Pueue groups priority over GHC."""
 import json
 import os
 import shutil
@@ -26,6 +26,9 @@ def tag(value):
 def other_work(s):
     for task in s["tasks"].values():
         if task["group"] == "ghc":
+            continue
+        # This job supervises a remote Colab runtime from the build group.
+        if task["group"] == "build" and (task.get("label") or "").startswith("colab-inkling-graded-"):
             continue
         status = tag(task["status"])
         if status == "Running":
