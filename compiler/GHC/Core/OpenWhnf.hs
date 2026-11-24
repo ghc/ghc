@@ -469,14 +469,14 @@ indexedConstructorApplication expr = do
 openIndexedDataCon :: DataCon -> Kind -> [Type] -> Maybe ([Type], [Coercion], [Type])
 openIndexedDataCon con kind source_args = do
     (tc, universals) <- splitTyConApp_maybe kind
-    (univ, exs, specs@(_:_), [], fields, result) <- pure (dataConFullSig con)
+    (univ, exs, specs, [], fields, result) <- pure (dataConFullSig con)
     let user_vars = dataConUserTyVars con
         variables = univ ++ exs
     guard (tc == dataConTyCon con && isBoxedDataTyCon tc && not (isTypeDataCon con) &&
            null (dataConRepArgBinders con) && null (dataConStupidTheta con) &&
            all (not . isBanged) (dataConImplBangs con))
-    guard (length univ == length universals && all isTyVar exs &&
-           length user_vars == length source_args)
+    guard (not (null exs && null specs) && length univ == length universals &&
+           all isTyVar exs && length user_vars == length source_args)
     local_tys <- traverse (`lookup` zip user_vars source_args) exs
     let tys = universals ++ local_tys
         instantiate = substTyWith variables tys
@@ -501,8 +501,10 @@ openIndexedDataCon con kind source_args = do
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A promoted constructor can determine the branch of an imported GADT
 match. The operand decoder uses the constructor's checked result kind
-and source type arguments to instantiate its worker. Accept a proof
-argument only where the instantiated nominal EqSpec endpoints agree.
+and source type arguments to instantiate its worker. A constructor can
+carry existential types without refining its result type. Read these
+types from the source arguments and check them against their binders.
+Accept a proof argument only where the instantiated nominal EqSpec endpoints agree.
 Check the complete worker representation against those proof and field
 types. Leave a constructor with a strict field or other evidence out of
 this observer.
