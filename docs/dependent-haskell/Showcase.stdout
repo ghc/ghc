@@ -560,6 +560,7 @@ commute addition by induction on the second argument: Refl
 unfold the fixed point of the identity: True
 substitute under a lambda and preserve the free variable at index two: Just 2
 prove progress for application, successor case, recursion and a value: ["beta","case successor","unfold","value"]
+preserve an open predicate proof in a promoted existential witness: Refl
 sum two lists with the right-fold append proof: True
 convert a Boolean to a bit and check both inverse laws: (Set,False,Refl,Refl)
 apply the identity isomorphism at Maybe Bool: (Just True,Nothing,Refl,Refl)

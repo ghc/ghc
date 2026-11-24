@@ -184,6 +184,7 @@ import qualified BookCongruence
 import qualified BookFoldProof
 import qualified BookLambdaUnfold
 import qualified BookBetaReduction
+import qualified BookAnyWitnessProof
 import qualified BookReverseProof
 import qualified BookNaturals
 import qualified CastedConstructorGivens as TreeProof
@@ -2004,6 +2005,8 @@ main = do
                 BookBetaReduction.freeIndexAfterBeta
     observe "prove progress for application, successor case, recursion and a value"
         BookBetaReduction.progressExamples
+    observe "preserve an open predicate proof in a promoted existential witness"
+        (BookAnyWitnessProof.packHeadPreservesProof @(BookAnyWitnessProof.EvidenceBit False))
     observe "sum two lists with the right-fold append proof"
         (HaskLib.eqSize (BookFoldProof.checkedSum [1, 2] [3, 4]) 10)
     case BookIso.sample of
