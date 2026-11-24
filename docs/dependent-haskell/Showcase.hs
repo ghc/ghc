@@ -1953,6 +1953,7 @@ main = do
     prefixBound <- newIORef (HaskLib.Succ HaskLib.Zero) >>= readIORef
     observe "apply the same partially applied addition to equal sizes"
         (HaskLibClient.addUnder prefixBound prefixBound HaskLib.Zero)
+    observe "compare a runtime size with itself" (HaskLib.eqSize prefixBound prefixBound, HaskLib.eqSizeRefl prefixBound)
     case SumOfSizes.plusExists prefixBound prefixBound of
         Sigma.Pair k Refl -> observe "read the sum with its equality proof" k
     prefixInput <- newIORef (True : error "forced the list beyond the prefix") >>= readIORef

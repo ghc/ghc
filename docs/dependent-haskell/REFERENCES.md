@@ -8735,3 +8735,15 @@ family call. Job 2074 checked a two-equation example with
 [Agda termination checking](https://agda.readthedocs.io/en/v2.8.0/language/termination-checking.html),
 [the compiler check](../../compiler/GHC/Tc/Validity.hs) and
 [the cell schema](examples/open-evaluation/CellValidation.hs).
+
+### Boolean equality on structural sizes
+
+Agda's Boolean equality on natural numbers compares the constructors.
+Two successors call the same function on their predecessors. HaskLib's
+`eqSize` uses this definition for finite sizes. Its proof `eqSizeRefl`
+uses induction on the runtime input. The R13 source-equation checker
+accepts a Boolean result for this two-operand recursion. Each recursive
+argument must stay in its own column and at least one must decrease.
+The checked case tree preserves which operand the program evaluates.
+[Agda.Builtin.Nat](https://github.com/agda/agda/blob/v2.8.0/src/data/lib/prim/Agda/Builtin/Nat.agda#L37-L42)
+and [HaskLib.Size](hasklib/HaskLib/Size.hs).
