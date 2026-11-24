@@ -29,3 +29,10 @@ main = do
   print (either (const True) (const False) (demanded :: Either ErrorCall (Maybe (Ty, Ty))))
   case nestedEquality (J (A B B) (A B B)) Refl of
     Refl -> putStrLn "nested Refl"
+  let knownProof = Refl :: 'True :~: 'True
+      badProof = error "required equality proof" :: 'True :~: 'True
+  case diagonalEquation knownProof of Refl -> pure ()
+  diagonalDemand <- try (evaluate (case diagonalCase badProof of Refl -> True))
+  case diagonalDemand :: Either ErrorCall Bool of
+    Left _ -> pure ()
+    Right _ -> fail "The retained case must demand its equality proof"

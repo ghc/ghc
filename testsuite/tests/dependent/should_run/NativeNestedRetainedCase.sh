@@ -27,7 +27,8 @@ for opt in -O0 -O2 -fno-code; do
     if ! grep -Eq 'Reject\.hs:12:[0-9]+: error: \[GHC-05617\]' reject.log ||
        ! grep -Eq 'Reject\.hs:19:[0-9]+: error: \[GHC-83865\]' reject.log ||
        ! grep -Eq 'Reject\.hs:25:[0-9]+: error: \[GHC-18872\]' reject.log ||
-       ! grep -Eq 'Reject\.hs:32:[0-9]+: error: \[GHC-83865\]' reject.log; then
+       ! grep -Eq 'Reject\.hs:32:[0-9]+: error: \[GHC-83865\]' reject.log ||
+       ! grep -Eq 'Reject\.hs:36:[0-9]+: error: \[GHC-25897\]' reject.log; then
         cat reject.log >&2
         exit 1
     fi
