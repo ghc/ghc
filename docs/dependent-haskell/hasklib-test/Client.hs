@@ -23,9 +23,13 @@ checkAppendSingleton :: [Bool] -> Bool -> Bool
 checkAppendSingleton xs x = case lengthAppendSingleton xs x of
     H.Refl -> True
 
+-- | Give the imported reverse law the same polymorphic signature.
+reverseLaw :: forall a. foreach (xs :: [a]) -> H.size (reverse xs) H.:~: H.size xs
+reverseLaw = H.lengthReverse
+
 -- | Check a reverse proof from an ordinary caller.
 checkReverse :: [Bool] -> Bool
-checkReverse xs = case H.lengthReverse xs of
+checkReverse xs = case reverseLaw xs of
     H.Refl -> True
 
 -- | Compose two library proofs. The map proof visits the entire left spine.
