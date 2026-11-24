@@ -72,6 +72,11 @@ simplifyFields :: foreach (n :: Nat) -> n :~: 'Z -> Maybe Bool -> Fields n
 simplifyFields _ proof payload = case proof of
     Refl -> payload
 
+-- | Refine Fields through a successor equality carrying another retained index.
+stepFields :: foreach (from :: Nat) -> foreach (to :: Nat) ->
+              from :~: 'S to -> Either Bool (Fields to) -> Fields from
+stepFields _ _ Refl payload = payload
+
 #ifdef WRONG_FAMILY_ENDPOINT
 wrongFields :: foreach (n :: Nat) -> n :~: 'Z -> Fields n
 wrongFields _ Refl = Left True

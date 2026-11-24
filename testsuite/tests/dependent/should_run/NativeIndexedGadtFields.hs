@@ -7,7 +7,7 @@ import Data.Type.Equality ((:~:) (Refl))
 import NativeIndexedGadtFieldsProvider
     ( Held(..), Hold(..), Shape(..)
     , inspectAnonymous, inspectCons, inspectEquations, inspectHold, inspectKnown
-    , simplifyFields, transportFields )
+    , simplifyFields, stepFields, transportFields )
 import qualified NativeNonuniformGadtFieldsProvider as N
 import PackedVecLibrary (Nat(..), Vec(..))
 
@@ -79,3 +79,7 @@ main = do
     case transportFields Z Z Refl (simplifyFields Z Refl (Just (error "family payload"))) of
       Just _ -> pure ()
       Nothing -> fail "the family payload changed"
+    case transportFields (S Z) (S Z) Refl
+           (stepFields (S Z) Z Refl (Right (simplifyFields Z Refl (Just (error "stepped payload"))))) of
+      Right (Just _) -> pure ()
+      _ -> fail "the stepped family payload changed"
