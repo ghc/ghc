@@ -7253,6 +7253,17 @@ explicit `@M @M` at the use.
 [Agda implicit arguments](https://agda.readthedocs.io/en/v2.8.0/language/implicit-arguments.html)
 and [package check](roadmap/R23-unsaturated-type-families.md#one-constructor-for-term-and-promoted-callbacks).
 
+PLFA's `Any` records which occurrence satisfies a predicate and carries
+the proof for that occurrence. PLFH stores the membership and predicate
+proof together in `AnyWitness`. The fork infers the predicate's
+matchability when checking the promoted constructor. Reading its worker
+recovers the existential type from the checked arguments. Job 2994
+accepted a result containing the original proof and rejected one that
+substituted a different proof of the same proposition.
+[PLFA Lists, Any](https://plfa.github.io/Lists/#any),
+[proposal #242, inference](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#inference),
+[worker regression](../../testsuite/tests/dependent/should_run/NativeOpenIndexedSubst.sh).
+
 ### Inferring nested applications and exporting pair equations
 
 Agda inserts implicit arguments during elaboration. A type or another

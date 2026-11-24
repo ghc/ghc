@@ -20,33 +20,44 @@ and interactive compiler regression.
 [progress proof](examples/open-evaluation/BookBetaReduction.hs),
 [provider requirements](roadmap/R16-open-term-evaluator.md#typed-substitution-under-a-binder).
 
-[PLFH batch 23](https://github.com/Tritlo/PLFH/tree/8a351936672142e61c6c444fc6ae5e823b2d6645)
-contains the application lemma and a negative test for accidental capture.
-The complete theorem was qualified separately on batch 22 in book commit
-`d441b292b8`. Job 2961 checked 28 book modules at both native optimization
-levels. All 112 runtime observations also matched in default GHCi. Job 2968
-passed the book's 66 checks, including the 30 maintained fixed reports.
-From a book checkout, fetch the tested patch with
-`git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/intrinsic-progress-7efc298`.
-On unchanged batch 22, job 2940 accepted 33 of the original 40 reports at
-`-O0` and 30 at default `-O2`.
+[PLFH batch 24](https://github.com/Tritlo/PLFH/tree/2fd9b9a5a832bcb4ef91f2c6bd69e703bb084c7f)
+contains the complete proof and a negative test for accidental capture.
+On the published book, job 2992 checked all 28 modules at native `-O0`
+and default `-O2`. Each module also compiled independently against
+source-hidden native interfaces at both levels. All four runs rejected
+the seven negative programs. The native runs matched all 113 book
+observations. Of the 40 original reports, 33 compiled at `-O0` and 30
+at default `-O2`. See the [book verification instructions](#build-and-verify).
+
+[HaskLib.Nat.plusComm](hasklib/HaskLib/Nat.hs) proves that addition
+commutes. Book patch `f332a78d0f` reuses it in Induction and Equality.
+It preserves the author's progress proof and all seven negative controls.
+Job 2996 matched the 113 book observations at native `-O0`, default
+`-O2` and in GHCi. From a batch 24 book checkout, fetch it with
+`git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/hasklib-plus-comm-2fd9b9a`.
 
 ## Next compiler work
 
-- Combine the progress proof with the additions in PLFH batch 23 and the
-  shared arithmetic proof in HaskLib. Preserve the new capture test and
-  qualify the combined book with its ordinary check script.
+- Extend checked substitution to the **More** chapter's list case. It
+  substitutes both a head and a tail under two binders. Job 3009 found
+  that the provider omits the equation for `substDouble`. A separate
+  client then gets GHC-70565 at the target of `BetaCons`.
+- In **Lists**, job 2994 checked an existential package containing a
+  proof at a hidden index. Its source-hidden readers preserved the
+  original proof at both optimization levels and rejected a different
+  proof of the same proposition. Check the ordinary converter at a
+  recursive membership path whose position is unknown.
 - A no-code reader can use a separately compiled native provider. A fresh
   no-code provider withholds the substitution equation. Job 2968 reproduced
   GHC-70565 at the beta endpoint at both optimization levels. Publication
   requires an account of imported rewrite rules for no-code interfaces.
-- Run the independent two-stage build of the 615 checkpoint. The previous
+- Job 2983 is rebuilding the 615 checkpoint at `2c9b9b286e`. The previous
   build at `781a6c6a8f` passed all 15 gates, including 52 selected tests
   and all three modes of the 612-line Showcase. Job 2837 also passed
   234/234 compatibility cases and 136/138 focused tests. The two failures
   were the old `NativeDependentCoreRun` expectation and the known
-  `deriving-via-compile` diagnostic. Job 2974 replays the revised
-  fixture on the same compiler. The complete original results are under
+  `deriving-via-compile` diagnostic. Job 2974 passed the revised
+  fixture on the same compiler, giving 137/138 across the two runs. The complete original results are under
   `_build/on-demand/plfh-batch18-normal-next-20261124`.
 - Three compiler agents use a shared queue with four GHC build slots,
   16 logical CPUs and 64 GB of memory.
@@ -830,9 +841,15 @@ docs/dependent-haskell/tools/ghc-build-job plfh-qualification \
 ```
 
 Check `verified.pass`, `modules.tsv`, `negative.tsv` and `reports.tsv`.
-The original reports run once per optimization level. The chapters and
-negative clients also run with fresh no-code interfaces. A report in the
-book's `fixed/` directory must compile at both levels.
+The original reports run once per optimization level. A report in
+`fixed/` must compile at both levels. By default the checker builds
+fresh no-code providers. That check reaches the open substitution
+publication gap in batch 24. To check batch 24 against native interfaces,
+pass `--native-interfaces` immediately after `check-plfh-revision`.
+This recompiles each book module using only the native `.hi` files of
+its dependencies. The checker audits the resulting interfaces and runs
+the negative clients against the same native interfaces. The
+`readback-O0` and `readback-O2` directories contain the results.
 
 The 574-line Showcase uses the normal two-stage compiler at
 `c11b29a399` in `r04-r17-r21-normal-after-572-20261123`.

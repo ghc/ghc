@@ -2,8 +2,13 @@
 # Check one book revision with native and interface-only clients.
 set -euo pipefail
 export LC_ALL=C.UTF-8
+reader_mode=no-code
+if [[ ${1:-} == --native-interfaces ]]; then
+    reader_mode=readback
+    shift
+fi
 if [[ $# != 5 ]]; then
-    echo "Usage: check-plfh-revision BOOK_REPO REVISION COMPILER LIBDIR NEW_RESULTS_DIR" >&2
+    echo "Usage: check-plfh-revision [--native-interfaces] BOOK_REPO REVISION COMPILER LIBDIR NEW_RESULTS_DIR" >&2
     exit 2
 fi
 book=$(realpath "$1")
@@ -32,17 +37,33 @@ mapfile -t modules < <(find "$work/hs/PLFH" -name '*.hs' | sort)
 mapfile -t reports < <(find "$work/reproducers" -name 'R[0-9]*.hs' | sort)
 (( ${#modules[@]} && ${#reports[@]} ))
 
-for mode in native-O0 native-O2 no-code-O0 no-code-O2; do
+for mode in native-O0 native-O2 "$reader_mode-O0" "$reader_mode-O2"; do
     opt=${mode##*-}
     flags=("-$opt")
-    if [[ $mode == no-code-* ]]; then flags+=(-fno-code -fwrite-interface); fi
+    if [[ $mode != native-* ]]; then flags+=(-fno-code -fwrite-interface); fi
     provider="$work/$mode/provider"
     client="$work/$mode/client"
     logs="$out/$mode"
     mkdir -p "$provider" "$client" "$logs"
     cd "$provider"
-    "${ghc[@]}" "${flags[@]}" "-i$work/hs" "-i$docs/hasklib" "-i$docs/examples/open-evaluation" \
-        --make -no-link -outputdir . "${modules[@]}" >"$logs/provider.log" 2>&1
+    if [[ $mode == readback-* ]]; then
+        # Give each module the same native interfaces, including its dependencies.
+        # Write its no-code interface separately so later modules see the original.
+        native="$work/native-$opt/provider"
+        (cd "$native" && find . \( -name '*.hi' -o -name '*.hi-boot' \) -exec cp --parents -t "$provider" {} +)
+        readback="$work/$mode/reader"
+        for src in "${modules[@]}"; do
+            rel=${src#"$work/hs/"}
+            iface="$readback/${rel%.hs}.hi"
+            mkdir -p "$(dirname "$iface")"
+            "${ghc[@]}" "${flags[@]}" -fforce-recomp -c "$src" -ohi "$iface" >>"$logs/reader.log" 2>&1
+            test -s "$iface"
+        done
+        python3 "$work/scripts/audit_ifaces.py" "$work/ghc" "$readback" >"$logs/reader-interfaces.log" 2>&1
+    else
+        "${ghc[@]}" "${flags[@]}" "-i$work/hs" "-i$docs/hasklib" "-i$docs/examples/open-evaluation" \
+            --make -no-link -outputdir . "${modules[@]}" >"$logs/provider.log" 2>&1
+    fi
     for src in "${modules[@]}"; do
         rel=${src#"$work/hs/"}
         test -s "${rel%.hs}.hi"
@@ -58,7 +79,7 @@ for mode in native-O0 native-O2 no-code-O0 no-code-O2; do
         ./run >"$logs/runtime.stdout"
         grep -qF '[RUN-OK]' "$logs/runtime.stdout"
     else
-        test -z "$(find "$provider" "$client" \( -name '*.o' -o -name '*.bc' \) -print -quit)"
+        test -z "$(find "$work/$mode" \( -name '*.o' -o -name '*.bc' \) -print -quit)"
     fi
     for src in "$work"/hs/negative/*.hs; do
         name=$(basename "$src")

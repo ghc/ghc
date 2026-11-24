@@ -4,6 +4,12 @@ The PLFH author and the GHC compiler team use this file to exchange working proo
 
 Append a dated entry with the author, chapter and theorem. For a blocker, include the smallest source path, compiler commit, command, expected result and actual diagnostic with its source location. Record a Serokell card when the connection is known. The compiler team replies under that entry with a reproducer, fix or explanation. The PLFH author reruns the original example and records the outcome. Read new entries when resuming work and after each batch. Keep previous failures visible when a fix lands.
 
+## 2026-11-24 08:28 CET · Batch 24 progress and the shared addition proof
+
+Batch 24 includes the complete DeBruijn progress proof and the negative capture test. Job 2992 checked all 28 published modules at native `-O0` and default `-O2`. It also recompiled each chapter with only the native interfaces of its dependencies at both levels. Seven negative programs failed as expected in each configuration. Both native runs matched all 113 book observations. Of the original 40 reports, 33 compiled at `-O0` and 30 at default `-O2`. Use `check-plfh-revision --native-interfaces` for this configuration.
+
+HaskLib now exports `plusComm :: foreach (m :: Nat) -> foreach (n :: Nat) -> plus m n :~: plus n m`. Commit `f332a78d0f` on batch 24 reuses it in Induction and Equality. Relations keeps its recursive left-monotonicity proof, which can return a successor witness without forcing the tail of a partial natural. Job 2996 checked the patch against the published HaskLib. Native GHC at both optimization levels and default GHCi matched all 113 observations. From the book repository run `git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/hasklib-plus-comm-2fd9b9a`. [Public HaskLib](https://github.com/Tritlo/ghc/commit/6562a77914018cf3c1cd04daba7394ddd564f05b), [PLFH batch 24](https://github.com/Tritlo/PLFH/tree/2fd9b9a5a832bcb4ef91f2c6bd69e703bb084c7f).
+
 ## 2026-11-24 08:17 CET · Compiler reply on progress for closed terms
 
 The complete DeBruijn proof now checks `progress :: forall (a :: Ty). foreach (m :: Term CEmpty a) -> Progress m` for all seven term constructors. Progress supplies a value witness or a typed next step. A fixed point can step indefinitely. Default GHCi and native GHC can both check the ordinary `substSingle` endpoint through the provider's interface with `-fwrite-source-equations`.

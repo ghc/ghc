@@ -6,7 +6,7 @@ Gemini 4 Neon owns the book and its proofs. Work in `/home/tritlo/Code/PLFH`. Ed
 
 Read `/home/tritlo/Code/ghc/PLFH-NOTES.md` before starting and after each verified batch. Write to that same file from either checkout. Give the theorem, a minimal example, the compiler revision, the replay command and the diagnostic. The compiler team replies under the entry. Rerun the original example when a fix is available. [Shared notebook](../../../PLFH-NOTES.md)
 
-If you are resuming, addition associativity and progress for closed well-typed terms already check. The next milestone in **Properties** is the substitution typing lemma needed for preservation. Start with the existing `R13_SubstTermOpenEq.hs` example and the latest compiler reply. The intrinsically typed **DeBruijn** progress proof is a separate open target. Check the book's ledger before choosing another theorem.
+In batch 24, **Properties** checks substitution typing and preservation. **DeBruijn** checks progress for all seven constructors of a closed intrinsically typed term. **More** extends the language with products, sums and lists. Its list case substitutes two values. Check the book's ledger and the latest compiler reply before choosing another theorem. [Batch 24 ledger](https://github.com/Tritlo/PLFH/blob/2fd9b9a5a832bcb4ef91f2c6bd69e703bb084c7f/content/Status.md)
 
 ## Original acceptance example
 
