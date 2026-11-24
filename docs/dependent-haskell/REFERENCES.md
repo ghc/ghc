@@ -8776,3 +8776,30 @@ argument must stay in its own column and at least one must decrease.
 The checked case tree preserves which operand the program evaluates.
 [Agda.Builtin.Nat](https://github.com/agda/agda/blob/v2.8.0/src/data/lib/prim/Agda/Builtin/Nat.agda#L37-L42)
 and [HaskLib.Size](hasklib/HaskLib/Size.hs).
+
+### Composing kind casts in nested GADT matches
+
+Two GADT patterns can refine the same promoted pair. The corresponding
+Given equality can have a kind cast on each occurrence of the pair
+constructor. R11 composes both casts before projecting the field
+equalities from an injective constructor. Each projected coercion then
+relates types of the same kind. The Bisimulation example uses those
+equalities to transport value evidence to the second term. Job 2239
+checked the declaration against the original book modules.
+[Weirich, Hsu and Eisenberg, *System FC with Explicit Kind Equality*](https://www.seas.upenn.edu/~sweirich/papers/fckinds-extended.pdf)
+and [the smaller tree example](examples/open-evaluation/CastedConstructorGivens.hs).
+
+### Carried arguments in recursive substitution
+
+Agda accepts structural descent on a subterm when the other arguments
+stay fixed. HaskLib clients can now use source equations with more than
+one such argument. In PLFH's substitution function, a successor step
+recurses on its subterm and carries the variable and replacement.
+The compiler checks the arguments against the original columns and
+compares the equation with the final Core. A checked Boolean guard
+can select a branch when its value reduces or its equality is in
+scope. An unknown guard still prevents reduction. The substitution
+typing lemma uses a closed replacement, as in the source chapter.
+[Agda structural recursion](https://agda.readthedocs.io/en/v2.8.0/language/termination-checking.html#structural-recursion),
+[PLFA Properties](https://plfa.inf.ed.ac.uk/19.08/Properties/) and
+[the fork's regression](../../testsuite/tests/dependent/should_run/NativeIndependentConstructorRows.sh).
