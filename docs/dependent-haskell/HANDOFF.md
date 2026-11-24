@@ -8,26 +8,26 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
-[Compiler `c130ce0391`](https://github.com/Tritlo/ghc/commit/c130ce0391d4f9d03b6ecb5d9a07a944df255582)
-checks the additive fold law using the installed `GHC.Internal.List.foldr`.
-Its induction step applies congruence under `plus x`, then uses
-associativity in reverse. A separate theorem uses `congVis Succ` and
-`congVis (plus m)` with inferred equality endpoints. Job 2740 matched all
-**609 Showcase observations** at native `-O0`, default `-O2` and in GHCi.
-[Proofs and checks](CHECKPOINTS.md#required-congruence-and-sum-over-append).
+[Compiler `9d310102c7`](https://github.com/Tritlo/ghc/commit/9d310102c7222750985c6918102a8db75f44ace2)
+checks direct equations that split the second retained argument. PLFH
+Induction writes `plusComm m Zero = plusZero m`. Lists writes
+`mapAppend _ [] _ = Refl`. The Lambda fixed-point rule uses `TMu` without
+a promotion tick inside `substTerm`. Ordinary namespace lookup still
+requires a tick if a type constructor shadows the data constructor.
+Job 2810 matched all 611 Showcase outputs in GHCi and in native code at
+`-O0` and default `-O2`.
 
-[Published PLFH batch 18](https://github.com/Tritlo/PLFH/tree/7c18bfbdcbef8b3df23ddaee4b80373609346f8f)
-incorporates the earlier Lists, Isomorphism and Connectives changes. On this
-book revision, job 2754 found **26 of 38 original reports compile at `-O0`
-and 24 at default `-O2`**. All 27 modules passed in four native and no-code
-configurations. Each native reader passed 84 checks. The unchanged
-fold report contains an independent proof error. The Lists chapter patch
-uses `sym` to give associativity the required direction.
-
-The combined Induction and Lists patch is available from the book checkout
-with `git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/induction-lists-7c18bfb`.
-Job 2755 checked the Haskell sources and all reports in that handoff.
-The [shared notebook](../../PLFH-NOTES.md) records the compiler and book revisions.
+On [unchanged PLFH batch 18](https://github.com/Tritlo/PLFH/tree/7c18bfbdcbef8b3df23ddaee4b80373609346f8f),
+job 2793 found **29 of 38 original reports compile at `-O0` and 26 at
+default `-O2`**. The unchanged `R03_FunctionColumnSplit` still hits the guard for append
+rewrite rules at default `-O2`. The joint book patch `f307736b` uses the new equations
+and corrects the earlier fold proof. Job 2781 found 30 and 28 passes
+on that book. All 28 reports in its fixed directory compile at both
+levels. Both revisions passed the 27-module interface audit in four
+configurations, the 84 runtime checks per native build and six negative
+checks per configuration. From the book checkout, run
+`git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/joint-induction-lists-lambda-7c18bfb`.
+[Earlier fold and congruence proofs](CHECKPOINTS.md#required-congruence-and-sum-over-append).
 
 ## Next compiler work
 
@@ -47,12 +47,17 @@ The [shared notebook](../../PLFH-NOTES.md) records the compiler and book revisio
   Compatibility passed 233 of 234. `NativeBinaryEnum` used the old test
   expectation corrected in `83f46cf3ce`. The focused suite passed 137
   of 138 with the known `MTrans` diagnostic. Job 2680 built both stages of the
-  607-example source `a745ffc9b8`. Its qualification includes 49 selected registrations.
+  607-example source `a745ffc9b8`. Its selected registrations passed 47 of 49.
+  `NativeOpenIndexedAppend` and `NativeNamedRetainedSiblingFields` failed
+  their expected diagnostics. Both pass on the 602 compiler in the registered
+  configuration. Preserve the `-dynamic` flag for the append comparison.
   Check `_build/on-demand/plfh-batch15-normal-607-20261124/build.pass`,
   `qualification/gates.tsv` and `cohorts/gates.tsv` for final results.
 - Three compiler agents use a shared queue with four GHC build slots,
   16 logical CPUs and 64 GB of memory.
-  GHC yields to local benchmark jobs. The [roadmap](ROADMAP.md#where-this-fork-stands)
+  A runnable local benchmark pauses the GHC queue and freezes the shared
+  build slice. Job 2752 checked that running builds resumed after the
+  benchmark finished. The [roadmap](ROADMAP.md#where-this-fork-stands)
   counts 27 of 50 cards complete.
 
 <details>

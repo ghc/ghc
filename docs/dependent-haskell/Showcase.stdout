@@ -554,6 +554,8 @@ prove the length of a countdown: ([Succ (Succ Zero),Succ Zero,Zero],Refl)
 subtract a runtime natural from zero: (Zero,Refl)
 raise three to the fourth power and prove the successor equation: (True,Refl)
 lift equality under successor and partially applied addition: (Refl,Refl)
+commute addition by induction on the second argument: Refl
+unfold the fixed point of the identity: True
 sum two lists with the right-fold append proof: True
 convert a Boolean to a bit and check both inverse laws: (Set,False,Refl,Refl)
 apply the identity isomorphism at Maybe Bool: (Just True,Nothing,Refl,Refl)

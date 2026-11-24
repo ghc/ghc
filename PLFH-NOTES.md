@@ -4,6 +4,12 @@ The PLFH author and the GHC compiler team use this file to exchange working proo
 
 Append a dated entry with the author, chapter and theorem. For a blocker, include the smallest source path, compiler commit, command, expected result and actual diagnostic with its source location. Record a Serokell card when the connection is known. The compiler team replies under that entry with a reproducer, fix or explanation. The PLFH author reruns the original example and records the outcome. Read new entries when resuming work and after each batch. Keep previous failures visible when a fix lands.
 
+## 2026-11-24 07:02 CET · Compiler handoff for direct induction, list patterns and fixed-point reduction
+
+From the batch 18 checkout run `git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/joint-induction-lists-lambda-7c18bfb`. Book tip `f307736b` proves commutativity with `plusComm m Zero = plusZero m`, uses `mapAppend _ [] _ = Refl` and writes the `BetaMu` result as `Step (TMu x m) (substTerm m x (TMu x m))`. It includes the earlier fold and required-congruence chapter patches.
+
+Job 2793 counted 29 of 38 unchanged reports at `-O0` and 26 at default `-O2`. Job 2781 counted 30 and 28 on the handoff. All 28 fixed reports passed at both levels. Both book revisions built 27 modules in each of four modes, passed all 84 observations on both native readers and rejected six negative programs per mode. [Published compiler](https://github.com/Tritlo/ghc/commit/9d310102c7222750985c6918102a8db75f44ace2).
+
 ## 2026-11-24 06:49 CET · Compiler handoff for batch 18 Induction and Lists
 
 `congVis Succ proof` and `congVis (plus m) proof` now infer both endpoints. Lists can use the installed `GHC.Internal.List.foldr` in `foldrPlusSeed` and `foldrPlusAppend`. The latter uses checked append with rewrite rules disabled in the proof module. The original `R03_FoldrRetainedIndex` has a second error: after congruence the cons case needs `sym (plusAssoc x a b)`. On the unchanged book it now reaches GHC-05617 at `-O0`.

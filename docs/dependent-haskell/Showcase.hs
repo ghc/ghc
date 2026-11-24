@@ -182,6 +182,7 @@ import qualified BookIsoComposition
 import qualified BookConnectives
 import qualified BookCongruence
 import qualified BookFoldProof
+import qualified BookLambdaUnfold
 import qualified BookReverseProof
 import qualified BookNaturals
 import qualified CastedConstructorGivens as TreeProof
@@ -1986,6 +1987,10 @@ main = do
         (HaskLib.eqSize (BookNaturals.pow count 4) 81, powSuccessor count 3)
     observe "lift equality under successor and partially applied addition"
         (BookCongruence.plusAssoc count 2 3, BookCongruence.addUnder count 2)
+    observe "commute addition by induction on the second argument"
+        (BookCongruence.plusComm count 2)
+    case BookLambdaUnfold.unwrapVariable of
+        BookLambdaUnfold.BetaMu -> observe "unfold the fixed point of the identity" True
     observe "sum two lists with the right-fold append proof"
         (HaskLib.eqSize (BookFoldProof.checkedSum [1, 2] [3, 4]) 10)
     case BookIso.sample of

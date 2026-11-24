@@ -6,6 +6,23 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Direct induction on the second argument
+
+Compiler `9d310102c7` checks both `plusComm m Zero = plusZero m` and
+`mapAppend _ [] _ = Refl`. The earlier arguments can include an ordinary
+pattern or a retained function. The original match checks the patterns
+from left to right. Job 2763 checked a failing earlier pattern, a guard
+that falls through, lazy constructor fields and a false index.
+The false index still fails at `Refl`.
+
+PLFH Lambda also uses the ordinary constructor spelling in its fixed-point
+reduction. Job 2763 checked the chapter and its separate readers.
+Job 2793 used unchanged batch 18. Of 38 original reports, 29 compile at
+`-O0` and 26 at default `-O2`. The original `R03_FunctionColumnSplit`
+still needs the rewrite rules for append disabled at `-O2`.
+Job 2781 ran the combined chapter changes. All 28 reports in its fixed
+directory compiled in both modes. The native readers each passed 84 checks.
+
 ## Required congruence and sum over append
 
 PLFH Induction can write `congVis Succ (plusAssoc m n p)` in the

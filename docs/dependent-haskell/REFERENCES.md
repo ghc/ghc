@@ -109,6 +109,14 @@ a comparison implementation. External solvers remain later work.
   The proof module disables rewrite rules to use the checked append equations.
   [PLFA Lists](https://plfa.github.io/Lists/),
   [Haskell proof](examples/open-evaluation/BookFoldProof.hs).
+- **Fixed-point reduction.** PLFA substitutes the entire fixed point
+  for its bound variable in the body. The PLFH constructor uses the same
+  term as an operand to `substTerm`. The fork resolves the unquoted
+  constructor through ordinary `DataKinds` lookup before requesting
+  equations. A type constructor with the same name takes precedence.
+  [PLFA Lambda](https://plfa.github.io/Lambda/),
+  [GHC constructor lookup](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/data_kinds.html#distinguishing-between-types-and-constructors),
+  [Haskell fragment](examples/open-evaluation/BookLambdaUnfold.hs).
 - **Commutativity of sums and products.** PLFA gives an isomorphism for
   each law. In PLFH, swapping a pair exchanges its fields. Swapping a
   sum exchanges its constructors and preserves the payload. Pattern
