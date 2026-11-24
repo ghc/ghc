@@ -54,7 +54,7 @@ import GHC.Data.Bag (isEmptyBag)
 import GHC.Data.OrdList (fromOL)
 import GHC.Driver.Backend (backendGeneratesCode)
 import GHC.Driver.Config (initSimpleOpts)
-import GHC.Driver.Session (GeneralFlag(Opt_EnableRewriteRules), backend, HasDynFlags(getDynFlags))
+import GHC.Driver.Session (GeneralFlag(Opt_EnableRewriteRules, Opt_WriteIfSimplifiedCore), backend, gopt, HasDynFlags(getDynFlags))
 import GHC.Driver.Env (hsc_HUG, hsc_home_unit, hsc_plugins, hugRuleInterfacesBelow, hugRulesBelow)
 import GHC.Driver.Plugins (pluginsWithArgs)
 import GHC.Hs
@@ -2030,7 +2030,8 @@ sourceCaseTables binds = do
   dflags <- getDynFlags
   rdr_env <- getGlobalRdrEnv
   let generates_code = backendGeneratesCode (backend dflags)
-  no_code_structural <- if generates_code || not (null (tcg_rules env))
+  no_code_structural <- if generates_code || gopt Opt_WriteIfSimplifiedCore dflags ||
+                           not (null (tcg_rules env))
     then pure False
     else do
       hsc <- getTopEnv
@@ -3120,8 +3121,9 @@ no-code compilation does not start running Core plugin passes.
 The driver discards these candidates if the module needs the retained
 program pipeline. That pipeline still requires an object or bytecode
 backend. This check emits equations without a Core program. A module
-that explicitly requests simplified Core keeps its separate driver
-path. See validateSimpleSourceTables in GHC.Driver.Main.Passes.
+that explicitly requests simplified Core uses its existing path and
+does not create these candidates. See validateSimpleSourceTables in
+GHC.Driver.Main.Passes.
 
 Before Tidy the driver checks the final optimized definition of the same
 owner with the same structural test. This check covers the actual callback,

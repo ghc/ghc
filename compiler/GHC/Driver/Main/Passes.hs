@@ -938,12 +938,11 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
           -- user requested. See #22008 for some discussion.
           plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
           simplified_guts <- hscSimplify' plugins desugared_guts
-          let checked_tc = validateSimpleSourceTables desugared_guts (Just simplified_guts) tc_result
           (cg_guts, _) <-
               liftIO $ hscTidy hsc_env simplified_guts
 
           (iface, _details) <- liftIO $
-            hscSimpleIface hsc_env (Just $ cg_binds cg_guts) (cg_modBreaks cg_guts) checked_tc summary
+            hscSimpleIface hsc_env (Just $ cg_binds cg_guts) (cg_modBreaks cg_guts) tc_result summary
 
           liftIO $ hscMaybeWriteIface logger dflags True iface mb_old_hash (ms_location summary)
 
@@ -994,7 +993,6 @@ keepValidatedSourceMappers original final
 -- See Note [Final Core source equations] in GHC.Tc.Gen.SourceTable.
 validateSimpleSourceTables :: ModGuts -> Maybe ModGuts -> TcGblEnv -> TcGblEnv
 validateSimpleSourceTables original final env
-  | null (finalCoreMappers (mg_binds original)) = env
   | isEmptyNameSet owners && isEmptyNameSet families = env
   | otherwise = env { tcg_tcs = filter (not . invalidName . tyConName) (tcg_tcs env)
                     , tcg_type_env = mapNameEnv clearOwner
