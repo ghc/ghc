@@ -1303,6 +1303,8 @@ ghcup-metadata-nightly-push:
   stage: deploy
   image: debian:13
   dependencies: null
+  tags:
+    - lint-anyarch
   variables:
     BUILD_FLAVOUR: default
     GIT_SUBMODULE_STRATEGY: "none"
