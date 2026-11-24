@@ -7,6 +7,17 @@ An erased existential can hide an index without providing its value.
 [Serokell roadmap](https://ghc.serokell.io/dh#dependent-sums) and
 [first-class existentials proposal](https://github.com/ghc-proposals/ghc-proposals/pull/473).
 
+## Functions stored with their inverse laws
+
+The [published isomorphism example](https://github.com/Tritlo/ghc/commit/34582bce5489634e15d9fc16a53d37b19dcc58e5)
+stores a function in each direction and a proof of each round trip over
+arbitrary lifted types. A separately compiled reader exchanges all four
+fields to construct the reverse isomorphism. Swapping only the functions
+fails even when the two endpoint types coincide. The chapter handoff
+also checks the natural-to-binary embedding. General identity and
+transitivity still require better support for polymorphic identity and
+composition of unknown callbacks. [Book and compiler checks](../CHECKPOINTS.md#polymorphic-proofs-from-the-published-book).
+
 ## What source programs can express
 
 An ordinary module can return a list's computed length with a vector of

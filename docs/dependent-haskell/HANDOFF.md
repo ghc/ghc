@@ -8,62 +8,37 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
-[Public compiler `2e4fbb752a`](https://github.com/Tritlo/ghc/commit/2e4fbb752a2fca6d9d4ac4b7901e2aa07b3c1534)
-also checks PLFH exponentiation, case-based De Bruijn value classification
-and keyed-tree declaration ordering. Job 2433
-checked all 27 patched PLFH modules in four configurations on the exponentiation
-compiler. Of the 29 original reports, 17 compiled at `-O0` and 16 at default
-`-O2`. Jobs 2436–2438 tested the keyed-tree change with both arithmetic fixes.
-[Proofs and scope](CHECKPOINTS.md#exponentiation-and-keyed-trees).
+[Compiler `34582bce54`](https://github.com/Tritlo/ghc/commit/34582bce5489634e15d9fc16a53d37b19dcc58e5)
+checks [published PLFH `0fd43f5`](https://github.com/Tritlo/PLFH/tree/0fd43f5353c4c3ae7670bac668ff2abe8f3c67ea).
+Job 2505 built all 27 modules in native and fresh no-code modes at `-O0`
+and default `-O2`. Every interface audit passed. Both native readers ran
+66 observations. All five negative programs reported the expected errors
+in each build. Of 31 original reports, 21 compile at `-O0` and 20 at
+default `-O2`. The difference is the append rule in `R13_ShuntAccumOpenEq`.
 
-[Compiler `63e2f0974b`](https://github.com/Tritlo/ghc/commit/63e2f0974b174dc86bef79c3a84d1d76fea3dadf)
-checks PLFH's ordinary truncated subtraction. The Induction chapter proves
-that subtracting twice subtracts the sum of the two operands. With both
-the Induction and preservation patches on PLFH `85f90be`, job 2405 checked
-27 modules in native and no-code modes at `-O0` and `-O2`. Sixteen of the
-29 compiler reproducers compile at `-O0` and fifteen at default `-O2`.
-The [shared notebook](../../PLFH-NOTES.md) gives the chapter patch refs.
+The book's map-length alias checks without explicit type arguments. A
+polymorphic isomorphism stores its functions with both inverse laws.
+The record regression and mixed subtraction modules pass their controls.
+[Proofs and verification](CHECKPOINTS.md#polymorphic-proofs-from-the-published-book).
 
-The compiler changes for the PLFH preservation proof are on
-[`dependent-haskell` at `692eae0778`](https://github.com/Tritlo/ghc/commit/692eae077896a00384fecf15a3d5d92d828a6415).
-The beta rules use the ordinary substitution function from the same module.
-Job 2381 checked 27 book modules and audited their interfaces at both
-optimization levels in native and no-code builds. Job 2384 matched all 599
-Showcase observations at native `-O0`, default `-O2`, and in GHCi.
-These checks used the changed compiler components linked into a stage-one
-compiler. [Proof and verification](CHECKPOINTS.md#one-step-preservation-with-same-module-substitution).
-
-The next [compiler fix at `9cc4065fab`](https://github.com/Tritlo/ghc/commit/9cc4065fab4f2f106859b39daa9bdad23f00f0fd)
-keeps equality evidence used by an inner retained case. Job 2389 checked the
-nested `subInvDist` proof from the Denotational chapter with Core and STG Lint
-at `-O0` and `-O2`. Both clients ran and the wrong witness failed with GHC-83865.
-
-The book patch is separate from the compiler. In the book checkout, retrieve
-it with `git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/unsplit-preservation-85f90be`.
-Inspect `git show FETCH_HEAD` before applying it to a working chapter.
-The patch is based on PLFH `85f90be`. The [shared notebook](../../PLFH-NOTES.md)
-records updates from the book author and the compiler team.
+The Isomorphism chapter patch is separate. From the book checkout, run
+`git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/isomorphism-0fd43f5`
+and inspect `git show FETCH_HEAD`. The [notebook](../../PLFH-NOTES.md)
+records the chapter handoff.
 
 ## Next compiler work
 
-- Job 2356 built both stages of `923571c2c8` and passed the 599-output
-  Showcase in all modes. Its registration run timed out after reporting
-  GHC-45510 on an independent index named like the record label `gLength`.
-  Job 2413 confirmed the regression. A candidate restored the record and
-  passed the false substitution target, but job 2445 found that it could
-  silently quantify an applied record selector. Keep this candidate local.
-- Job 2429 builds both stages of `76e67f4fdb` and runs the 42 registrations.
-  For PLFH, check the retained GADT case in
-  the De Bruijn progress proof. Default optimization still rejects the append
-  equation in `R13_ShuntAccumOpenEq`. Job 2395 did not run because its
-  prerequisite required the entire earlier qualification run to pass.
-- Run the full Showcase on the R21 compiler. The three
-  GHC slots share the same 16-core and 64 GB slice. Local benchmark jobs
-  pause the GHC queue and freeze its active builds.
-
-The [roadmap](ROADMAP.md#where-this-fork-stands) counts 27 of 50 cards complete.
-The [open obligations](ROADMAP.md#remaining-work-by-roadmap-area) cover
-retained binders, promotion, evaluation, matchability and language cleanup.
+- Complete De Bruijn progress on the book's intrinsically typed terms.
+  Its value classifier checks in case and equation form. The application
+  case introduces an existential argument index. Its step evidence and
+  the typed `substSingle` endpoints of beta reduction still need work.
+- Job 2429 built both stages of the 600-example compiler `76e67f4fdb`.
+  The 42 registrations reported the known independent record-index failure.
+  Its repair passed on the subsequent compiler components. Qualify the
+  newer compiler with a normal build.
+- Three compiler agents and three GHC slots share 16 cores and 64 GB.
+  GHC yields to local benchmark jobs. The [roadmap](ROADMAP.md#where-this-fork-stands)
+  counts 27 of 50 cards complete.
 
 <details>
 <summary>Earlier PLFH verification through the 599-example candidate</summary>

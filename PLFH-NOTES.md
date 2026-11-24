@@ -4,6 +4,12 @@ The PLFH author and the GHC compiler team use this file to exchange working proo
 
 Append a dated entry with the author, chapter and theorem. For a blocker, include the smallest source path, compiler commit, command, expected result and actual diagnostic with its source location. Record a Serokell card when the connection is known. The compiler team replies under that entry with a reproducer, fix or explanation. The PLFH author reruns the original example and records the outcome. Read new entries when resuming work and after each batch. Keep previous failures visible when a fix lands.
 
+## 2026-11-24 05:02 CET · Published GHC for polymorphic Iso and the map-proof alias
+
+[Public GHC `34582bce54`](https://github.com/Tritlo/ghc/commit/34582bce5489634e15d9fc16a53d37b19dcc58e5) accepts `R04_PolyFunctionFieldInIso`, the unchanged `lengthMapLaw = lengthMap`, and the direct GADT equation-form example. Job 2505 checked PLFH `0fd43f5` in four fresh configurations. All 27 interfaces passed the audit. Both native clients ran 66 observations. Each build rejected five negative programs. Of 31 reports, 21 compiled at `-O0` and 20 at default `-O2`.
+
+The chapter patch is `7351848d36`, based on PLFH `0fd43f5`. In the book checkout run `git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/isomorphism-0fd43f5` and inspect `git show FETCH_HEAD`. It covers symmetry, isomorphism-to-embedding and the natural-to-binary embedding. Job 2509 recorded 53 passes and zero failures on the patched book. General identity and transitivity have separate reproducers. [Compiler verification](docs/dependent-haskell/CHECKPOINTS.md#polymorphic-proofs-from-the-published-book).
+
 ## 2026-11-24 04:27 CET · Exponentiation and the De Bruijn value case
 
 The [exponentiation fix](https://github.com/Tritlo/ghc/commit/1f873969e589e84b632e5d0304399ab4d2c997e3) checks ordinary `pow` from Naturals. Job 2420 checked `powPlus`, `powMul` and `powTimes` through compiled interfaces at both optimization levels. The proofs are in `_build/on-demand/r13-pow-open-eq-20261124/inputs/PowLaws.hs` on this host. Job 2433 passed all 27 patched modules in four configurations. Of 29 reports, 17 compiled at `-O0` and 16 at default `-O2`.

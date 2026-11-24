@@ -6,6 +6,37 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Polymorphic proofs from the published book
+
+Job 2505 checked [PLFH `0fd43f5`](https://github.com/Tritlo/PLFH/tree/0fd43f5353c4c3ae7670bac668ff2abe8f3c67ea)
+with [compiler `34582bce54`](https://github.com/Tritlo/ghc/commit/34582bce5489634e15d9fc16a53d37b19dcc58e5).
+In four fresh builds, all 27 modules passed the interface audit. Both
+native executables passed 66 observations. Each build rejected all five
+negative programs with the expected diagnostics. Fresh no-code builds
+emitted no object or bytecode files. Of 31 compiler reports, 21 compiled
+at `-O0` and 20 at default `-O2`.
+
+- Jobs 2457 and 2475 isolated the map proof alias. GHC inferred both
+  callback endpoint types but compared the dependent function types
+  before reading the assignments. Reading them fixes
+  `lengthMapLaw = lengthMap`. A wrong length still fails with GHC-83865.
+  Job 2479 checked that forcing an alias of a bottom-valued proof still
+  raises the original exception.
+- Job 2471 checked the distinction between a record label that also
+  names an independent type index and a selector applied in a field or
+  result type. The latter retains term lookup.
+- Jobs 2454 and 2482 checked an unrelated retained proof beside ordinary
+  subtraction. Native and no-code clients can use the equation when GHC
+  verifies the original case order and result. A strict producer, local
+  rewrite rule or loaded plugin suppresses the no-code equation.
+- Jobs 2487 and 2488 checked polymorphic `Iso` fields through compiled
+  interfaces. A reader reverses the isomorphism by exchanging both
+  functions and proofs. Keeping the old proof order fails. Job 2503
+  checked the binary-natural embedding and isomorphism-to-embedding
+  proof. Job 2509 ran the full book harness on that chapter patch and
+  reported 53 passes and zero failures.
+  [Agda and GHC provenance](REFERENCES.md#plfh-arithmetic-dependent-patterns-and-callback-inference).
+
 ## Exponentiation and keyed trees
 
 The [ordinary exponentiation fix](https://github.com/Tritlo/ghc/commit/1f873969e589e84b632e5d0304399ab4d2c997e3)

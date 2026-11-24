@@ -59,6 +59,14 @@ a comparison implementation. External solvers remain later work.
   Inspecting a lambda leaves its body unevaluated.
   [Agda progress](https://plfa.github.io/DeBruijn/#progress),
   [PLFH DeBruijn](https://github.com/Tritlo/PLFH/blob/49903d04bdde2b140a763c16cca23768a9f8dd08/content/part2/DeBruijn.md).
+- **Isomorphism fields.** PLFA packages two functions with proofs of both
+  round trips. The fork's GADT has four fields. Its first two fields are
+  retained functions between lifted type parameters. The other two refer
+  to those same functions in order. Reversing an isomorphism exchanges
+  both functions and both proofs. Exchanging only the functions fails
+  even when the endpoints have the same type.
+  [Agda Isomorphism](https://plfa.github.io/Isomorphism/),
+  [PLFH reproducer](https://github.com/Tritlo/PLFH/blob/0fd43f5353c4c3ae7670bac668ff2abe8f3c67ea/reproducers/R04_PolyFunctionFieldInIso.hs).
 - **Callback inference.** Agda can infer implicit arguments from the
   signature of a partially applied function. In `lengthMapLaw = lengthMap`,
   GHC already infers the callback's input and output types. The fix reads those
