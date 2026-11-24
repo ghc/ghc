@@ -2258,7 +2258,8 @@ tcIfaceType = go
                Just con
                  -- See Note [Runtime arguments of promoted GADT constructors].
                  | let (_, _, eqs, theta, _, _) = dataConFullSig con
-                       indexed = any (anyFreeVarsOfType isId) tks' && not (null eqs) && null theta
+                       indexed = any (anyFreeVarsOfType isId) tks' && null theta &&
+                                 (not (null eqs) || isNativeIndexedGadtCon con)
                  , not (null (dataConRepArgBinders con)) || indexed ->
                    check_iface_retained_args (ppr tc) (tyConKind tc') tks'
                  | isJust (tyConDataFamCoercion_maybe (dataConTyCon con))
@@ -2329,7 +2330,7 @@ tcIfaceType = go
                              <+> ppr fun <+> ppr arg) }
     app _ fun@(TyConApp tc _) arg
       | Just con <- isPromotedDataCon_maybe tc
-      , not (null (dataConRepArgBinders con))
+      , not (null (dataConRepArgBinders con)) || isNativeIndexedGadtCon con
       = do { check_iface_retained_args (ppr tc) (typeKind fun) [arg]
            ; return (mkAppTy fun arg) }
     app _ fun arg = return (mkAppTy fun arg)
@@ -2401,6 +2402,10 @@ The constructor can occur in an exported type with retained values for its
 head and tail. Check them against the promoted telescope, substituting each
 argument before checking the next one. Splitting arguments at the number
 of parent parameters cannot recover the tail length from the result index.
+
+The promoted App constructor has no result equality. Its first field kind
+still depends on an erased existential from the constructor's telescope.
+Use the same argument kind check for this supported existential shape.
 
 This checks an application in a type. Deriving evidence from a case expression
 requires the constructor and fields of the actual scrutinee.

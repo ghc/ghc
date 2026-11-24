@@ -36,7 +36,7 @@ import GHC.Core.Multiplicity
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Errors.Types (DsMessage(DsRetainedPackagePatterns, DsLinearRetainedPackageRows))
 import GHC.HsToCore.Utils
-import GHC.Core ( CoreExpr, Expr(Var), isNativeIndexedGadtCon )
+import GHC.Core ( CoreExpr, Expr(Var), splitNativeIndexedPatternEvidence )
 import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, ft_mult) )
 import GHC.Core.Utils ( applyTypeToArgs )
 import GHC.Core.Make ( mkCoreLets )
@@ -199,9 +199,8 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
                , pat_con_ext = ConPatTc { cpt_tvs = tvs, cpt_dicts = dicts
                                        , cpt_arg_tys = tys } }
           <- firstPat eqn
-      = case dicts of
+      = isJust (splitNativeIndexedPatternEvidence con dicts) || case dicts of
           [cv] -> null tvs && isCoVar cv && isNativeIndexType (mkTyConApp (dataConTyCon con) tys)
-          [eq, cv] -> isCoVar eq && isCoVar cv && isNativeIndexedGadtCon con
           _ -> False
       | otherwise = False
 
@@ -286,7 +285,7 @@ exact proof type. CoreToStg erases only the trailing virtual proof.
 
 Bare field patterns retain their renamed Unique values through tcPatBndr and
 selectConMatchVars. The proof therefore names the actual alternative fields.
-For an indexed GADT proof, keep the ordinary existentials and equality first.
+For an indexed GADT proof, keep the ordinary existentials and equalities first.
 Select the exact named fields, including a variable named by a signature pattern.
 Append the virtual proof after those fields.
 See Note [Retained constructor matches] in GHC.Tc.Gen.Match and the Agda
@@ -470,8 +469,8 @@ matchOneConLike scrut vars ty (eqn1 :| eqns)   -- All eqns for a single construc
                                   , isNativeIndexType (mkTyConApp (dataConTyCon con) arg_tys)
                                   -- See Note [Retained constructor field scope].
                                   -> arg_vars ++ dicts1
-                                _ | Just (eq, proof) <- indexed_proof
-                                  -> tvs1 ++ [eq] ++ arg_vars ++ [proof]
+                                _ | Just (eqs, proof) <- indexed_proof
+                                  -> tvs1 ++ eqs ++ arg_vars ++ [proof]
                                 _ -> tvs1 ++ dicts1 ++ arg_vars,
                               alt_wrapper = wrapper1,
                               alt_result = foldr1 combineMatchResults match_results } }
@@ -479,9 +478,7 @@ matchOneConLike scrut vars ty (eqn1 :| eqns)   -- All eqns for a single construc
     mult = matchIdMult scrut
 
     indexed_proof
-      | RealDataCon con <- con1, [eq, cv] <- dicts1
-      , isCoVar eq, isCoVar cv, isNativeIndexedGadtCon con
-      = Just (eq, cv)
+      | RealDataCon con <- con1 = splitNativeIndexedPatternEvidence con dicts1
       | otherwise = Nothing
 
     -- See Note [Retained package equation scope].

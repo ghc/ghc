@@ -12,7 +12,7 @@ import GHC.Prelude
 
 import GHC.HsToCore.Pmc.Types
 import GHC.HsToCore.Pmc.Utils
-import GHC.Core ( isNativeIndexedGadtCon, CoreExpr, Expr(Var, App) )
+import GHC.Core ( splitNativeIndexedPatternEvidence, CoreExpr, Expr(Var, App) )
 import GHC.Core.Utils (stripTicksTopE)
 import GHC.Data.FastString (unpackFS, lengthFS, mkFastStringShortText)
 import GHC.Driver.DynFlags
@@ -245,7 +245,7 @@ desugarPat x pat = case pat of
            }
          } ->
     let ordinary_dicts = case con of
-          RealDataCon dc | [eq, _] <- dicts, isNativeIndexedGadtCon dc -> [eq]
+          RealDataCon dc | Just (eqs, _) <- splitNativeIndexedPatternEvidence dc dicts -> eqs
           _ -> dicts
     in desugarConPatOut x con arg_tys ex_tvs ordinary_dicts ps
 

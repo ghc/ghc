@@ -48,7 +48,7 @@ module GHC.Core (
         containsRetainedNaturalLiteral, isBoxedBigNaturalLiteral,
         isNativeIndexAlt, isNativeIndexDataAlt, isNativeIndexAliasAlt, isNativeIndexAliasBinder,
         isNativeIndexedDataAlt, splitNativeIndexedDataAlt, isNativeIndexedGadtCon,
-        nativeIndexedCon_maybe,
+        splitNativeIndexedPatternEvidence, nativeIndexedCon_maybe,
 
         mkBinds,
 
@@ -158,7 +158,7 @@ import Data.Data hiding (TyCon)
 import Data.Int
 import Data.List.NonEmpty (nonEmpty)
 import qualified Data.List.NonEmpty as NE
-import Data.Maybe (isJust, isNothing)
+import Data.Maybe (fromMaybe, isJust, isNothing)
 import Data.Word
 
 import Control.DeepSeq
@@ -3473,7 +3473,7 @@ nativeIndexedPromotedCon_maybe con tys fields = do
 -- | Check the indexed GADT shapes that can be reified as retained operands.
 nativeIndexedOperandSpec_maybe :: DataCon -> Maybe EqSpec
 nativeIndexedOperandSpec_maybe con = do
-  spec <- nativeIndexedGadtSpec_maybe con
+  [spec] <- nativeIndexedGadtSpecs_maybe con
   case (dataConExTyCoVars con, dataConOrigArgTys con) of
     ([], []) -> Just spec
     ([predecessor], [_, _])
@@ -3587,59 +3587,79 @@ splitNativeIndexedDataAlt con args
 
 -- | Check the ordinary GADT constructor shape supported by indexed evidence.
 isNativeIndexedGadtCon :: DataCon -> Bool
-isNativeIndexedGadtCon = isJust . nativeIndexedGadtSpec_maybe
+isNativeIndexedGadtCon = isJust . nativeIndexedGadtSpecs_maybe
+
+-- | Separate the ordinary GADT equalities from the virtual branch proof.
+-- See Note [Native indexed branch evidence].
+splitNativeIndexedPatternEvidence :: DataCon -> [Var] -> Maybe ([Var], Var)
+splitNativeIndexedPatternEvidence con dicts
+  | Just specs <- nativeIndexedGadtSpecs_maybe con
+  , (eqs, [proof]) <- splitAt (length specs) dicts
+  , all isCoVar eqs, isCoVar proof
+  = Just (eqs, proof)
+  | otherwise = Nothing
 
 -- | Reconstruct the promoted constructor from the ordinary alternative binders.
 -- See Note [Native indexed branch evidence].
 nativeIndexedCon_maybe :: Type -> DataCon -> [Var] -> Maybe Type
 nativeIndexedCon_maybe domain con binders
-  | Just spec <- nativeIndexedGadtSpec_maybe con
+  | Just specs <- nativeIndexedGadtSpecs_maybe con
   , TyConApp tc args <- coreFullView domain
   , tc == dataConTyCon con
   , isNativeOpaqueValueType domain
   , let univs = dataConUnivTyVars con
         exs = dataConExTyCoVars con
         (existentials, remaining) = splitAt (length exs) binders
-  , equality : fields <- remaining
+        (equalities, fields) = splitAt (length specs) remaining
   , univs `equalLength` args, exs `equalLength` existentials
+  , specs `equalLength` equalities
   , all isTyVar existentials
   , let params = zip univs args
-        refined = eqSpecTyVar spec
         substitution = params ++ zip exs (mkTyVarTys existentials)
         instantiate = substTyWith (map fst substitution) (map snd substitution)
-  , all (not . anyFreeVarsOfType (== refined) . varType) (univs ++ exs)
+  , all (\tv -> all (not . anyFreeVarsOfType (== tv) . varType) (univs ++ exs))
+        (map eqSpecTyVar specs)
   , and (zipWith (\tv actual -> instantiate (varType tv) `eqType` varType actual) exs existentials)
-  , Just actual <- lookup refined params
   , Just con_args <- traverse (`lookup` substitution) (dataConUserTyVars con)
-  , isCoVar equality
-  , let co = mkCoVarCo equality
-  , coercionRole co == Nominal
-  , coercionLKind co `eqType` actual
-  , coercionRKind co `eqType` instantiate (eqSpecType spec)
+  , Just refinements <- traverse (check_equality params instantiate) (zip specs equalities)
   , fields `equalLength` dataConOrigArgTys con
   , all isNativeOpaqueValueId fields
   , and (zipWith (\field (Scaled _ ty) -> varType field `eqType` instantiate ty)
                  fields (dataConOrigArgTys con))
   , let constructor = mkTyConApp (promoteDataCon con) (con_args ++ map TermVarTy fields)
         kind_co = mkTyConAppCo Nominal tc
-          [if tv == refined then co else mkNomReflCo ty | (tv, ty) <- params]
+          [fromMaybe (mkNomReflCo ty) (lookup tv refinements) | (tv, ty) <- params]
   , coercionLKind kind_co `eqType` domain
   , coercionRKind kind_co `eqType` typeKind constructor
   = Just (mkCastTy constructor (mkSymCo kind_co))
   | otherwise = Nothing
+  where
+    check_equality params instantiate (spec, equality)
+      | let refined = eqSpecTyVar spec
+      , Just actual <- lookup refined params
+      , isCoVar equality
+      , let co = mkCoVarCo equality
+      , coercionRole co == Nominal
+      , coercionLKind co `eqType` actual
+      , coercionRKind co `eqType` instantiate (eqSpecType spec)
+      = Just (refined, co)
+      | otherwise = Nothing
 
-nativeIndexedGadtSpec_maybe :: DataCon -> Maybe EqSpec
-nativeIndexedGadtSpec_maybe con
+nativeIndexedGadtSpecs_maybe :: DataCon -> Maybe [EqSpec]
+nativeIndexedGadtSpecs_maybe con
   | let tc = dataConTyCon con
   , isVanillaAlgTyCon tc, isBoxedDataTyCon tc
   , null (dataConRepArgBinders con)
-  , (_, exs, [spec], [], fields, _) <- dataConFullSig con
+  , (_, exs, specs, [], fields, _) <- dataConFullSig con
   , all isTyVar exs, null (dataConStupidTheta con)
-  , dataConRepArity con == 1 + length fields
+  , dataConRepArity con == length specs + length fields
   , all (\(Scaled mult ty) -> (isOneTy mult || isManyTy mult) && isNativeOpaqueValueType ty) fields
   , all (not . isBanged) (dataConImplBangs con)
-  , not (null fields) || not (null exs) || noFreeVarsOfType (eqSpecType spec)
-  = Just spec
+  , case specs of
+      [] -> not (null exs)
+      [spec] -> not (null fields) || not (null exs) || noFreeVarsOfType (eqSpecType spec)
+      _ -> False
+  = Just specs
   | otherwise = Nothing
 
 {- Note [Native indexed branch evidence]
@@ -3678,6 +3698,12 @@ generated family type to Vec a n. exprToNativeIndex checks the nominal
 coercion and returns the casted index. Use that whole index on the left
 of the branch equality. The cast's endpoints alone do not identify the
 value. See Note [Nominal native index casts].
+
+For App :: Term g (TArr a b) -> Term g a -> Term g b, the alternative
+binds the existential a and the two fields. Its result has the original
+scrutinee kind, so no EqSpec or kind transport is necessary. Recover the
+constructor index from the same existential and actual fields. The
+existential distinguishes this shape from an ordinary structural case.
 
 Inlining can also expose a checked indexed constructor as the scrutinee.
 For example, the proof in a VNil alternative has the promoted VNil on the
