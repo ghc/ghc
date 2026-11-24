@@ -151,6 +151,7 @@ import GHC.Types.Name.Set (NameSet, mkNameSet, unionNameSet, emptyNameSet, elemN
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Name
+import GHC.Types.TypeEnv (lookupTypeEnv)
 import GHC.Types.Var.Env
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
@@ -3114,26 +3115,43 @@ tc_app_ty_external mode rn_ty exp_kind
     source_call rdr name =
       do { env <- getGblEnv
          ; if nameIsLocalOrFrom (tcg_semantic_mod env) name
-           then case (lookupNameEnv (tcg_local_open_defs env) name, value_args) of
-             (Just (fun, _), Just args)
+           then case (lookupTypeEnv (tcg_type_env env) name,
+                      lookupNameEnv (tcg_local_open_defs env) name, value_args) of
+             (Just (AnId fun), _, Just args)
+               | Just table <- partial_source_callback fun args
+               -> checked_callback table
+             (_, Just (fun, _), Just args)
                | isTypeLevel (mode_tyki mode), ordinary_call
                , Just table <- sourceTableOccurrence env fun >>= sourceTableId_maybe
                , lengthIs args 1 || equalLength args (tyConVisibleTyVars table)
                -> do { sourceTableReferenceUse table
                      ; tc_app_ty_with_head mode rn_ty exp_kind (mkTyConTy table) }
-             (Just (fun, _), Just args)
+             (_, Just (fun, _), Just args)
                | isTypeLevel (mode_tyki mode), ordinary_call
                , Just (instantiated, domains, result_kind) <- instantiateOpenTypeFunction True fun
                , equalLength domains args, all is_local_open_operand args
                -> do { result <- tcOpenTypeCall mode name instantiated result_kind (zip args domains)
                      ; checkExpKind mode rn_ty result result_kind exp_kind }
-             (Just _, Just [arg])
+             (_, Just _, Just [arg])
                | isTypeLevel (mode_tyki mode), ordinary_call
                , isJust (closedCallLiteralKind arg)
                -> failWithTc (TcRnClosedTypeEval name
                     "Closed type evaluation requires an imported definition. This function belongs to the module being compiled.")
              _ -> unsupported name
            else imported_call env rdr name }
+
+    partial_source_callback fun args
+      | isTypeLevel (mode_tyki mode), isJust (mode_complete_type_arg mode)
+      , Just table <- sourceTableId_maybe fun
+      , Just arity <- sourceCaseVisibleArity table
+      , not (args `lengthAtLeast` arity)
+      = Just table
+      | otherwise = Nothing
+
+    checked_callback table
+      = do { let head_ty = mkTyConTy table
+           ; sourceTableTypeUses head_ty
+           ; tc_app_ty_with_head mode rn_ty exp_kind head_ty }
 
     is_local_open_operand arg = isOpenTypeOperand arg || is_type_constructor_app arg
 
@@ -3152,6 +3170,8 @@ tc_app_ty_external mode rn_ty exp_kind
              -> do { thing <- tcLookupGlobal name
                    ; case thing of
                        AnId fun
+                         | Just table <- partial_source_callback fun args
+                         -> checked_callback table
                          | ordinary_call, null args, isQual rdr
                          , isNativeNamedOpaqueFunctionId fun
                          , Nothing <- sourceTableId_maybe fun
@@ -3389,6 +3409,17 @@ term a. Use the ordinary type application checker in that case. It
 reports the captured term at its occurrence. Only modules that enable
 ExperimentalDependentTypes check source equations for an ordinary term
 head. Imported type synonyms keep their existing type-level names.
+
+An erased required argument can be written `f (plus m)` or
+`f (type (plus m))`. The term-to-type mapping keeps the resolved term
+name in the first form. The renamer resolves the second form to the
+source family. Recover that same certified constructor-case family from
+the resolved Id when checking a partial callback. The Id can come from
+the current type environment or from an interface. Check the original
+argument types and record the family identity. The later use of a
+saturated application still checks the rules for using its equations.
+This lookup uses equations already visible at the occurrence. It does
+not schedule new equations or use an unfolding to evaluate code.
 -}
 
 -- | Add the written constraints to the scope of a promoted method call.

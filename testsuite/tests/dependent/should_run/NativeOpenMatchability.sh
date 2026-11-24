@@ -186,3 +186,56 @@ annotated :: ArrowMatchability (Select True) :~: M
 annotated = Refl
 HS
 "${ghc[@]}" -c MixedInjectiveArrows.hs
+
+# Check retained proof endpoints after the required erased callbacks.
+cat >../provider/CongNat.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
+{-# OPTIONS_GHC -fwrite-source-equations #-}
+module CongNat (Nat(..), add) where
+
+data Nat = Z | S Nat
+
+add :: Nat -> Nat -> Nat
+add Z n = n
+add (S m) n = S (add m n)
+HS
+cat >RequiredCong.hs <<'HS'
+{-# LANGUAGE AllowAmbiguousTypes, DataKinds, ExperimentalDependentTypes #-}
+{-# LANGUAGE GADTs, Modifiers, PolyKinds, RequiredTypeArguments, TypeOperators #-}
+module RequiredCong where
+
+import CongNat (Nat(..), add)
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Matchability (Matchability)
+
+cong :: forall {a} {b} {m :: Matchability}.
+        forall (f :: a %m -> b) -> forall (x :: a) (y :: a).
+        x :~: y -> f x :~: f y
+cong _ Refl = Refl
+
+assoc :: foreach (m :: Nat) -> foreach (n :: Nat) -> foreach (p :: Nat)
+      -> add (add m n) p :~: add m (add n p)
+assoc Z _ _ = Refl
+assoc (S m) n p = cong S (assoc m n p)
+
+outer :: foreach (m :: Nat) -> foreach (n :: Nat) -> foreach (p :: Nat)
+      -> foreach (q :: Nat) -> add m (add (add n p) q) :~: add m (add n (add p q))
+outer m n p q = cong (add m) (assoc n p q)
+HS
+sed -e 's/^module RequiredCong where$/module WrongCong where/' \
+    -e 's/cong S (assoc m n p)/cong S (assoc n m p)/' RequiredCong.hs >WrongCong.hs
+for opt in -O0 -O2; do
+    (cd ../provider && "${ghc[@]}" "$opt" -fomit-interface-pragmas -fforce-recomp -c CongNat.hs)
+    cp ../provider/CongNat.hi .
+    test ! -e CongNat.hs
+    "${ghc[@]}" "$opt" -fforce-recomp -c RequiredCong.hs
+    if "${ghc[@]}" "$opt" -fforce-recomp -c WrongCong.hs >wrong-cong.log 2>&1 ||
+       ! grep -Fq '[GHC-05617]' wrong-cong.log; then
+        cat wrong-cong.log >&2
+        exit 1
+    fi
+    rm -f ../provider/CongNat.hi CongNat.hi
+    (cd ../provider && "${ghc[@]}" "$opt" -fforce-recomp -fno-code -fwrite-interface -c CongNat.hs)
+    cp ../provider/CongNat.hi .
+    "${ghc[@]}" "$opt" -fforce-recomp -fno-code -c RequiredCong.hs
+done
