@@ -134,7 +134,9 @@ for opt in -O0 -O2; do
             exit 1
         fi
         grep -Fq '[GHC-83605]' rule.log
-        "${ghc[@]}" "$opt" -fforce-recomp -DABSTRACT_RENAMING -c NativeCheckedClosureDoubleRule.hs
+        # Keep the deliberately conflicting rule visible in the interface.
+        "${ghc[@]}" "$opt" -Wno-inline-rule-shadowing -fforce-recomp -DABSTRACT_RENAMING \
+             -c NativeCheckedClosureDoubleRule.hs
         if "${ghc[@]}" "$opt" -DHELPER_RULE -DABSTRACT_RENAMING -fno-code \
              -c NativeCheckedClosureDouble.hs >rule.log 2>&1; then
             cat rule.log
