@@ -1550,8 +1550,12 @@ canEqCast :: CanEqState
           -> TcType -> TcType     -- RHS (res. LHS), ty2 both normal and pretty
           -> TcS (StopOrContinue (Either IrredCt EqCt))
 canEqCast _ _ _ ev@(CtGiven (GivenCt { ctev_evar = evar })) NomEq swapped
-          ty1@(TyConApp tc tys1) co1 ty2@(TyConApp tc' tys2) _
-  | tc == tc'
+          ty1@(TyConApp tc tys1) co1 ty2 _
+  | let (rhs, rhs_cast) = case ty2 of
+          CastTy body co2 -> (body, MCo co2)
+          _ -> (ty2, MRefl)
+  , TyConApp tc' tys2 <- rhs
+  , tc == tc'
   , not (isTypeFamilyTyCon tc)
   , isInjectiveTyCon tc Nominal
   , tys1 `equalLength` tys2
@@ -1565,6 +1569,7 @@ canEqCast _ _ _ ev@(CtGiven (GivenCt { ctev_evar = evar })) NomEq swapped
                          IsSwapped  -> mkNomEqPred ty2 cast_ty1
              parent = mkGReflRightCo Nominal ty1 co1 `mkTransCo`
                         maybeSymCo swapped (mkCoVarCo (setVarType evar pred_ty))
+                        `mkTransCo` mkSymCo (mkGReflRightMCo Nominal rhs rhs_cast)
              selectors = tyConAppGivenSelectors (repeat Nominal) tys1 tys2 parent
        ; emitSelectorGivens loc selectors
        ; stopWith ev "Decomposed casted TyConApp Given" }
@@ -3361,9 +3366,13 @@ Wrinkles:
      expression within the homogeneous proof (T11711).
 
 (EIK5) A nominal Given can have the form (T as |> h) ~# T bs.
-     When T is injective, use the uncast equality as an expression
-     in its selectors. Binding that expression would create a mixed-kind
-     CoVar. A selector can also have different endpoint kinds. Bind
+     The right endpoint can also have a cast. For example, two GADT
+     matches can cast a promoted constructor application back to the
+     original scrutinee kind on each side.
+     When T is injective, compose both transports with the Given.
+     Use the uncast equality as an expression in its selectors.
+     Removing one cast first would bind mixed-kind evidence.
+     A selector can also have different endpoint kinds. Bind
      its kind equality first and transport the right endpoint, as in
      canEqCanLHSHetero. This keeps the argument Given homogeneous.
      For example, this permits decomposition of the boxed Given
