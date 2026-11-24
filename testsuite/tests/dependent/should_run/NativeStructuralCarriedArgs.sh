@@ -7,8 +7,10 @@ trap 'rm -rf -- "$work"' EXIT
 ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-color=never)
 
 cat >"$work/Worker.hs" <<'HS'
-{-# LANGUAGE ExperimentalDependentTypes #-}
+{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
 module Worker (Term(..), Label(..), decorate, decorateLast) where
+
+import Data.Type.Equality ((:~:)(Refl))
 
 data Term = Empty | Atom Label | Next Term
 data Label = Here | There Label
@@ -22,6 +24,18 @@ decorateLast :: Label -> Term -> Term
 decorateLast label Empty = Atom label
 decorateLast label (Atom _) = Empty
 decorateLast label (Next term) = Next (decorateLast label term)
+
+carryLast :: Label -> Label -> Label
+carryLast l Here = l
+carryLast l (There r) = There (carryLast l r)
+
+localLast :: foreach (l :: Label) -> foreach (r :: Label)
+#ifdef WRONG_LOCAL
+          -> carryLast l ('There r) :~: 'There (carryLast ('There l) r)
+#else
+          -> carryLast l ('There r) :~: 'There (carryLast l r)
+#endif
+localLast _ _ = Refl
 HS
 cat >"$work/Main.hs" <<'HS'
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
@@ -62,6 +76,11 @@ for opt in -O0 -O2; do
     cp "$work/Worker.hs" .
     "${ghc[@]}" "$opt" -fomit-interface-pragmas -c Worker.hs
     cp Worker.{hi,o} ../client/
+    if "${ghc[@]}" "$opt" -DWRONG_LOCAL -fforce-recomp -c Worker.hs >wrong.log 2>&1 ||
+       ! grep -Fq 'error: [GHC-83865]' wrong.log; then
+        cat wrong.log >&2
+        exit 1
+    fi
     cd ../client
     cp "$work/Main.hs" .
     "${ghc[@]}" "$opt" -c Main.hs
