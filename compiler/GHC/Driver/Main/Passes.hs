@@ -958,9 +958,16 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
       _ -> do
         checked_tc <- case mb_desugar of
           Just guts | not (null (finalCoreMappers (mg_binds guts))) -> do
-            let ordinary = null (mg_rules guts) &&
-                           not (hasNativeDependentModuleBody (mg_binds guts) [] (mg_tcs guts))
-            optimized <- if ordinary then Just <$> hscSimplify' [] guts else pure Nothing
+            optimized <- if not (null (mg_rules guts))
+              then pure Nothing
+              else if hasNativeDependentModuleBody (mg_binds guts) [] (mg_tcs guts)
+                then do
+                  added_plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
+                  if null added_plugins && null (pluginsWithArgs (hsc_plugins hsc_env)) &&
+                     null (pluginModNames dflags)
+                    then liftIO $ validateRetainedSourceBodies hsc_env guts
+                    else pure Nothing
+                else Just <$> hscSimplify' [] guts
             pure (validateSimpleSourceTables guts optimized tc_result)
           _ -> pure tc_result
         (iface, _details) <- liftIO $
@@ -1002,6 +1009,18 @@ validateSimpleSourceTables original final env
     invalidName name = name `elemNameSet` families
     clearOwner (AnId owner) = AnId (clearInvalidSourceOwner owners families owner)
     clearOwner thing = thing
+
+-- | Prepare a checked retained body for equation validation without a backend.
+-- See Note [Final Core source equations] in GHC.Tc.Gen.SourceTable.
+validateRetainedSourceBodies :: HscEnv -> ModGuts -> IO (Maybe ModGuts)
+validateRetainedSourceBodies env guts
+  | supportsNativeGentle simplified =
+      Just <$> simplifyRetainedGentle lint_env (guts { mg_binds = simplified })
+  | otherwise = pure Nothing
+  where
+    simplified = simpleOptNativeProgram (mg_binds guts)
+    lint_env = hscUpdateFlags
+      (\df -> gopt_set (gopt_unset df Opt_EnableRewriteRules) Opt_DoCoreLinting) env
 
 -- | Collect rejected owners and families, including equations that refer to them.
 invalidSourceMappers :: ModGuts -> Maybe ModGuts -> (NameSet, NameSet)
@@ -1619,16 +1638,21 @@ hscSimplify' plugins ds_result = do
               endPassHscEnvIO lint_env name_ppr_ctx CoreDesugarOpt (mg_binds optimized) rules
               return optimized
             Nothing | null rules && supportsNativeGentle simplified -> do
-              let df = hsc_dflags lint_env
-                  opts = initSimplifyOpts df [] 1
-                           ((initGentleSimplMode df) { sm_core_mode = RetainedCore }) emptyRuleBase
-              (_, optimized) <- simplifyPgm (hsc_logger lint_env)
-                (hsc_unit_env lint_env) name_ppr_ctx opts result
-              let final = simpleOptNativeProgram (mg_binds optimized)
-              endPassHscEnvIO lint_env name_ppr_ctx CoreDesugarOpt final rules
-              return (optimized { mg_binds = final })
+              optimized <- simplifyRetainedGentle lint_env result
+              endPassHscEnvIO lint_env name_ppr_ctx CoreDesugarOpt (mg_binds optimized) rules
+              return optimized
             Nothing -> return result
         else {-# SCC "Core2Core" #-} core2core hsc_env_with_plugins ds_result
+
+-- | Run one retained Gentle iteration and simplify the resulting RHSs.
+-- See Note [Retained Core in the Gentle simplifier].
+simplifyRetainedGentle :: HscEnv -> ModGuts -> IO ModGuts
+simplifyRetainedGentle env result = do
+  let df = hsc_dflags env
+      mode = (initGentleSimplMode df) { sm_core_mode = RetainedCore }
+      opts = initSimplifyOpts df [] 1 mode emptyRuleBase
+  (_, optimized) <- simplifyPgm (hsc_logger env) (hsc_unit_env env) alwaysQualify opts result
+  pure (optimized { mg_binds = simpleOptNativeProgram (mg_binds optimized) })
 
 {- Note [Private dictionary programs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
