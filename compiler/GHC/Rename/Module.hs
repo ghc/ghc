@@ -2660,8 +2660,19 @@ localSourceTableBinders binds sigs =
         , isExternalName n, nameOccName n `elemOccSet` signed
         , all (constructor_row n False) rows ||
           (any matches_second rows && all (constructor_row n True) rows) ||
-          all (mapping_row n) rows ]
+          all (mapping_row n) rows ||
+          all pair_swap_row rows ]
   where
+    -- See Note [Reservation for pair swap equations].
+    pair_swap_row (L _ Match{m_pats = L _ [pat], m_grhss = rhss})
+      | TuplePat _ [first, second] Boxed <- unparen pat
+      , VarPat _ (L _ x) <- unparen first
+      , VarPat _ (L _ y) <- unparen second
+      , GRHSs _ (L _ (GRHS _ [] rhs) :| []) (L _ EmptyLocalBinds{}) <- rhss
+      , ExplicitTuple _ [Present _ left, Present _ right] Boxed <- unLoc (stripParensLHsExpr rhs)
+      = variable left == Just y && variable right == Just x
+    pair_swap_row _ = False
+
     signed = mkOccSet [ rdrNameOcc n | L _ (TypeSig _ [] [L _ n] _) <- sigs ]
     constructor_row :: Name -> Bool -> LMatch GhcPs (LHsExpr GhcPs) -> Bool
     constructor_row self structural (L _ Match{m_pats = L _ (pat : rest), m_grhss = rhss})
@@ -2781,6 +2792,25 @@ localSourceTableBinders binds sigs =
       VarPat{} -> True
       WildPat{} -> True
       _ -> False
+
+{- Note [Reservation for pair swap equations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Reserve a private source family name only for the direct pair swap.
+This happens before checking the signature. The reserved name takes
+precedence over the ordinary open evaluator at a local symbolic call.
+The early declaration scheduler can check the parameter permutation.
+
+If the general constructor-row scan reserves names for boxed tuple
+patterns, it also reserves names for projections and pair rebuilding.
+For example, the ordinary evaluator accepts
+  rebuild :: (a, b) -> (a, b)
+  rebuild (x, y) = (x, y)
+  law :: forall a b. rebuild '(a, b) :~: '(a, b)
+The early scheduler cannot publish this equation, so reserving the
+name makes the formerly accepted law fail with GHC-68947. Keep these
+functions on the ordinary path. The typed pair case checker verifies
+the swap and supplies its exact equation.
+-}
 
 -- | A type use requires equations before type declarations; a value use can wait.
 -- A missing arity marks a domain applied to the worker's bound parameters.
@@ -2909,9 +2939,10 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
     -- | Read distinct named arguments and check the known local arity.
     parameter_domain :: LHsType GhcRn -> Maybe (Maybe Name, [Name])
     parameter_domain ty = do
-      (root, args) <- case list_element ty of
-        Just element -> Just (Nothing, [element])
-        Nothing -> do
+      (root, args) <- case unLoc (ignoreParens ty) of
+        HsTupleTy _ HsBoxedOrConstraintTuple [left, right] -> Just (Nothing, [left, right])
+        _ | Just element <- list_element ty -> Just (Nothing, [element])
+        _ -> do
           (name, args) <- type_application ty
           guard (not (null args))
           case lookupNameEnv early_datatypes name of
@@ -2923,6 +2954,13 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
       pure (root, params)
 
     worker_dependencies outer arg result
+      | TableInType{} <- use
+      , Just vars <- outer_vars outer
+      , Just (root, params) <- parameter_domain arg
+      , Just (target, new_params) <- parameter_domain result
+      , root == target, params /= new_params
+      , mkNameSet params == mkNameSet new_params, mkNameSet vars == mkNameSet params
+      = Just (maybe [] (\name -> [(name, Nothing)]) root)
       | TableInType{} <- use
       , Just (from, to) <- source_arrow arg
       , Just (domain, codomain) <- source_arrow result
