@@ -5669,7 +5669,21 @@ checkedDomains strict body_tv ty rows = do
     guard (length actual == length expected && mkUniqSet actual == mkUniqSet expected)
     pure (input, carried, result)
 
+{- Note [Ordinary constructors in GADT syntax]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A constructor signature such as Join :: Tree -> Tree -> Tree has the
+same representation as an H98 constructor declaration. Check for
+vanilla constructors with ordinary lifted fields. This excludes equality
+evidence, existentials, constructor wrappers and strict fields.
+
+The early declaration split in GHC.Rename.Module can move a nullary
+datatype before a local source equation. For GADT syntax, check that
+each constructor returns this datatype and uses the same prefix fields.
+The typechecker still checks its solved constructor representation.
+-}
+
 -- | Recognise a closed instance of a datatype with ordinary lifted parameters.
+-- See Note [Ordinary constructors in GADT syntax].
 ordinaryDataType :: Type -> Maybe (TyCon, [Type])
 ordinaryDataType ty
   | Just (tc, args) <- splitTyConApp_maybe ty
@@ -5678,7 +5692,7 @@ ordinaryDataType ty
   , all (tcIsLiftedTypeKind . tyVarKind) (tyConTyVars tc), all ordinaryField args
   , let cons = tyConDataCons tc
   , (null args && isEnumerationTyCon tc) ||
-    (not (isGadtSyntaxTyCon tc) && not (null cons) && all (ordinaryCon args) cons)
+    (not (null cons) && all (ordinaryCon args) cons)
   = Just (tc, args)
   | otherwise = Nothing
   where

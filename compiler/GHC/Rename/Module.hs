@@ -2859,7 +2859,7 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
                   , Just cons <- [early_constructors t cs derivs] ]
 
     early_constructors t [con] [] | Just c <- retained_constructor t con = Just [c]
-    early_constructors _ cs _ = traverse prefix_con cs
+    early_constructors t cs _ = concat <$> traverse (prefix_con t) cs
 
     retained_constructor t (L _ ConDeclGADT
       { con_names = L _ c :| [], con_modifiers = [], con_telescope = []
@@ -2885,11 +2885,18 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
         name == witness || isJust (type_name ty)
       _ -> False
 
-    prefix_con :: LConDecl GhcRn -> Maybe Name
-    prefix_con (L _ ConDeclH98{con_name = L _ c, con_modifiers = [], con_telescope = [],
-                               con_args = PrefixCon _ fields})
-      | all independent_field fields = Just c
-    prefix_con _ = Nothing
+    -- See Note [Ordinary constructors in GADT syntax] in GHC.Tc.Gen.SourceTable.
+    prefix_con :: Name -> LConDecl GhcRn -> Maybe [Name]
+    prefix_con _ (L _ ConDeclH98{con_name = L _ c, con_modifiers = [], con_telescope = [],
+                                 con_args = PrefixCon _ fields})
+      | all independent_field fields = Just [c]
+    prefix_con t (L _ ConDeclGADT{con_names = cs, con_modifiers = [], con_telescope = [],
+                                  con_outer_bndrs = L _ outer, con_g_args = PrefixConGADT _ fields,
+                                  con_res_ty = result})
+      | Just [] <- outer_vars outer
+      , type_name result == Just t
+      , all independent_field fields = Just (map unLoc (toList cs))
+    prefix_con _ _ = Nothing
 
     independent_field :: HsConDeclField GhcRn -> Bool
     independent_field CDF{cdf_type = ty, cdf_multiplicity = HsModifiedFunArr _ [] HsStandardArr{}}

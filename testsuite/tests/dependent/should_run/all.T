@@ -15,6 +15,9 @@ test('NativeOpenIdentity',
                  'RuntimeOrdering.hs', 'OrderingPayload.hs',
                  'IndexedPrefix.hs', 'IndexedPrefixClient.hs']]),
      run_command, ['bash check-source.sh "{compiler}" "{libdir}"'])
+test('NativeOrdinaryGadtSource',
+     [req_host_target_ghc, only_ways(['normal'])],
+     run_command, ['bash NativeOrdinaryGadtSource.sh "{compiler}" "{libdir}"'])
 test('NativeLocalOpen',
      [req_interp, req_rts_linker, only_ways(['normal']),
       extra_files(['NativeLocalOpenProducer.hs', 'NativeLocalOpenSibling.hs', 'NativeLocalOpenDerived.hs',
