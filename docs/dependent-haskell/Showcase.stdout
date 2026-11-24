@@ -562,6 +562,7 @@ unfold the fixed point of the identity: True
 substitute under a lambda and preserve the free variable at index two: Just 2
 prove progress for application, successor case, recursion and a value: ["beta","case successor","unfold","value"]
 replace two variables of the same type in de Bruijn order: Refl
+rename the free variable under a lambda and preserve the bound variable: Refl
 preserve an open predicate proof in a promoted existential witness: Refl
 keep the second occurrence when decoding a list witness: Refl
 round trip the same occurrence and predicate proof: Refl

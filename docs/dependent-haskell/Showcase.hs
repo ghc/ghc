@@ -2016,6 +2016,8 @@ main = do
         BookBetaReduction.progressExamples
     observe "replace two variables of the same type in de Bruijn order"
         (BookBetaReduction.replacementOrder BookDeBruijn.Zero (BookDeBruijn.Suc BookDeBruijn.Zero))
+    observe "rename the free variable under a lambda and preserve the bound variable"
+        BookBetaReduction.weakenUnderLambda
     observe "preserve an open predicate proof in a promoted existential witness"
         (BookAnyWitnessProof.packHeadPreservesProof @(BookAnyWitnessProof.EvidenceBit False))
     let firstMember :: BookAnyWitness.Any ((:~:) True) '[True]

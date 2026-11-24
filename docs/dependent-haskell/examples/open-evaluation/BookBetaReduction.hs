@@ -1,12 +1,13 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, EmptyCase, GADTs, PolyKinds #-}
-{-# LANGUAGE StandaloneKindSignatures, TypeAbstractions, TypeApplications, TypeOperators #-}
+{-# LANGUAGE AllowAmbiguousTypes, DataKinds, ExperimentalDependentTypes, EmptyCase, GADTs, PolyKinds #-}
+{-# LANGUAGE Modifiers, RankNTypes, StandaloneKindSignatures, TypeAbstractions, TypeApplications, TypeOperators #-}
 -- | Progress and capture-avoiding beta reduction for the PLFH DeBruijn terms.
 module BookBetaReduction (Step(..), Progress(..), progress, progressExamples,
-                          captureAvoided, freeIndexAfterBeta, replacementOrder) where
+                          captureAvoided, freeIndexAfterBeta, replacementOrder, weakenUnderLambda) where
 
 import BookDeBruijn
 import Data.Kind (Type)
 import Data.Type.Equality ((:~:)(Refl))
+import GHC.Exts (U)
 
 -- | One call-by-value reduction. The endpoints have the same context and type.
 type Step :: forall (g :: Ctx) (a :: Ty). Term g a -> Term g a -> Type
@@ -97,6 +98,24 @@ replacementOrder :: foreach (older :: Term CEmpty TNat) -> foreach (newer :: Ter
 replacementOrder _ _ = Refl
 
 type Outer = CExt CEmpty TNat
+
+type Renaming g d = forall a. Lookup g a %U -> Lookup d a
+
+-- | Renaming keeps the lambda-bound variable and renames the outer variable.
+renameUnderLambda :: forall g d (r :: Renaming g d) (v :: Lookup g TNat).
+    rename r (Lam (Case (Var Z) (Var (S v)) Zero) :: Term g (TArr TNat TNat))
+    :~: (Lam (Case (Var Z) (Var (S (r v))) Zero) :: Term d (TArr TNat TNat))
+renameUnderLambda = Refl
+
+type Shift :: forall (a :: Ty). @U Lookup Outer a %U -> Lookup (CExt Outer TNat) a
+type Shift x = S x
+
+-- | Add one outer variable. The lookup bound by the lambda remains zero.
+weakenUnderLambda ::
+    rename Shift (Lam (Case (Var Z) (Var (S Z)) Zero) :: Term Outer (TArr TNat TNat))
+    :~: (Lam (Case (Var Z) (Var (S (S Z))) Zero) :: Term (CExt Outer TNat) (TArr TNat TNat))
+weakenUnderLambda = renameUnderLambda @Outer @(CExt Outer TNat) @Shift @Z
+
 type Fn = TArr TNat TNat
 type Argument = Lam (Var (S Z)) :: Term Outer Fn
 type Body = Lam (Var (S Z)) :: Term (CExt Outer Fn) (TArr TNat Fn)
