@@ -2000,10 +2000,8 @@ main = do
                 (to (Left True), from (Left GT), fromTo (Right LT), toFrom (Right False))
     case BookConnectives.prodComm :: BookIso.Iso (Bool, Ordering) (Ordering, Bool) of
         BookIso.MkIso to from fromTo toFrom ->
-            let leftPair = (True, GT)
-                rightPair = (LT, False)
-            in observe "exchange the fields of a pair and check both inverse laws"
-                (to leftPair, from rightPair, fromTo leftPair, toFrom rightPair)
+            observe "exchange the fields of a pair and check both inverse laws"
+                (to (True, GT), from (LT, False), fromTo (True, GT), toFrom (LT, False))
     observe "reverse onto an accumulator and check the append proof"
         (BookReverseProof.shunt [True, False] [True],
          BookReverseProof.checkShuntReverse [True, False] [True])

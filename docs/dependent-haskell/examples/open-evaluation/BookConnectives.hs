@@ -25,8 +25,7 @@ swapPair (x, y) = (y, x)
 
 -- | Exchanging the fields twice returns the original pair.
 swapPairInv :: foreach (p :: (a, b)) -> swapPair (swapPair p) :~: p
-swapPairInv p = case p of
-    (,) _ _ -> Refl
+swapPairInv (_, _) = Refl
 
 -- | Conjunction is commutative.
 prodComm :: Iso (a, b) (b, a)

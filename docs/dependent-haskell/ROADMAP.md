@@ -36,6 +36,15 @@ The [PLFH preservation proof](CHECKPOINTS.md#one-step-preservation-with-same-mod
 checks ordinary same-module substitution in a GADT result. It exercises the
 partial binder and evaluation cards.
 
+In PLFH batch 15, the Lists chapter defines ordinary recursive reversal
+next to its proof (R13, R16 and declaration ordering in R21).
+Connectives uses retained functions and inverse laws to prove that sums
+and products commute (R03 and R04). The original foldr report still
+blocks a proof over a retained callback. The De Bruijn progress proof
+still needs substitution for an unknown function body. The published
+book and the three-chapter patch have separate
+[verification results](CHECKPOINTS.md#reversal-and-commutativity-in-batch-15).
+
 ### Release readiness
 
 Four cards meet their documented scope on the fork. R35 and R36 were

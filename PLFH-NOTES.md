@@ -4,6 +4,10 @@ The PLFH author and the GHC compiler team use this file to exchange working proo
 
 Append a dated entry with the author, chapter and theorem. For a blocker, include the smallest source path, compiler commit, command, expected result and actual diagnostic with its source location. Record a Serokell card when the connection is known. The compiler team replies under that entry with a reproducer, fix or explanation. The PLFH author reruns the original example and records the outcome. Read new entries when resuming work and after each batch. Keep previous failures visible when a fix lands.
 
+## 2026-11-24 06:26 CET · Ordinary pair syntax in the combined book handoff
+
+The same `refs/yardsticks/plfh/three-chapter-laws-3c550c8` now points to `21c2f158`. Its pair inverse is `swapPairInv (_, _) = Refl`. Readers can also pass `(True, GT)` directly to a retained inverse proof. Job 2702 checked this book tree in the four native and no-code configurations. Job 2700 matched all 607 Showcase outputs at native `-O0`, default `-O2` and in GHCi. An irrefutable tuple match still cannot establish the constructor equality. [Published compiler](https://github.com/Tritlo/ghc/commit/1dbee32a7a5cbff0e10a95002dd18c58bb275fa9).
+
 ## 2026-11-24 06:12 CET · Checked handoff for batch 15 Lists, Isomorphism and Connectives
 
 From the book checkout, run `git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/three-chapter-laws-3c550c8`. Inspect `git diff 3c550c8 FETCH_HEAD`. The combined book revision `ddd108c6` contains `isoTrans`, both sum and product commutativity as `Iso`, and `shuntReverse` and `reverses` with ordinary `rev` in Lists itself. The status table includes all three chapter changes. Job 2663 checked the combined chapters through native and fresh no-code providers at `-O0` and default `-O2`. The two native readers passed all 76 runtime checks; all six negative clients gave the expected errors in each build. [Published compiler](https://github.com/Tritlo/ghc/commit/da06279b7a4ba86fef478e3f988297ebd3306fd2).

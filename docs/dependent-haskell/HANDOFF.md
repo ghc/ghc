@@ -8,10 +8,11 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
-[Compiler `da06279b7a`](https://github.com/Tritlo/ghc/commit/da06279b7a4ba86fef478e3f988297ebd3306fd2)
+[Compiler `1dbee32a7a`](https://github.com/Tritlo/ghc/commit/1dbee32a7a5cbff0e10a95002dd18c58bb275fa9)
 checks the ordinary list reversal function alongside its inductive proof.
 It also checks that swapping a sum or a product twice returns the input.
-Job 2674 matched all **607 Showcase observations** at native `-O0`,
+The pair proof now uses `swapPairInv (_, _) = Refl`. Job 2700
+matched all **607 Showcase observations** at native `-O0`,
 default `-O2` and in GHCi. [Proofs and verification](CHECKPOINTS.md#reversal-and-commutativity-in-batch-15).
 
 [Published PLFH batch 15](https://github.com/Tritlo/PLFH/tree/3c550c8b9879b0f9202b8a9c408df3f61dca222c)
@@ -21,10 +22,10 @@ at default `-O2`**. The two differences are `R13_RevOpenEq` and
 four configurations. Both native readers passed 76 runtime checks.
 Each configuration rejected the six negative programs as expected.
 
-The combined book patch `ddd108c6` applies directly to batch 15. It
+The combined book patch `21c2f158` applies directly to batch 15. It
 contains the changes to Lists, Isomorphism and Connectives. From the book
 checkout, run `git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/three-chapter-laws-3c550c8`.
-Job 2663 checked the three patched chapters together in the full book
+Job 2702 checked the three patched chapters together in the full book
 matrix. The [notebook](../../PLFH-NOTES.md) records the handoff.
 
 ## Next compiler work

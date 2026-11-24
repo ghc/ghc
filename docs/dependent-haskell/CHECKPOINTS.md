@@ -32,6 +32,15 @@ and in GHCi. The reversal witness is opened inside its proof module.
 The sums and products use different input types to expose their field
 order. [PLFA provenance](REFERENCES.md#plfh-arithmetic-dependent-patterns-and-callback-inference).
 
+Job 2700 replayed the 607 observations using ordinary boxed pair
+patterns and expressions. The inverse proof can now use
+`swapPairInv (_, _) = Refl` and the reader can pass `(True, GT)` directly
+to that proof. Demanding the proof forces the outer pair and leaves
+both fields lazy. With irrefutable tuple matching enabled, that pattern
+cannot establish the constructor equality. Job 2696 checked that
+boundary in single- and two-column matches. Job 2702 checked the
+updated combined book tree `21c2f158` in all four configurations.
+
 Jobs 2663 and 2664 used [the PLFH checker](tools/check-plfh-revision)
 on the combined chapter patch and on unchanged batch 15. Both built
 27 modules and audited all interfaces in four configurations. Both native
