@@ -41,10 +41,8 @@ instance Num Nat where
     signum (Succ _) = Succ Zero
     fromInteger n
       | n < 0 = throw Underflow
-      | otherwise = natural n
-      where
-        natural 0 = Zero
-        natural k = Succ (natural (k - 1))
+      | n == 0 = Zero
+      | otherwise = Succ (fromInteger (n - 1))
 
 -- | Count the list constructors without inspecting the elements.
 size :: [a] -> Nat
