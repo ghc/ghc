@@ -29,6 +29,20 @@ captured = Pair True Refl
 HS
 "${g[@]}" -fomit-interface-pragmas -Werror=unused-foralls -c IndexedCapture.hs
 cp IndexedCapture.hi "$out/client/"
+cat >InlineSum.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
+module InlineSum (sumWitness) where
+
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Sigma (Sigma(Pair))
+import PackedVecLibrary (Nat, plus)
+
+sumWitness :: foreach (m :: Nat) -> foreach (n :: Nat)
+           -> some (k :: Nat) | k :~: plus m n
+sumWitness m n = Pair (plus m n) Refl
+HS
+"${g[@]}" -fomit-interface-pragmas -c InlineSum.hs
+cp InlineSum.hi "$out/client/"
 cp {PackedVecLibrary,PackedLength,RetainedNat,RetainedWitness,DependentPair}.hi "$src"/{PackedProjection,RetainedProjection,DependentProjection}.hs "$out/projection/"
 cd "$out/projection"
 "${g[@]}" -fomit-interface-pragmas -c PackedProjection.hs RetainedProjection.hs DependentProjection.hs
@@ -53,6 +67,7 @@ import Data.Functor.Const (Const(..))
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Sigma (Sigma(Pair))
 import IndexedCapture (captured)
+import InlineSum (sumWitness)
 import PackedVecLibrary
 import RetainedNat
 import RetainedProjection (project)
@@ -69,10 +84,34 @@ main = do
   case captured of
     Pair True Refl -> pure ()
     Pair False _ -> fail "unexpected captured witness"
+  case sumWitness (S Z) (S (S Z)) of
+    Pair k Refl | natToInt k == 3 -> pure ()
+    _ -> fail "unexpected sum witness"
+  let m = error "unused first operand" :: Nat
+      n = error "unused second operand" :: Nat
+  case sumWitness m n of
+    Pair _ _ -> pure ()
 HS
 "${g[@]}" -c Main.hs
-"${g[@]}" Main.o ../projection/RetainedProjection.o ../provider/{IndexedCapture,PackedVecLibrary,RetainedNat,RetainedWitness}.o -o run
+"${g[@]}" Main.o ../projection/RetainedProjection.o ../provider/{IndexedCapture,InlineSum,PackedVecLibrary,RetainedNat,RetainedWitness}.o -o run
 ./run
+cat >WrongInlineWitness.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
+module WrongInlineWitness where
+
+import Data.Type.Equality ((:~:)(Refl))
+import GHC.Sigma (Sigma(Pair))
+import PackedVecLibrary (Nat(..), plus)
+
+wrong :: foreach (m :: Nat) -> foreach (n :: Nat)
+      -> some (k :: Nat) | k :~: plus m n
+wrong m n = Pair (S (plus m n)) Refl
+HS
+if "${g[@]}" -c WrongInlineWitness.hs >wrong-inline.log 2>&1 ||
+   ! grep -Eq 'WrongInlineWitness.hs:10:.*GHC-83865' wrong-inline.log; then
+    cat wrong-inline.log >&2
+    exit 1
+fi
 cat >General.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, PolyKinds #-}
 module General where

@@ -103,6 +103,23 @@ relationship between the two stored fields in a constructor match.
 [ordinary client](../examples/packed-vector/RuntimeMessageClient.hs),
 and [Agda's built-in Σ](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type).
 
+## Return an inline sum from a retained function
+
+```haskell
+sumWitness :: foreach (m :: Nat) -> foreach (n :: Nat)
+           -> some (k :: Nat) | k :~: plus m n
+sumWitness m n = Pair (plus m n) Refl
+```
+
+The result captures the two function arguments in their original scope.
+`Pair` checks the proof at the witness supplied as its first argument.
+An ordinary importing module can match `Pair k Refl` and use `k`.
+Matching the pair alone leaves both fields unevaluated. Incrementing the
+witness while keeping the same proof gives a type error at `Refl`.
+The witness domain and payload in this signature use no further binders.
+[Package test](../../../testsuite/tests/dependent/should_run/NativeRetainedPackage.sh)
+and [Agda's built-in Σ](https://agda.readthedocs.io/en/v2.8.0/language/built-ins.html#the-s-type).
+
 ## Project a payload at the length of its input package
 
 Agda's `Σ` record gives the second projection a result type indexed by
