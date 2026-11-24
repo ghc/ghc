@@ -174,6 +174,9 @@ tryLiftLocalTypeLambdas doc ty = do
   lift_lambdas <- tcg_rn_local_lambdas <$> getGblEnv
   case (level, lift_lambdas) of
     (Comp, Just (scope, lift_sig)) -> lift_sig scope doc ty
+    -- See Note [Lifting type lambdas in typed quotations] in GHC.Rename.Module.
+    (Brack Comp RnPendingTyped, Just (scope, lift_sig)) -> lift_sig scope doc ty
+    (Brack (Splice Typed Comp) RnPendingTyped, Just (scope, lift_sig)) -> lift_sig scope doc ty
     _ -> pure Nothing
 
 -- | Get the optional written kinds of explicitly scoped erased binders.
@@ -1196,13 +1199,18 @@ rnHsTyKi env (XHsType (HsTypeLambda _ binders body)) = do
   enabled <- xoptM LangExt.ExperimentalDependentTypes
   unless enabled $ failWithTc TcRnTypeLambdaDisabled
   level <- getThLevel
+  let rename_lambda = do
+        checkDupRdrNames binders
+        binders' <- traverse (\binder -> L (getLoc binder) <$> newLocalBndrRn binder) binders
+        (body', fvs) <- bindLocalNamesFV (map unLoc binders') (rnLHsTyKi env body)
+        pure (XHsType (HsTypeLambdaQuoteRn binders' body'), fvs)
   case level of
     -- See Note [Quoting type lambdas] in GHC.HsToCore.Quote.
-    UntypedBrack{} -> do
-      checkDupRdrNames binders
-      binders' <- traverse (\binder -> L (getLoc binder) <$> newLocalBndrRn binder) binders
-      (body', fvs) <- bindLocalNamesFV (map unLoc binders') (rnLHsTyKi env body)
-      pure (XHsType (HsTypeLambdaQuoteRn binders' body'), fvs)
+    UntypedBrack{} -> rename_lambda
+    Brack _ RnPendingTyped -> do
+      -- If lifting failed, still report any scope errors in the callback.
+      _ <- checkNoErrs rename_lambda
+      failWithTc TcRnTypeLambdaContext
     _ -> failWithTc TcRnTypeLambdaContext
 
 -- See Note [Checking local lambda captures] in GHC.Tc.Gen.HsType.
