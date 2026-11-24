@@ -5481,6 +5481,15 @@ choose an endpoint. Final nominal subsumption must still prove that the
 two endpoints agree in this branch. A missing induction premise must
 therefore fail at Refl.
 
+In the branch Lam _ -> YesVal VLam, the expected argument to YesVal
+mentions the promoted Lam. Its nominal kind cast transports it from the
+constructor's result kind to the original scrutinee kind. The cast can
+hide the kind arguments needed to instantiate VLam. If the ordinary
+candidates do not supply those choices, match the same checked promoted
+GADT constructor beneath the cast. Use only the resulting substitution.
+Final subsumption keeps the original expected type and checks the cast
+using the branch evidence.
+
 The expected algebraic result can contain a supported retained function type.
 For example, Refl can be checked at value :~: QPi under value ~ QPi. Choose
 its repeated endpoint immutably. Keep the actual reflexive result and let
@@ -5623,10 +5632,8 @@ tcRetainedResultCandidate NoQL (Just expected) args fun sigma
   , not (hasNativeDependentExpr (Core.Type body))
   , Just result <- tcRetainedOrdinaryResult (count isHsValArg args) tau
   , Just pairs <- candidate_pairs body result expected
-  , let candidates = [ subst | (formal, actual) <- pairs
-                            , Just kinds <- [tcMatchTyX_BM (bind_outer tvs)
-                                               Subst.emptySubst (typeKind formal) (typeKind actual)]
-                            , Just subst <- [tcMatchTyX_BM (bind_outer tvs) kinds formal actual] ]
+  , let candidates = mapMaybe (match_pair tvs) pairs ++
+                     mapMaybe (match_pair tvs) (mapMaybe uncast_constructor pairs)
   , Just inst_tys <- traverse (candidate candidates) tvs
   , not (any (`elemVarSet` tyCoVarsOfTypes inst_tys) tvs)
   , let subst = Subst.zipTvSubst tvs inst_tys
@@ -5640,6 +5647,19 @@ tcRetainedResultCandidate NoQL (Just expected) args fun sigma
 
     bind_outer tvs tv _ | tv `elem` tvs = BindMe
                         | otherwise = DontBindMe
+
+    match_pair tvs (formal, actual) = do
+      kinds <- tcMatchTyX_BM (bind_outer tvs) Subst.emptySubst (typeKind formal) (typeKind actual)
+      tcMatchTyX_BM (bind_outer tvs) kinds formal actual
+
+    uncast_constructor (formal, CastTy actual co)
+      | coercionRole co == Nominal
+      , Core.isNativeConstructedGadtIndex actual
+      , Just (expected_con, _) <- splitTyConApp_maybe formal
+      , Just (actual_con, _) <- splitTyConApp_maybe actual
+      , expected_con == actual_con
+      = Just (formal, actual)
+    uncast_constructor _ = Nothing
 
     candidate substs tv = listToMaybe [ ty | subst <- substs
                                          , Just ty <- [Subst.lookupTyVar subst tv] ]

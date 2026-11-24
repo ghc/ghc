@@ -20,6 +20,12 @@ inspectCons xs = case xs of
     VCons h (t :: Vec Bool m) -> Just (ConsSeen @h @m @t)
 #endif
 
+{-# INLINE inspectAnonymous #-}
+inspectAnonymous :: foreach (xs :: Vec Bool n) -> Maybe (Shape n xs)
+inspectAnonymous xs = case xs of
+    VNil -> Nothing
+    VCons _ _ -> Just ConsSeen
+
 {-# INLINE inspectKnown #-}
 inspectKnown :: foreach (xs :: Vec Bool ('S n)) -> Shape ('S n) xs
 inspectKnown xs = case xs of

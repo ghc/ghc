@@ -1351,14 +1351,15 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
                                    , text "ex_ty_args:"   <+> ppr ex_ty_args
                                    , text "val_arg_pats:" <+> ppr val_arg_pats ])
 
-        ; let check_fields :: [Scaled TcSigmaType] -> TcM r -> TcM (HsConPatDetails GhcTc, r)
-              check_fields tys action
+        ; let check_fields :: HsConPatDetails GhcRn -> [Scaled TcSigmaType]
+                           -> TcM r -> TcM (HsConPatDetails GhcTc, r)
+              check_fields pats tys action
                 | OrderedConArgs (_ : groups) <- source_order
-                = do { (pats, _, result) <- tcOrderedConArgs con_like penv tenv
-                         (getSkolemInfo skol_info) groups tys val_arg_pats late_ty_args [] action
-                     ; return (pats, result) }
+                = do { (checked, _, result) <- tcOrderedConArgs con_like penv tenv
+                         (getSkolemInfo skol_info) groups tys pats late_ty_args [] action
+                     ; return (checked, result) }
                 | otherwise
-                = tcConValArgs con_like tys penv val_arg_pats $
+                = tcConValArgs con_like tys penv pats $
                     tcConTyArgs tenv penv (concatMap snd late_ty_args) action
 
         ; if null ex_tvs && null eq_spec && null theta
@@ -1366,7 +1367,7 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
                     -- (see Note [Arrows and patterns])
                     (val_arg_pats', res) <-
                                         tcConTyArgs tenv penv univ_ty_args $
-                                        check_fields arg_tys_scaled (thing_inside Nothing)
+                                        check_fields val_arg_pats arg_tys_scaled (thing_inside Nothing)
                   ; let res_pat = ConPat { pat_con = header
                                          , pat_args = val_arg_pats'
                                          , pat_con_ext = ConPatTc
@@ -1395,15 +1396,15 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
               ; index_vars <- newEvVars (substTheta proof_subst index_preds)
               ; context_vars <- newEvVars (substTheta tenv theta)
               ; return (kind_vars ++ index_vars ++ context_vars) }
-        ; let indexed_fields
-                | Just scrut <- index, [eq] <- given
-                , not trailing_context, LegacyConOrder _ <- source_order
-                , isIdHsWrapper wrap, isNativeIndexedGadtCon data_con
-                , PrefixCon _ fields <- val_arg_pats
-                , Just names <- traverse index_field_name fields
-                = Just (scrut, eq, names)
-                | otherwise = Nothing
-              field_tys
+        ; (body_pats, indexed_fields) <- case (index, given, val_arg_pats) of
+            (Just scrut, [eq], PrefixCon ann fields)
+              | not trailing_context, LegacyConOrder _ <- source_order
+              , isIdHsWrapper wrap, isNativeIndexedGadtCon data_con
+              , Just prepare <- traverse indexed_field fields
+              -> do { (names, pats) <- mapAndUnzipM id prepare
+                    ; return (PrefixCon ann pats, Just (scrut, eq, names)) }
+            _ -> return (val_arg_pats, Nothing)
+        ; let field_tys
                 | Just (_, _, _ : _) <- indexed_fields
                 = map (scaleScaled ManyTy) (substScaledTys tenv arg_tys)
                 | otherwise = arg_tys_scaled
@@ -1446,7 +1447,7 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
                     do { (binds, (pats, result)) <-
                            checkConstraints skol ex_tvs' given $
                            tcConTyArgs tenv penv ex_ty_args $
-                           check_fields field_tys check_body
+                           check_fields body_pats field_tys check_body
                        ; return (idHsWrapper, binds, [], pats, result) }
 
         ; let res_pat = ConPat
@@ -1464,15 +1465,30 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
         ; return (mkHsWrapPat wrap res_pat pat_ty, res)
         } }
   where
-    index_field_name :: LPat GhcRn -> Maybe Name
-    index_field_name (L _ (VarPat _ (L _ name))) = Just name
-    index_field_name (L _ (ParPat _ pat)) = index_field_name pat
-    index_field_name (L _ (SigPat _ pat _)) = index_field_name pat
-    index_field_name _ = Nothing
+    -- See Note [Wildcards in indexed GADT cases].
+    indexed_field :: LPat GhcRn -> Maybe (TcM (Name, LPat GhcRn))
+    indexed_field pat@(L _ (VarPat _ (L _ name))) = Just (return (name, pat))
+    indexed_field pat@(L _ WildPat{}) = Just $
+      do { name <- newSysName (mkVarOcc "_")
+         ; return (name, bindRetainedWildcard name pat) }
+    indexed_field (L loc (ParPat ann pat)) =
+      fmap (second (L loc . ParPat ann)) <$> indexed_field pat
+    indexed_field (L loc (SigPat ann pat sig)) =
+      fmap (second (\p -> L loc (SigPat ann p sig))) <$> indexed_field pat
+    indexed_field _ = Nothing
 
     -- A signature pattern can name the constructor skolem with a meta-variable.
     -- Read its solved type and keep the original field's Name and Unique.
     zonk_field field = setIdType field <$> liftZonkM (zonkTcType (idType field))
+
+{- Note [Wildcards in indexed GADT cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a dependent case, Lam _ can return a witness for the matched lambda.
+Its index still mentions the body. Bind the wildcard to a fresh internal
+Name so nativeIndexedCon_maybe can build the index from the actual field.
+Use the same pattern and proof path as for Lam body. The variable pattern
+does not force the field. The original match still supplies the error context.
+-}
 
 -- | Expose the ordinary constructor syntax of a selected retained pattern.
 -- See Note [Parameterized retained constructor patterns].
