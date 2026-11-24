@@ -146,6 +146,7 @@ import GHC.Builtin.WiredIn.Prim
 
 import GHC.Types.Literal (litValue, mkLitIntWrap, mkLitWordWrap)
 import GHC.Types.Id ( idName, isClassOpId_maybe, mkLocalId, mkSysLocalM, sourceTableId_maybe, sourceTableKeepsExecutable )
+import GHC.Types.Id.Info ( IdDetails(SourceTableId) )
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Set (NameSet, mkNameSet, unionNameSet, emptyNameSet, elemNameSet, extendNameSet)
@@ -3144,9 +3145,17 @@ tc_app_ty_external mode rn_ty exp_kind
     partial_source_callback fun args
       | isTypeLevel (mode_tyki mode), isJust (mode_complete_type_arg mode)
       , Just table <- sourceTableId_maybe fun
-      , Just arity <- sourceCaseVisibleArity table
+      , Just arity <- sourceCaseVisibleArity table <|> ordinary_source_arity fun table
       , not (args `lengthAtLeast` arity)
       = Just table
+      | otherwise = Nothing
+
+    -- See Note [Captured term names in ordinary types].
+    ordinary_source_arity fun table
+      | SourceTableId _ _ NominalSourceTable <- idDetails fun
+      , not (any isNamedTyConBinder (tyConBinders table))
+      , varType fun `tcEqType` tyConKind table
+      = Just (tyConArity table)
       | otherwise = Nothing
 
     checked_callback table
@@ -3421,13 +3430,18 @@ head. Imported type synonyms keep their existing type-level names.
 An erased required argument can be written `f (plus m)` or
 `f (type (plus m))`. The term-to-type mapping keeps the resolved term
 name in the first form. The renamer resolves the second form to the
-source family. Recover that same certified constructor-case family from
-the resolved Id when checking a partial callback. The Id can come from
-the current type environment or from an interface. Check the original
-argument types and record the family identity. The later use of a
-saturated application still checks the rules for using its equations.
-This lookup uses equations already visible at the occurrence. It does
-not schedule new equations or use an unfolding to evaluate code.
+source family. Recover the same checked family from the resolved Id
+when checking a bare or partial callback. The Id can come from the
+current type environment or from an interface. Check the original
+argument types and record the family identity. A later reduction of
+a saturated application checks the rules for using its equations.
+
+The constructor-case arity describes the equations the closed evaluator
+can use. A callback needs the kind and identity of its family. An
+ordinary monomorphic certificate, such as that for `inc` or right-first
+`pow`, supplies this when its kind agrees with the owner. Count the
+visible family binders. Use the existing kind check for the expected
+matchability.
 -}
 
 -- | Add the written constraints to the scope of a promoted method call.
