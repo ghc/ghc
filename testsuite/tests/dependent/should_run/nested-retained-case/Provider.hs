@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, EmptyCase, ExperimentalDependentTypes, GADTs, TypeOperators #-}
+{-# LANGUAGE DataKinds, EmptyCase, ExperimentalDependentTypes, GADTs, PolyKinds, TypeOperators #-}
 module Provider where
 
 import Data.Type.Equality ((:~:)(Refl))
@@ -45,3 +45,9 @@ nestedEquality (J l r) eq = case l of
     B     -> case eq of {}
     J _ _ -> case eq of {}
     A _ _ -> case eq of Refl -> Refl
+
+diagonalEquation :: forall a (x :: a). foreach (proof :: x :~: x) -> proof :~: 'Refl
+diagonalEquation Refl = Refl
+
+diagonalCase :: forall a (x :: a). foreach (proof :: x :~: x) -> proof :~: 'Refl
+diagonalCase proof = case proof of Refl -> Refl

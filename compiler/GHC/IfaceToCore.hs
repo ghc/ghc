@@ -2824,7 +2824,11 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
             failIfM (text "Missing indexed constructor proof tag:" <+> ppr dc)
           return (DataAlt dc)
         IfaceIndexedDataAltWithProof name ->
-          indexed_data_alt False (\dc -> dataConSourceArity dc == 0 && null (dataConExTyCoVars dc)) name names
+          indexed_data_alt False
+            (\dc -> dataConSourceArity dc == 0 && null (dataConExTyCoVars dc)
+                     && not (isNativeIndexedDiagonalCon dc)) name names
+        IfaceIndexedDiagonalAltWithProof name ->
+          indexed_data_alt False isNativeIndexedDiagonalCon name names
         IfaceIndexedFieldsAltWithProof name ->
           indexed_data_alt False (\dc -> dataConSourceArity dc > 0) name names
         IfaceIndexedExistentialAltWithProof name ->

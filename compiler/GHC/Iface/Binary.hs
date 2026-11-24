@@ -348,7 +348,7 @@ evidenceSuffix requirements
     || needs OrphanErasedUserRuleEvidence || needs AnchoredErasedRuleEvidence
     || needs RetainedUserRuleEvidence || needs ImportedRetainedRuleEvidence
     || needs IndexedConstructorCaseEvidence || needs IndexedConstructorFieldsEvidence
-    || needs IndexedOrdinaryConstructorCaseEvidence
+    || needs IndexedOrdinaryConstructorCaseEvidence || needs IndexedDiagonalConstructorCaseEvidence
     || needs IndexedConstructorOperandEvidence
     || needs IndexedConstructorExistentialCaseEvidence || needs GeneralIndexedConstructorOperandEvidence
     || needs RetainedUserUnfoldingEvidence || needs LinearUnpackEvidence
@@ -413,6 +413,7 @@ legacyEvidenceSuffix ImportedRetainedRuleEvidence = featureSetPrefix ++ "importe
 legacyEvidenceSuffix IndexedConstructorCaseEvidence = featureSetPrefix ++ "indexed-constructor-case"
 legacyEvidenceSuffix IndexedConstructorFieldsEvidence = featureSetPrefix ++ "indexed-constructor-fields"
 legacyEvidenceSuffix IndexedOrdinaryConstructorCaseEvidence = featureSetPrefix ++ "indexed-ordinary-constructor-case"
+legacyEvidenceSuffix IndexedDiagonalConstructorCaseEvidence = featureSetPrefix ++ "indexed-diagonal-constructor-case"
 legacyEvidenceSuffix IndexedConstructorOperandEvidence = featureSetPrefix ++ "indexed-constructor-operand"
 legacyEvidenceSuffix IndexedConstructorExistentialCaseEvidence = featureSetPrefix ++ "indexed-constructor-existential-case"
 legacyEvidenceSuffix RetainedUserUnfoldingEvidence = featureSetPrefix ++ "retained-user-unfolding"
@@ -484,6 +485,7 @@ independentFeatures = [ ("default", RetainedDefaultEvidence)
                       , ("indexed-constructor-case", IndexedConstructorCaseEvidence)
                       , ("indexed-constructor-fields", IndexedConstructorFieldsEvidence)
                       , ("indexed-ordinary-constructor-case", IndexedOrdinaryConstructorCaseEvidence)
+                      , ("indexed-diagonal-constructor-case", IndexedDiagonalConstructorCaseEvidence)
                       , ("indexed-constructor-operand", IndexedConstructorOperandEvidence)
                       , ("indexed-constructor-existential-case", IndexedConstructorExistentialCaseEvidence)
                       , ("general-indexed-constructor-operand", GeneralIndexedConstructorOperandEvidence)

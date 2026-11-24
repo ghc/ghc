@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LinearTypes, TypeOperators #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds, LinearTypes, TypeOperators #-}
 module Reject where
 
 import qualified Data.Type.Equality as Eq
@@ -30,3 +30,7 @@ discard box = case box of
 
 wrongWitness :: 'J ('A 'B 'B) 'B Eq.:~: 'J ('A 'B 'B) ('A 'B 'B)
 wrongWitness = nestedEquality (J (A B B) B) Eq.Refl
+
+otherProof :: forall a (x :: a) (other :: x Eq.:~: x).
+              foreach (proof :: x Eq.:~: x) -> proof Eq.:~: other
+otherProof proof = case proof of Eq.Refl -> Eq.Refl

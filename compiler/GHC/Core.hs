@@ -48,7 +48,7 @@ module GHC.Core (
         containsRetainedNaturalLiteral, isBoxedBigNaturalLiteral,
         isNativeIndexAlt, isNativeIndexDataAlt, isNativeIndexAliasAlt, isNativeIndexAliasBinder,
         isNativeIndexedDataAlt, splitNativeIndexedDataAlt, isNativeIndexedGadtCon,
-        isNativeIndexedOrdinaryCon,
+        isNativeIndexedOrdinaryCon, isNativeIndexedDiagonalCon,
         splitNativeIndexedPatternEvidence, nativeIndexedCon_maybe,
 
         mkBinds,
@@ -3506,6 +3506,7 @@ nativeIndexedPromotedCon_maybe con tys fields = do
 -- | Check the indexed GADT shapes that can be reified as retained operands.
 nativeIndexedOperandSpec_maybe :: DataCon -> Maybe EqSpec
 nativeIndexedOperandSpec_maybe con = do
+  guard (not (isNativeIndexedDiagonalCon con))
   [spec] <- nativeIndexedGadtSpecs_maybe con
   case (dataConExTyCoVars con, dataConOrigArgTys con) of
     ([], []) -> Just spec
@@ -3699,11 +3700,24 @@ nativeIndexedGadtSpecs_maybe = eligible True
       , all (not . isBanged) (dataConImplBangs con)
       , case specs of
           [] -> not (null exs)
-                || (allow_ordinary && any (isJust . eligible False) (tyConDataCons tc))
+                || (allow_ordinary && any supports_ordinary_sibling (tyConDataCons tc))
           [spec] -> not (null fields) || not (null exs) || noFreeVarsOfType (eqSpecType spec)
+                    || isNativeIndexedDiagonalCon con
           _ -> False
       = Just specs
       | otherwise = Nothing
+
+    supports_ordinary_sibling con =
+      not (isNativeIndexedDiagonalCon con) && isJust (eligible False con)
+
+-- | Identify a nullary branch that needs diagonal index evidence.
+-- See Note [Native indexed branch evidence].
+isNativeIndexedDiagonalCon :: DataCon -> Bool
+isNativeIndexedDiagonalCon con
+  | (universals, [], [spec], [], [], _) <- dataConFullSig con
+  , Just rhs <- getTyVar_maybe (eqSpecType spec)
+  = rhs /= eqSpecTyVar spec && rhs `elem` universals
+  | otherwise = False
 
 {- Note [Native indexed branch evidence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3730,6 +3744,17 @@ An indexed branch can bind erased arguments without binding any fields.
 For FZ :: Fin (S n), the ordinary alternative binds n and the nominal
 equality with S n. Form the promoted FZ at that n. The proof identifies
 the matched value at the scrutinee kind and adds no runtime argument.
+
+A nullary constructor can also refine one universal to another.
+Refl refines the right endpoint to the left endpoint. Use the nominal
+equality from the actual alternative to cast the promoted constructor
+to the scrutinee kind. The case forces the equality proof itself.
+Use a distinct interface feature for such alternatives. An older
+reader cannot reconstruct the dependent case proof. Keep diagonal branches
+out of the older simple indexed operand and ordinary sibling tests. The
+general indexed operand form already supports a constructed diagonal
+value. An ordinary sibling still needs a previously supported indexed
+constructor.
 
 An ordinary constructor can be a sibling of an eligible GADT constructor.
 For example, Mu :: Term (Ext g a) a -> Term g a has no EqSpec or

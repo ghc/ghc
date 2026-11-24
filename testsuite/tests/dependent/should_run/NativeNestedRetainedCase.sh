@@ -27,8 +27,23 @@ for opt in -O0 -O2 -fno-code; do
     if ! grep -Eq 'Reject\.hs:12:[0-9]+: error: \[GHC-05617\]' reject.log ||
        ! grep -Eq 'Reject\.hs:19:[0-9]+: error: \[GHC-83865\]' reject.log ||
        ! grep -Eq 'Reject\.hs:25:[0-9]+: error: \[GHC-18872\]' reject.log ||
-       ! grep -Eq 'Reject\.hs:32:[0-9]+: error: \[GHC-83865\]' reject.log; then
+       ! grep -Eq 'Reject\.hs:32:[0-9]+: error: \[GHC-83865\]' reject.log ||
+       ! grep -Eq 'Reject\.hs:36:[0-9]+: error: \[GHC-25897\]' reject.log; then
         cat reject.log >&2
         exit 1
     fi
 done
+
+cd "$out/-O2/provider"
+cat >DiagonalIface.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds, TypeOperators #-}
+module DiagonalIface where
+import Data.Type.Equality ((:~:) (Refl))
+
+{-# INLINE check #-}
+check :: forall a (x :: a). foreach (p :: x :~: x) -> p :~: 'Refl
+check p = case p of Refl -> Refl
+HS
+"${ghc[@]}" -O2 -fno-omit-interface-pragmas -c DiagonalIface.hs
+"${ghc[@]}" --show-iface DiagonalIface.hi >diagonal.iface
+grep -Fq 'indexed-diagonal-constructor-case' diagonal.iface

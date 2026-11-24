@@ -3157,6 +3157,7 @@ data IfaceEvidence
   | RetainedNamedRecordEvidence
   | RetainedRecordParametersEvidence
   | CheckedClosureSourceTableEvidence
+  | IndexedDiagonalConstructorCaseEvidence
   deriving (Bounded, Enum, Eq, Ord)
 
 -- | Requirements of an interface payload. See Note [Versioning retained evidence]
