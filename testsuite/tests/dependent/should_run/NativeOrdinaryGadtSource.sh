@@ -8,7 +8,7 @@ ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-
 
 cat >"$work/Tree.hs" <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
-module Tree (Tree(..), focus, known, pairRoundTrip, swapPair) where
+module Tree (Tree(..), focus, known, pairRoundTrip, swapPair, later) where
 
 import Data.Type.Equality ((:~:)(Refl))
 
@@ -49,6 +49,16 @@ first (x, _) = x
 
 firstLaw :: forall a b. first '(a, b) :~: a
 firstLaw = Refl
+
+later :: Bool -> Bool -> foreach (t :: Tree) -> (Bool, t :~: t)
+later False _ _ = (False, Refl)
+later True flag (Join _ _) | flag = (False, Refl)
+later True _ (Join _ _) = (True, Refl)
+later _ _ _ = (True, Refl)
+
+laterCallback :: foreach (f :: Tree -> Bool) -> foreach (t :: Tree) -> f t :~: f t
+laterCallback _ (Join _ _) = Refl
+laterCallback _ _ = Refl
 HS
 cat >"$work/Main.hs" <<'HS'
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
@@ -68,7 +78,12 @@ wrong _ = Refl
 main :: IO ()
 main = case open (Arrow Empty Other) of
     Refl -> case pairRoundTrip (False, EQ) of
-        Refl -> putStrLn "Refl"
+        Refl -> do
+            let bottom = error "forced the second argument" :: Tree
+                node = Join bottom bottom
+            if not (fst (later False False bottom)) && fst (later True False node)
+                then putStrLn "Refl"
+                else fail "unexpected result from the later column"
 HS
 cat >"$work/Mixed.hs" <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
