@@ -44,6 +44,34 @@ for opt in -O0 -O2; do
     done
 done
 
+for opt in -O0 -O2; do
+    mkdir -p "$work/$opt/double"/{provider,reader}
+    cd "$work/$opt/double/provider"
+    cp "$inputs/NativeCheckedClosureDoubleProvider.hs" .
+    "${ghc[@]}" "$opt" -fwrite-source-equations -c NativeCheckedClosureDoubleProvider.hs
+    "${ghc[@]}" --show-iface NativeCheckedClosureDoubleProvider.hi >provider.iface
+    grep -Fq 'CheckedClosureSourceTable T:replaceBoth' provider.iface
+
+    cd "$work/$opt/double/reader"
+    cp ../provider/NativeCheckedClosureDoubleProvider.hi "$inputs/NativeCheckedClosureDouble.hs" .
+    "${ghc[@]}" "$opt" -c NativeCheckedClosureDouble.hs
+    if "${ghc[@]}" "$opt" -DWRONG_DOUBLE_CAPTURE -c NativeCheckedClosureDouble.hs >wrong.log 2>&1; then
+        cat wrong.log
+        exit 1
+    fi
+    grep -Fq '[GHC-83865]' wrong.log
+
+    if [[ $opt == -O2 ]]; then
+        cp "$inputs/NativeCheckedClosureDoubleRule.hs" .
+        "${ghc[@]}" "$opt" -c NativeCheckedClosureDoubleRule.hs
+        if "${ghc[@]}" "$opt" -DHELPER_RULE -c NativeCheckedClosureDouble.hs >rule.log 2>&1; then
+            cat rule.log
+            exit 1
+        fi
+        grep -Fq '[GHC-83605]' rule.log
+    fi
+done
+
 mkdir "$work/interactive"
 cd "$work/interactive"
 cp "$inputs/NativeCheckedClosureProvider.hs" "$inputs/NativeCheckedClosure.hs" .

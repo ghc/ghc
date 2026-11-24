@@ -26,7 +26,9 @@ test('NativeOrdinaryGadtSource',
      run_command, ['bash NativeOrdinaryGadtSource.sh "{compiler}" "{libdir}"'])
 test('NativeCheckedClosure',
      [req_host_target_ghc, only_ways(['normal']),
-      extra_files(['NativeCheckedClosureProvider.hs', 'NativeCheckedClosure.hs'])],
+      extra_files(['NativeCheckedClosureProvider.hs', 'NativeCheckedClosure.hs',
+                   'NativeCheckedClosureDoubleProvider.hs', 'NativeCheckedClosureDouble.hs',
+                   'NativeCheckedClosureDoubleRule.hs'])],
      run_command, ['bash NativeCheckedClosure.sh "{compiler}" "{libdir}"'])
 test('NativeLocalBooleanResult',
      [req_host_target_ghc, only_ways(['normal']), extra_files(['NativeLocalBooleanResult.hs'])],
