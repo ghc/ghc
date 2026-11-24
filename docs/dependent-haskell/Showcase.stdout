@@ -162,6 +162,7 @@ computed forall kind supports reflection: True
 function value in an algebraic index: 2
 family-exposed call uses imported proof: 1
 proof retains the stored function identity: True
+apply a stored callback with its identity proof: (False,False)
 algebraic function container stays lazy: 42
 algebraic function leaf stays lazy: 1
 generic Boolean list: [True,False]

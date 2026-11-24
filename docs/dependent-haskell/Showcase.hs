@@ -613,6 +613,9 @@ algebraicFunctionFields = do
         FunctionFieldClient.inspectViaCall (FunctionFields.repack (FunctionFields.build id b))
     observe "proof retains the stored function identity" $
         FunctionFieldClient.proofOnly (FunctionFields.build not b)
+    case FunctionFields.checkedEndo of
+        FunctionFields.CheckedEndo f law -> case law b of
+            Refl -> observe "apply a stored callback with its identity proof" (b, f b)
     observe "algebraic function container stays lazy" $
         FunctionFieldClient.outer (FunctionFields.loose (error "showcase-function-container") (error "showcase-function-input"))
     observe "algebraic function leaf stays lazy" $

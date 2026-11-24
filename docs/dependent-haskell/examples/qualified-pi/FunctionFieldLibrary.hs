@@ -54,10 +54,12 @@ data CheckedEndo where
                 -> (foreach (x :: Bool) -> f x :~: x)
                 -> CheckedEndo
 
+-- | Return the input bit.
 keepBit :: Bool -> Bool
 keepBit False = False
 keepBit True = True
 
+-- | Prove that the callback returns its input.
 keepBitLaw :: foreach (x :: Bool) -> keepBit x :~: x
 keepBitLaw False = Refl
 keepBitLaw True = Refl
