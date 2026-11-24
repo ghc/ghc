@@ -101,7 +101,7 @@ import GHC.Tc.Gen.OpenTypeEval (OpenTypeFailure(InvalidInput), instantiateOpenMe
                                openTypeFailureReason, readOpenMethodWorker)
 import GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableFamilyUse, sourceTableTypeUses,
                               sourceCaseKindUse, sourceTableOccurrence, sourceTableReferenceUse, indexedProjectionSource, isSourceConstructorCase, monomorphicEnumCaseArity, sourceCaseVisibleArity, sourceTableOwner, sourcePairBuilderField,
-                              isFinalStructuralSource,
+                              isFinalCoreIdentity, isFinalStructuralSource,
                               lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource,
                               lookupSourceBinaryMethod, sourceMapSelector, lookupSourceContainerMethod,
                               lookupSourceGroundDFun, lookupSourceCheckedMapMethod,
@@ -3183,6 +3183,13 @@ tc_app_ty_external mode rn_ty exp_kind
                                ; call_span <- getSrcSpanM
                                ; updTcRef pending (TcPendingTypeCall call_span fun checked result :)
                                ; checkExpKind mode rn_ty result result_kind exp_kind }
+                         | ordinary_call, [arg] <- args
+                         , isFinalCoreIdentity fun
+                         , Just table <- sourceTableId_maybe fun
+                         , retained_identity_operand arg
+                         -> do { _ <- tcOpenTypeContext mode name
+                               ; sourceTableReferenceUse table
+                               ; tc_app_ty_with_head mode rn_ty exp_kind (mkTyConTy table) }
                          | ordinary_call
                          , Just (instantiated, domains, result_kind) <- instantiateOpenTypeFunction False fun
                          , equalLength domains args
@@ -3210,6 +3217,16 @@ tc_app_ty_external mode rn_ty exp_kind
                                      checkExpKind mode rn_ty result result_kind exp_kind }
                        _ -> unsupported name }
            _ -> unsupported name
+    -- Keep closed calls on the executable path. A retained variable and
+    -- nested applications that contain it have no closed runtime operand.
+    -- See Note [Identity certificates and open unfoldings] in GHC.Tc.Gen.SourceTable.
+    retained_identity_operand arg
+      | L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ operand))) <- ignoreParens arg
+      = operand `elemNameEnv` mode_indices mode
+      | Just (_, _, head_name, [operand]) <- nestedClosedCall arg
+      , isVarName head_name = retained_identity_operand operand
+      | otherwise = False
+
     -- See Note [Nullary indexed source projections] in GHC.Tc.Gen.SourceTable.
     indexed_variable name = isTyVarName name || isJust (lookupNameEnv (mode_indices mode) name)
     open_indexed_operand ty = case unLoc (indexed_operand ty) of

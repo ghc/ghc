@@ -1988,11 +1988,11 @@ simplArg env mb_arg_info fun_ty (UnSimplified arg_se) arg mco
     keep_retained_operand = case coreFullView fun_ty of
       DepDictTy{} -> True
       DepFunTy _ binder body
-        | Var fun <- arg
-        , isNativeNamedOpaqueFunctionId fun
-        , isNothing (sourceTableId_maybe fun)
-        , isNativeIndexFunctionId binder
+        | isNativeIndexFunctionId binder
         , not (isVacuousRetainedBinder binder body)
+        , (Var fun, _) <- collectArgs arg
+        , isExternalName (idName fun)
+        , isJust (nativeIndexFunctionArgIndex arg)
         -> True
       DepFunTy{} -> isJust (nativeComputedIndex arg) || isJust (nativeClassSelectorIndex arg)
       _ -> False
@@ -2011,8 +2011,9 @@ type mentions the checked source family for `not x`. Inlining `not`
 replaces the call with a case. The case has no index in the operand
 grammar, so Core Lint can no longer instantiate the result type.
 
-An imported callback can also determine the result type by its Name. Keep
-that operand as the original Id. Inlining its body would change the index.
+A named callback can determine the result type by its Name or its
+source table. Keep the original Id and its erased arguments. Inlining
+the body can replace the callback with an Id that has a different index.
 
 Apply the lexical substitution, but leave the checked call tree in place.
 This includes calls nested in constructor arguments. The ordinary
