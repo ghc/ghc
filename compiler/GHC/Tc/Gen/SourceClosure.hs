@@ -117,7 +117,10 @@ bytecode generation, including the variables used by the debugger.
 
 data CallbackLift = NamedLift Id | InlinedRename | InlinedSubst Id
 
-data FamilyInputs = FamilyInputs Id Int Kind Kind TyCon TyCon TyCon (Id, Id)
+-- The two traversals, their extensions and the optional named weakening.
+data ClosureOperations = ClosureOperations (Id, Id) (Id, Id, Maybe Id)
+
+data FamilyInputs = FamilyInputs Id Int Kind Kind TyCon TyCon TyCon ClosureOperations
                                   DC.DataCon DC.DataCon DC.DataCon [(DC.DataCon, [Int])]
 
 -- | Publish tables for eligible final Core bindings. The caller checks
@@ -152,6 +155,13 @@ publishCheckedSourceClosures original_binds final_binds final_types = do
                 filter (\name -> name /= idName old && include name)
                        (reachable original old ++ reachable final actual)
           traverse lookupLocal helpers
+        onlyCalls allowed old actual = do
+          old_rhs <- lookup old unoptimized
+          new_rhs <- lookup actual final
+          let helper v = isValueVar v &&
+                         idName v `notElem` allowed &&
+                         not (isJust (isDataConWorkId_maybe v <|> isDataConWrapId_maybe v))
+          guard (all (null . exprSomeFreeVarsList helper) [old_rhs, new_rhs])
         candidate (old, original_rhs) = do
           actual <- lookupOwner old
           original_shape <- familyInputs original old original_rhs
@@ -181,14 +191,25 @@ publishCheckedSourceClosures original_binds final_binds final_types = do
           guard (idName rename == idName final_rename && idName extend == idName final_extend)
           actual_rename <- lookupOwner final_rename
           actual_extend <- lookupOwner final_extend
-          original_extension <- lookup extend unoptimized
-          final_extension <- lookup actual_extend final
-          let helper v = isValueVar v &&
-                         not (isJust (isDataConWorkId_maybe v <|> isDataConWrapId_maybe v))
-          guard (all (null . exprSomeFreeVarsList helper) [original_extension, final_extension])
+          onlyCalls [] extend actual_extend
           helpers <- dependencies isExternalName rename actual_rename
           guard (actual_extend `elem` helpers)
           pure (actual_rename, (actual_extend, shape), helpers)
+        -- See Note [Substitution with an abstract callback].
+        substitution_extension (_, (original_shape, shape), _) = do
+          let (old_rename, _) = renamingOperations original_shape
+              (rename, _) = renamingOperations shape
+          (_, old_ext, Just old_weakening) <- pure (substitutionOperations original_shape)
+          (_, ext, Just weakening) <- pure (substitutionOperations shape)
+          let operation_names = map idName [rename,ext,weakening]
+          guard (map idName [old_rename,old_ext,old_weakening] == operation_names)
+          actual_ext <- lookupOwner ext
+          actual_weakening <- lookupOwner weakening
+          onlyCalls [] old_weakening actual_weakening
+          onlyCalls [idName rename, idName weakening] old_ext actual_ext
+          helpers <- dependencies isExternalName old_ext actual_ext
+          guard (all (`elem` map idName helpers) [idName rename, idName weakening])
+          pure (actual_ext, (rename, actual_weakening, shape), helpers)
         lookup_candidate (old, original_rhs) = do
           actual <- lookupOwner old
           final_rhs <- lookup actual final
@@ -210,8 +231,15 @@ publishCheckedSourceClosures original_binds final_binds final_types = do
         extensions <- catMaybes <$> traverse (publishRenameExtension public) (nubBy sameExtension renamings)
         let extension_tables = [(idName ext, table) | (ext, [table]) <- extensions]
         checked_renamings <- catMaybes <$> traverse (publishRenaming public extension_tables) (nubBy sameRename renamings)
+        let checked_tables entries = [(idName owner, table) | (owner, [table]) <- entries]
+            subst_extensions = nubBy sameRename (filter safe (mapMaybe substitution_extension closures))
+            weakening_inputs = [(weakening, shape) | (_, (_, weakening, shape), _) <- subst_extensions]
+        weakenings <- catMaybes <$> traverse (publishWeakening public) (nubBy (\a b -> fst a == fst b) weakening_inputs)
+        subst_exts <- catMaybes <$> traverse (publishSubstitutionExtension public
+                        (checked_tables checked_renamings) (checked_tables weakenings)) subst_extensions
         checked_lookups <- catMaybes <$> traverse (publishIndexedLookup public) (filter safe lookups)
-        let accepted = checked_closures ++ checked_indexed ++ extensions ++ checked_renamings ++ checked_lookups
+        let accepted = checked_closures ++ checked_indexed ++ extensions ++ checked_renamings ++
+                       weakenings ++ subst_exts ++ checked_lookups
         pure (map fst accepted, concatMap snd accepted)
   where
     publish public (owner, (_, shape), helpers) = do
@@ -791,7 +819,10 @@ sameShapes (FamilyInputs _ arity g a term ext index _ var hit miss rows)
     var == var' && hit == hit' && miss == miss' && rows == rows'
 
 renamingOperations :: FamilyInputs -> (Id, Id)
-renamingOperations (FamilyInputs _ _ _ _ _ _ _ operations _ _ _ _) = operations
+renamingOperations (FamilyInputs _ _ _ _ _ _ _ (ClosureOperations operations _) _ _ _ _) = operations
+
+substitutionOperations :: FamilyInputs -> (Id, Id, Maybe Id)
+substitutionOperations (FamilyInputs _ _ _ _ _ _ _ (ClosureOperations _ operations) _ _ _ _) = operations
 
 familyInputs :: [(Id, CoreExpr)] -> Id -> CoreExpr -> Maybe FamilyInputs
 familyInputs bindings owner rhs = do
@@ -845,7 +876,7 @@ checkedTraversals :: [(Id, CoreExpr)]
                   -> Id -> Id
                   -> DC.DataCon -> DC.DataCon -> DC.DataCon
                   -> [(DC.DataCon, [Var], CoreExpr)]
-                  -> Maybe ((Id, Id), [(DC.DataCon, [Int])])
+                  -> Maybe (ClosureOperations, [(DC.DataCon, [Int])])
 checkedTraversals bindings subst sigma var hit miss rows = do
     let constructors = tyConDataCons (DC.dataConTyCon var)
     guard (complete constructors rows)
@@ -854,7 +885,7 @@ checkedTraversals bindings subst sigma var hit miss rows = do
         subst_steps = concatMap concat used_extenders
     extender <- allSame [v | NamedLift v <- subst_steps]
     extender_rhs <- lookup extender bindings
-    rename <- checkedExtension bindings var hit miss extender_rhs
+    (rename, weakening) <- checkedExtension bindings var hit miss extender_rhs
     guard (all (isSubstLift rename) subst_steps)
     rename_rhs <- lookup rename bindings
     (tvs, [rho, operand], renaming) <- function rename_rhs
@@ -877,7 +908,7 @@ checkedTraversals bindings subst sigma var hit miss rows = do
     extend_rename <- allSame [v | NamedLift v <- rename_steps]
     extend_rename_rhs <- lookup extend_rename bindings
     checkRenameExtension hit miss extend_rename_rhs
-    pure ((rename, extend_rename), recipes)
+    pure (ClosureOperations (rename, extend_rename) (subst, extender, weakening), recipes)
   where
     complete constructors alts =
       let heads = [con | (con, _, _) <- alts]
@@ -957,9 +988,7 @@ checkedRow bindings var hit miss traversal callback (con, binders, rhs) = do
             (fresh_index, []) <- constructorCall v
             guard (fresh_con == var && fresh_index == hit)
             (Core.Var rename, [weakening, lookup_older]) <- application forwarded
-            ([_], [], partial) <- weakeningBody weakening >>= function
-            (shift, []) <- constructorCall partial
-            guard (shift == miss)
+            _ <- checkedWeakening bindings miss weakening
             pure (InlinedSubst rename, lookup_older)
           _ -> Nothing
 
@@ -1027,9 +1056,31 @@ weakeningBody :: CoreExpr -> Maybe CoreExpr
 weakeningBody (Core.Cast body co) = body <$ guard (checkedMultiplicityCast co)
 weakeningBody body = Just body
 
+-- | Read a constructor callback or a named function that forwards to it.
+checkedWeakening :: [(Id, CoreExpr)] -> DC.DataCon -> CoreExpr -> Maybe (Maybe Id)
+checkedWeakening bindings miss rhs = do
+    (tvs, [], partial) <- weakeningBody rhs >>= function
+    let direct = do
+          [_] <- pure tvs
+          (shift, []) <- constructorCall partial
+          Nothing <$ guard (shift == miss)
+        named = do
+          (Core.Var owner, types) <- pure (Core.collectArgs partial)
+          guard (length tvs <= 1 && length types == 2 + length tvs && all Core.isTypeArg types)
+          definition <- lookup owner bindings
+          (erased, inputs, body) <- function definition
+          (con, values) <- constructorCall body
+          guard (length erased == 3 && length inputs <= 1 && con == miss)
+          zipWithM_ (\input value -> case value of
+                       Core.Var actual -> guard (actual == input)
+                       _ -> Nothing) inputs values
+          guard (length inputs == length values)
+          pure (Just owner)
+    direct <|> named
+
 checkedExtension :: [(Id, CoreExpr)]
                  -> DC.DataCon -> DC.DataCon -> DC.DataCon
-                 -> CoreExpr -> Maybe Id
+                 -> CoreExpr -> Maybe (Id, Maybe Id)
 checkedExtension bindings var hit miss rhs = do
     let (binders, body) = Core.collectBinders rhs
     [g, d, b, capture, sort_var, argument] <- pure binders
@@ -1046,13 +1097,11 @@ checkedExtension bindings var hit miss rhs = do
     miss_body <- branchBody miss_bs miss_rhs
     (Core.Var rename, [weakening, lookup_older]) <- application miss_body
     _ <- lookup rename bindings
-    ([_], [], partial) <- weakeningBody weakening >>= function
-    (shift, []) <- constructorCall partial
-    guard (shift == miss)
+    chosen <- checkedWeakening bindings miss weakening
     (Core.Var lookup_capture, [arg]) <- application lookup_older
     Core.Var input <- branchBody miss_bs arg
     guard (lookup_capture == capture && input == older)
-    pure rename
+    pure (rename, chosen)
 
 constructorCall :: CoreExpr -> Maybe (DC.DataCon, [CoreExpr])
 constructorCall rhs = do
@@ -1158,8 +1207,55 @@ injectivity for that application.
 -- | Emit the binder extension once, even if several traversals use it.
 publishRenameExtension :: (TyCon -> Bool) -> (Id, (Id, FamilyInputs), [Id])
                        -> TcM (Maybe (Id, [TyCon]))
-publishRenameExtension public (_, (owner, shape), _) = runMaybeT $ do
-    let FamilyInputs _ _ context sort _ ext index _ _ hit miss _ = shape
+publishRenameExtension public (_, (owner, shape), _) =
+    publishLookupExtension public owner [] shape Nothing
+
+{- Note [Substitution with an abstract callback]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At a fresh lookup, an extension constructs the corresponding variable.
+At an older lookup, it applies the callback and renames the resulting
+term with a checked successor function. Use the same named successor
+in the family equation and the proof that renames the callback result.
+Its unmatchable rank-n kind comes from the ordinary function type.
+
+Check both stages of each function. Preserve the renaming and successor
+as rule dependencies of the substitution extension. A successor is a
+lazy constructor applied to its sole input. Extra calls in the original
+or final extension and successor withhold the equations.
+-}
+
+-- | Publish a named weakening callback with the kind of its runtime owner.
+publishWeakening :: (TyCon -> Bool) -> (Id, FamilyInputs) -> TcM (Maybe (Id, [TyCon]))
+publishWeakening public (owner, FamilyInputs _ _ context sort _ ext index _ _ _ miss _) = runMaybeT $ do
+    g <- lift (freshVar "g" context)
+    b <- lift (freshVar "b" sort)
+    a <- lift (freshVar "a" sort)
+    let [gk,bk,ak] = mkTyVarTys [g,b,a]
+        input = mkTyConApp index [gk,ak]
+        result = mkTyConApp index [mkTyConApp ext [gk,bk],ak]
+    x <- lift (freshVar "x" input)
+    let binders = mkNamedTyConBinders Specified [g,b,a] ++ [mkAnonTyConBinder x]
+        branches = do
+          output <- conAt miss result [mkTyVarTy x]
+          pure [renamingBranch (mkTyVarTys [g,b,a,x]) output]
+    publishRenamingTable public owner [] binders result (const branches)
+
+-- | Use the same checked renamed result that a client sees in the type.
+publishSubstitutionExtension :: (TyCon -> Bool) -> [(Name, TyCon)] -> [(Name, TyCon)]
+                             -> (Id, (Id, Id, FamilyInputs), [Id]) -> TcM (Maybe (Id, [TyCon]))
+publishSubstitutionExtension public renamings weakenings (owner, (rename, weaken, shape), helpers)
+  | Just renaming <- lookup (idName rename) renamings
+  , Just weakening <- lookup (idName weaken) weakenings
+  = publishLookupExtension public owner helpers shape (Just (renaming,weakening))
+  | otherwise = pure Nothing
+
+publishLookupExtension :: (TyCon -> Bool) -> Id -> [Id] -> FamilyInputs
+                       -> Maybe (TyCon, TyCon) -> TcM (Maybe (Id, [TyCon]))
+publishLookupExtension public owner helpers shape substitution = runMaybeT $ do
+    let FamilyInputs _ _ context sort term ext index _ var hit miss _ = shape
+        output = case substitution of
+          Nothing -> index
+          Just _ -> term
     g <- lift (freshVar "g" context)
     d <- lift (freshVar "d" context)
     b <- lift (freshVar "binder" sort)
@@ -1167,10 +1263,11 @@ publishRenameExtension public (_, (owner, shape), _) = runMaybeT $ do
     rank <- lift (freshVar "sort" sort)
     let [gk,dk,bk,ak] = mkTyVarTys [g,d,b,a]
         lookupAt c s = mkTyConApp index [c,s]
+        outputAt c s = mkTyConApp output [c,s]
         extend c = mkTyConApp ext [c,bk]
         domain = lookupAt (extend gk) ak
-        result = lookupAt (extend dk) ak
-    rho <- lift (freshVar "rho" (renamingKind index rank gk dk))
+        result = outputAt (extend dk) ak
+    rho <- lift (freshVar "rho" (closureCallbackKind index output rank gk dk))
     input <- lift (freshVar "input" domain)
     old <- lift (freshVar "index" (lookupAt gk ak))
     let r = mkTyVarTy rho
@@ -1179,12 +1276,20 @@ publishRenameExtension public (_, (owner, shape), _) = runMaybeT $ do
                   [mkAnonTyConBinder rho, mkNamedTyConBinder Specified a, mkAnonTyConBinder input]
         branches = do
           fresh <- conAt hit (lookupAt (extend gk) bk) []
-          fresh' <- conAt hit (lookupAt (extend dk) bk) []
+          new_index <- conAt hit (lookupAt (extend dk) bk) []
           previous <- conAt miss domain [x]
-          previous' <- conAt miss result [mkAppTys r [ak,x]]
+          let mapped = mkAppTys r [ak,x]
+          (fresh', previous') <- case substitution of
+            Nothing -> (new_index,) <$> conAt miss result [mapped]
+            Just (rename,weakening) -> do
+              v <- conAt var (outputAt (extend dk) bk) [new_index]
+              let shift = mkTyConApp weakening [dk,bk]
+              guard (typeKind shift `eqType` renamingKind index rank dk (extend dk))
+              pure (v, mkTyConApp rename [dk,extend dk,ak,shift,mapped])
+          guard (typeKind fresh' `eqType` outputAt (extend dk) bk && typeKind previous' `eqType` result)
           pure [renamingBranch [gk,dk,bk,r,bk,fresh] fresh',
                 renamingBranch [gk,dk,bk,r,ak,previous] previous']
-    publishRenamingTable public owner [] binders result (const branches)
+    publishRenamingTable public owner helpers binders result (const branches)
 
 -- | A traversal can extend its callback only at each field's own binders.
 publishRenaming :: (TyCon -> Bool) -> [(Name, TyCon)] -> (Id, (Id, FamilyInputs), [Id])
@@ -1241,9 +1346,12 @@ publishRenaming public extensions (owner, (extension, shape), helpers) = runMayb
 
 -- | Preserve the exact rank-n callback type when generating a table kind.
 renamingKind :: TyCon -> TyVar -> Type -> Type -> Kind
-renamingKind index rank g d =
+renamingKind index = closureCallbackKind index index
+
+closureCallbackKind :: TyCon -> TyCon -> TyVar -> Type -> Type -> Kind
+closureCallbackKind index result rank g d =
     mkSpecForAllTys [(unmatchableDataConTy, rank)] $
-      mkVisFunTyManyU (mkTyConApp index [g,mkTyVarTy rank]) (mkTyConApp index [d,mkTyVarTy rank])
+      mkVisFunTyManyU (mkTyConApp index [g,mkTyVarTy rank]) (mkTyConApp result [d,mkTyVarTy rank])
 
 renamingBranch :: [Type] -> Type -> CoAxBranch
 renamingBranch lhs = mkBranch (tyCoVarsOfTypesWellScoped lhs) lhs
