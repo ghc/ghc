@@ -50,6 +50,18 @@ main :: IO ()
 main = print ($$(named), $$(before), $$(after), $$(annotated), $$(captured) "checked")
 HS
 
+cat >"$work/Runtime.hs" <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TemplateHaskell #-}
+module Runtime where
+import TypedCallbacks (named)
+data Cell (present :: Bool) where
+    Filled :: Int -> Cell 'True
+getCell :: Cell 'True -> Int
+getCell (Filled n) = n
+ordinary :: Either String Int
+ordinary = fmap (getCell . Filled) $$(named)
+HS
+
 cat >"$work/BadCallback.hs" <<'HS'
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, TemplateHaskell, TypeApplications #-}
 module BadCallback where
@@ -80,6 +92,8 @@ for opt in O0 O2; do
     cp TypedCallbacks.{hi,o} ../consumer/
     cd ../consumer
     cp "$work/Main.hs" .
+    cp "$work/Runtime.hs" .
+    "${g[@]}" "$opt" -c Runtime.hs
     "${g[@]}" "-$opt" -c Main.hs
     "${g[@]}" "-$opt" Main.o TypedCallbacks.o -o test
     ./test >result

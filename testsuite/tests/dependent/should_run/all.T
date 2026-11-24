@@ -18,6 +18,9 @@ test('NativeOpenIdentity',
 test('NativeStructuralCountdown',
      [req_host_target_ghc, only_ways(['normal'])],
      run_command, ['bash NativeStructuralCountdown.sh "{compiler}" "{libdir}"'])
+test('NativeGadtImplicitSource',
+     [only_ways(['normal'])],
+     run_command, ['bash NativeGadtImplicitSource.sh "{compiler}" "{libdir}"'])
 test('NativeOrdinaryGadtSource',
      [req_host_target_ghc, only_ways(['normal'])],
      run_command, ['bash NativeOrdinaryGadtSource.sh "{compiler}" "{libdir}"'])
