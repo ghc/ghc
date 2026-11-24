@@ -83,3 +83,53 @@ HS
     printf '%s\n' '(Refl,Refl)' '[False,True,True]' True 'demanded input tail' | diff -u - actual
     reject 83865 "$opt" -DFALSE_EQ -fforce-recomp -c Main.hs
 done
+
+for opt in -O0 -O2; do
+    mkdir -p "$work/reverse/$opt"/{provider,client}
+    cd "$work/reverse/$opt/provider"
+    cat >ReverseSource.hs <<'HS'
+{-# LANGUAGE NoExperimentalDependentTypes #-}
+module ReverseSource (app, rev) where
+
+app :: [a] -> [a] -> [a]
+app [] ys = ys
+app (x:xs) ys = x : app xs ys
+
+rev :: [a] -> [a]
+rev [] = []
+rev (x:xs) = app (rev xs) [x]
+HS
+    "${ghc[@]}" "$opt" -fno-enable-rewrite-rules -fwrite-source-equations \
+        -fno-code -fwrite-interface -c ReverseSource.hs
+    test ! -e ReverseSource.o
+    "${ghc[@]}" --show-iface ReverseSource.hi >reverse.iface
+    grep -Fxq '  SourceTable T:rev' reverse.iface
+    cp ReverseSource.hi ../client/
+    cd ../client
+    test ! -e ReverseSource.hs
+    cat >ReverseProof.hs <<'HS'
+{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
+module ReverseProof where
+
+import Data.Type.Equality ((:~:)(Refl))
+import ReverseSource (app, rev)
+
+#ifdef RULE
+{-# RULES "skip append" forall xs. app [] xs = [] #-}
+#endif
+
+step :: foreach (x :: Bool) -> foreach (xs :: [Bool])
+#ifdef FALSE_REV
+     -> rev (x ': xs) :~: app (rev xs) '[ 'False]
+#else
+     -> rev (x ': xs) :~: app (rev xs) '[x]
+#endif
+step _ _ = Refl
+HS
+    proof=("$opt" -fno-code -fwrite-interface -c ReverseProof.hs)
+    "${ghc[@]}" "${proof[@]}"
+    reject '83865|25897' "${proof[@]}" -DFALSE_REV -fforce-recomp
+    if [[ "$opt" == -O2 ]]; then
+        reject 83605 "${proof[@]}" -DRULE -fforce-recomp
+    fi
+done
