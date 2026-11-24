@@ -5515,7 +5515,7 @@ rnConDecl parent decl@(ConDeclH98 { con_name = name, con_telescope = teles
       (new_args, fvs) <- rnConDeclH98Details (unLoc new_name) ctxt args
       pure (Nothing, new_args, fvs)
 
-rnConDecl _ (ConDeclGADT { con_names   = names
+rnConDecl _ decl@(ConDeclGADT { con_names   = names
                        , con_outer_bndrs = L outer_bndrs_loc outer_bndrs
                        , con_telescope = inner_bndrs
                        , con_g_args  = args
@@ -5536,7 +5536,7 @@ rnConDecl _ (ConDeclGADT { con_names   = names
                 extractConDeclGADTDetailsTyVars args        $
                 extractHsTysRdrTyVars [res_ty] []
 
-        ; implicit_bndrs <- filterGadtConTyVars free_vars
+        ; implicit_bndrs <- filterGadtConTyVars decl free_vars
         ; let ctxt = ConDeclCtx (toList new_names)
         ; case args of
             PrefixConGADT{} -> checkEmptyGadtRequiredGroups ctxt inner_bndrs res_ty
