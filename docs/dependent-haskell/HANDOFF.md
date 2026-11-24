@@ -16,6 +16,9 @@ and default `-O2`. Every interface audit passed. Both native readers ran
 in each build. Of 31 original reports, 21 compile at `-O0` and 20 at
 default `-O2`. The difference is the append rule in `R13_ShuntAccumOpenEq`.
 
+[Showcase revision `f6aff88d40`](https://github.com/Tritlo/ghc/commit/f6aff88d4040111518f1d148aaf0be20c01f009d)
+uses the same isomorphism definition as the interface regression. Job 2510
+matched all 602 observations at native `-O0`, default `-O2` and in GHCi.
 The book's map-length alias checks without explicit type arguments. A
 polymorphic isomorphism stores its functions with both inverse laws.
 The record regression and mixed subtraction modules pass their controls.
@@ -34,8 +37,10 @@ records the chapter handoff.
   the typed `substSingle` endpoints of beta reduction still need work.
 - Job 2429 built both stages of the 600-example compiler `76e67f4fdb`.
   The 42 registrations reported the known independent record-index failure.
-  Its repair passed on the subsequent compiler components. Qualify the
-  newer compiler with a normal build.
+  Its repair passed on the subsequent compiler components. Job 2525 builds
+  the 602-example revision in `_build/on-demand/plfh-iso-map-normal-602-20261124`
+  and runs 46 registrations plus the compatibility and focused suites.
+  Check `build.pass`, `qualification/gates.tsv`, and the cohort reports.
 - Three compiler agents and three GHC slots share 16 cores and 64 GB.
   GHC yields to local benchmark jobs. The [roadmap](ROADMAP.md#where-this-fork-stands)
   counts 27 of 50 cards complete.

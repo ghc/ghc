@@ -37,6 +37,12 @@ at `-O0` and 20 at default `-O2`.
   reported 53 passes and zero failures.
   [Agda and GHC provenance](REFERENCES.md#plfh-arithmetic-dependent-patterns-and-callback-inference).
 
+Job 2510 ran the same [isomorphism definition](examples/open-evaluation/BookIsomorphism.hs)
+in the registered interface test and the Showcase. Both native optimization
+levels and GHCi matched all 602 observations. The reader converted a Boolean
+to a bit and evaluated both proofs. The regression still rejected swapped
+proofs. [Published example](https://github.com/Tritlo/ghc/commit/f6aff88d4040111518f1d148aaf0be20c01f009d).
+
 ## Exponentiation and keyed trees
 
 The [ordinary exponentiation fix](https://github.com/Tritlo/ghc/commit/1f873969e589e84b632e5d0304399ab4d2c997e3)
