@@ -4,7 +4,7 @@ module PreludeFilterCutoff (CutoffBound(..), decideRow, packCutoff, showCutoffBo
 import PreludeFilterLengthProof (AtMost)
 import PreludeFilterRuntime (BooleanResult, decideBy, filterBoundBy)
 import PreludeFilterSource (FilterWith)
-import PreludeMapLengthSize (Size(..), size)
+import PreludeMapLengthSize (Nat(..), Size, size)
 import PreludeMapLengthSource (Count)
 
 -- | Compare two Peano sizes. Stop as soon as the result is known.

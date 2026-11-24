@@ -6,7 +6,7 @@ module PreludeZipWithLengthProof (Minimum, lengthZipWith, shorterLeft, shorterRi
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
 import PreludeMapLengthProof (Count, Spine(..))
-import PreludeMapLengthSize (Size(..))
+import PreludeMapLengthSize (Nat(..), Size)
 import PreludeZipWithSource (Minimum, PairHeads, Zipped)
 
 {- Note [Minimum length for ordinary zippers]

@@ -3,17 +3,16 @@
 
 -- | Length laws for the installed Prelude functions on ordinary lists.
 module HaskLib.List
-    ( Size(..), size, plus, minSize, takeSize
+    ( Nat(..), Size, size, plus, minSize, takeSize
     , lengthMap, lengthAppend, lengthZip, lengthZipWith, lengthZipMap, lengthMapZip, lengthReverse, lengthTakeSize
     ) where
 
 import Data.Type.Equality ((:~:)(Refl), trans)
 import qualified GHC.Internal.List as List
 import HaskLib.List.Prefix (takeSize)
-import HaskLib.Size (congSucc, plusSucc, plusZero)
+import HaskLib.Nat (Nat(..), congSucc, plus, plusSucc, plusZero)
 import Prelude ((++), map, reverse, zip)
-import PreludeAppendLengthSource (plus)
-import PreludeMapLengthSize (Size(..), minSize, size)
+import PreludeMapLengthSize (Size, minSize, size)
 import PreludeZipRuntime (lengthZip, lengthZipMap, lengthZipWith)
 
 -- | Mapping a function preserves the number of list cells.
@@ -53,7 +52,7 @@ in docs/dependent-haskell/examples/open-evaluation.
 -}
 
 -- | The prefix length is the smaller of the bound and input length.
-lengthTakeSize :: forall a. foreach (n :: Size) -> foreach (xs :: [a])
+lengthTakeSize :: forall a. foreach (n :: Nat) -> foreach (xs :: [a])
                -> size (takeSize n xs) :~: minSize n (size xs)
 lengthTakeSize Zero _ = Refl
 lengthTakeSize (Succ _) [] = Refl

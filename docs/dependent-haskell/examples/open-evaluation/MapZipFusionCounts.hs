@@ -3,7 +3,7 @@ module MapZipFusionCounts (producer, mapper, report) where
 
 import Control.Exception (ErrorCall, evaluate, try)
 import GHC.Exts (build)
-import HaskLib (Size(..), minSize, size)
+import HaskLib (Nat(..), minSize, size)
 
 -- | Inspect the first application of the supplied list constructor.
 {-# NOINLINE producer #-}
@@ -17,28 +17,28 @@ mapper source _ = source `seq` errorWithoutStackTrace "mapper forced"
 
 -- | Count the mapped pairs at one optimized call site.
 {-# NOINLINE mappedCount #-}
-mappedCount :: (Bool -> Bool) -> [()] -> Size
+mappedCount :: (Bool -> Bool) -> [()] -> Nat
 mappedCount p ys =
     let source = build producer
     in size (map (mapper source) (zip (filter p source) ys))
 
 -- | Compute the right side of the law at a separate call site.
 {-# NOINLINE plainCount #-}
-plainCount :: (Bool -> Bool) -> [()] -> Size
+plainCount :: (Bool -> Bool) -> [()] -> Nat
 plainCount p ys = minSize (size (filter p (build producer))) (size ys)
 
 -- | Give both sides the same filtered list binding.
 {-# NOINLINE sharedCounts #-}
-sharedCounts :: (Bool -> Bool) -> [()] -> (Size, Size)
+sharedCounts :: (Bool -> Bool) -> [()] -> (Nat, Nat)
 sharedCounts p ys =
     let source = build producer
         xs = filter p source
     in (size (map (mapper source) (zip xs ys)), minSize (size xs) (size ys))
 
 -- | Report the outer constructor or the exception raised when demanding it.
-observe :: Size -> IO String
+observe :: Nat -> IO String
 observe n = do
-    result <- try (evaluate n) :: IO (Either ErrorCall Size)
+    result <- try (evaluate n) :: IO (Either ErrorCall Nat)
     pure $ case result of
         Left _ -> "bottom"
         Right Zero -> "Zero"

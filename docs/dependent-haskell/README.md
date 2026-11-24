@@ -82,6 +82,10 @@ bound the witness can also terminate on an infinite list.
 [Proof and Agda precedent](REFERENCES.md#length-of-a-bounded-list-prefix).
 
 The proofs use the ordinary definitions of `size`, `plus` and `minSize`.
+They share the Peano `Nat` from `HaskLib.Nat`. The same type accepts
+ordinary numerals at runtime and natural literals in indices, as in
+`plus 2 3 :~: 5`. Import `Nat(..)` for the constructors. `HaskLib.Size`
+still exports the `Size` alias.
 Forcing a proof can traverse the list spines. The empty-left zip case
 leaves the right list unevaluated. The list elements and the `zipWith`
 callback can remain unevaluated throughout.
@@ -90,7 +94,7 @@ It can return a witness for a finite prefix of an infinite list.
 The reverse proof checks the accumulator used by this GHC's `reverse`.
 HaskLib imports that worker from `ghc-internal`. Clients can use
 `lengthReverse` with only `base` and `hasklib` in their dependencies.
-[Package](hasklib.cabal), [list API](hasklib/HaskLib/List.hs) and
+[Package](hasklib.cabal), [natural numbers](hasklib/HaskLib/Nat.hs), [list API](hasklib/HaskLib/List.hs) and
 [proof methods](REFERENCES.md#parametricity-and-the-list-length-laws).
 
 The list laws use the ordinary equations of the functions in their

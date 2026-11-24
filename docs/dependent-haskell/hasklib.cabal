@@ -12,6 +12,7 @@ library
   exposed-modules:
     HaskLib
     HaskLib.List
+    HaskLib.Nat
     HaskLib.Size
 
   other-modules:

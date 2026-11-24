@@ -9,7 +9,7 @@ module HaskLib
 
 import Data.Type.Equality ((:~:) (Refl), gcastWith, trans)
 import HaskLib.List
-import HaskLib.Size (congFirst, congSucc, plusSucc, plusZero)
+import HaskLib.Nat (congFirst, congSucc, plusSucc, plusZero)
 
 -- | Use an equality witness to bring @a ~ b@ into scope for the second argument.
 rewrite :: (a :~: b) -> ((a ~ b) => r) -> r

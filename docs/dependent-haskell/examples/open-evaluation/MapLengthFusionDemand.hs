@@ -2,7 +2,7 @@ module MapLengthFusionDemand where
 
 import Control.Exception (ErrorCall, evaluate, try)
 import GHC.Exts (build)
-import PreludeMapLengthSize (Size(..), size)
+import PreludeMapLengthSize (Nat(..), Size, size)
 
 -- | Inspect the prospective first cell before producing False.
 {-# NOINLINE producer #-}

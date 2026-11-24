@@ -1,7 +1,7 @@
 {-# LANGUAGE NoExperimentalDependentTypes #-}
 module NativeOpenZipDemandControls (rightFirstPair, strictPair, strictResult, twiceMinimum) where
 
-import PreludeMapLengthSize (Size(..))
+import PreludeMapLengthSize (Nat(..), Size)
 
 {-# NOINLINE [1] rightFirstPair #-}
 rightFirstPair :: [a] -> [b] -> [(a, b)]

@@ -1,9 +1,10 @@
 {-# LANGUAGE GHC2024, ExperimentalDependentTypes #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 
-module Client (zipLaw, lengthAppendSingleton, checkAppendSingleton, checkReverse, zipMapLaw, checkZipMap) where
+module Client (zipLaw, lengthAppendSingleton, checkAppendSingleton, checkReverse, zipMapLaw, checkZipMap, checkNat) where
 
 import qualified HaskLib as H
+import qualified HaskLib.Nat as N
 
 -- | Use the public functions and equality in a new dependent signature.
 zipLaw :: forall a b. foreach (xs :: [a]) -> foreach (ys :: [b])
@@ -40,3 +41,22 @@ zipMapLaw pre combine xs ys =
 checkZipMap :: (Bool -> Char) -> (Char -> Int -> Ordering) -> [Bool] -> [Int] -> Bool
 checkZipMap pre combine xs ys =
     case zipMapLaw pre combine xs ys of H.Refl -> True
+
+-- | Check numeral conversion in proof types and ordinary runtime expressions.
+checkNat :: Bool
+checkNat = case twoPlusThree of
+    H.Refl -> case zero of
+        H.Refl ->
+            value (0 :: N.Nat) == 0
+                && value (N.plus 2 3) == 5
+                && value (2 + 3) == 5
+  where
+    twoPlusThree :: N.plus 2 3 H.:~: 5
+    twoPlusThree = H.Refl
+
+    zero :: (0 :: N.Nat) H.:~: 'N.Zero
+    zero = H.Refl
+
+    value :: N.Nat -> Int
+    value N.Zero = 0
+    value (N.Succ n) = 1 + value n

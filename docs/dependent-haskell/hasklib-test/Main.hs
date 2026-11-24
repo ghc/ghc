@@ -1,7 +1,7 @@
 module Main where
 
 import Control.Exception (ErrorCall(..), evaluate, try)
-import Client (checkAppendSingleton, checkReverse, checkZipMap, zipLaw)
+import Client (checkAppendSingleton, checkNat, checkReverse, checkZipMap, zipLaw)
 import HaskLib
 
 -- | Use the installed list proofs from an ordinary Haskell function.
@@ -12,7 +12,7 @@ check pre f xs ys = case lengthMap pre xs of
             Refl -> case lengthZipWith f xs ys of Refl -> True
 
 -- | Consume a prefix-length witness without inspecting the elements.
-checkPrefix :: Size -> [Bool] -> Bool
+checkPrefix :: Nat -> [Bool] -> Bool
 checkPrefix n xs = case lengthTakeSize n xs of Refl -> True
 
 main :: IO ()
@@ -33,6 +33,7 @@ main = do
         && checkReverse []
         && checkReverse [element, element]
         && checkZipMap (error "forced map callback") (error "forced zip callback") [element] [0]
+        && checkNat
         && boundWasForced
         && checkPrefix Zero tailList
         && checkPrefix (Succ tailBound) []

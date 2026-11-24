@@ -3,7 +3,7 @@
 
 module NativeSizeListNoDescentSource (withoutDescent) where
 
-import PreludeMapLengthSize (Size(..))
+import PreludeMapLengthSize (Nat(..), Size)
 
 withoutDescent :: Size -> [a] -> [a]
 withoutDescent Zero _ = []
