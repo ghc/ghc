@@ -54,8 +54,9 @@ import GHC.Data.Bag (emptyBag, isEmptyBag)
 import GHC.Data.OrdList (fromOL)
 import GHC.Driver.Backend (backendGeneratesCode)
 import GHC.Driver.Config (initSimpleOpts)
-import GHC.Driver.Session (GeneralFlag(Opt_EnableRewriteRules), backend, HasDynFlags(getDynFlags))
-import GHC.Driver.Env (hsc_HUG, hsc_home_unit, hugRuleInterfacesBelow, hugRulesBelow)
+import GHC.Driver.Session (GeneralFlag(Opt_EnableRewriteRules, Opt_WriteIfSimplifiedCore), backend, gopt, HasDynFlags(getDynFlags))
+import GHC.Driver.Env (hsc_HUG, hsc_home_unit, hsc_plugins, hugRuleInterfacesBelow, hugRulesBelow)
+import GHC.Driver.Plugins (pluginsWithArgs)
 import GHC.Hs
 import {-# SOURCE #-} GHC.HsToCore.Binds (dsTopLHsBinds)
 import GHC.HsToCore.Errors.Ppr () -- Diagnostic DsMessage
@@ -2030,13 +2031,20 @@ sourceCaseTables binds = do
   char_tables <- xoptM LangExt.ExperimentalDependentTypes
   dflags <- getDynFlags
   rdr_env <- getGlobalRdrEnv
+  let generates_code = backendGeneratesCode (backend dflags)
+  no_code_structural <- if generates_code || gopt Opt_WriteIfSimplifiedCore dflags ||
+                           not (null (tcg_rules env))
+    then pure False
+    else do
+      hsc <- getTopEnv
+      added_plugins <- readTcRef (tcg_th_coreplugins env)
+      pure (null added_plugins && null (pluginsWithArgs (hsc_plugins hsc)))
   let exported = mkNameSet (concatMap availNames (tcg_exports env))
       ruled = sourceRuleOwners (tcg_rules env)
       enum_enabled = not char_tables
       imported = ordinaryImport rdr_env
       public = publicCaseType env exported imported
       eligible_case = eligibleCase env exported enum_enabled imported
-      generates_code = backendGeneratesCode (backend dflags)
       list_case_position owner
         | generates_code
         , let ty = varType owner
@@ -2050,13 +2058,14 @@ sourceCaseTables binds = do
         = publicCaseType env exported imported (dataConTyCon con)
         | otherwise = False
       structural_candidate owner
-        | generates_code
+        | generates_code || no_code_structural
         , isNothing (sourceTableOccurrence env owner >>= sourceTableId_maybe)
         , Just signature <- constructorCaseType (varType owner)
         = isTwoStructuralCase signature || isSizeListCase signature
         | otherwise = False
       partial_case_candidate owner =
-        generates_code && isNothing (sourceTableOccurrence env owner >>= sourceTableId_maybe) &&
+        (generates_code || no_code_structural) &&
+        isNothing (sourceTableOccurrence env owner >>= sourceTableId_maybe) &&
         isJust (partialConstructorCaseType (varType owner))
       final_candidate owner = isJust (list_case_position owner) || indexed_candidate owner ||
                               structural_candidate owner || partial_case_candidate owner
@@ -3094,7 +3103,22 @@ Check lazy list equations and indexed projections at final typechecking
 publication. At this point the module has checked all user declarations.
 See Note [Nullary indexed source projections].
 The new private family is available to neither user declarations nor the
-helper collector. A no-code producer does not create it.
+helper collector.
+
+A no-code module can check equations for structural sizes, for a size and a
+list, and for independent constructor cases. The driver checks the
+optimized body before it writes the equations to the simple interface.
+Simple interfaces do not include rules. A source rule can rewrite a call
+without changing the rule owner's Core. Skip new no-code candidates in
+modules with source rules. Also skip them in modules with plugins so
+no-code compilation does not start running Core plugin passes.
+
+The driver discards these candidates if the module needs the retained
+program pipeline. That pipeline still requires an object or bytecode
+backend. This check emits equations without a Core program. A module
+that explicitly requests simplified Core uses its existing path and
+does not create these candidates. See validateSimpleSourceTables in
+GHC.Driver.Main.Passes.
 
 A local signature can instead require an ordinary nominal table. See
 Note [Checked list reverse]. Do not remove that table after optimization.

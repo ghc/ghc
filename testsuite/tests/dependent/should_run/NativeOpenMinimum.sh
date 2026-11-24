@@ -8,6 +8,15 @@ trap 'rm -rf -- "$out"' EXIT
 cd "$out"
 cp "$src"/{NativeLocalMinSizeRule,PreludeMapLengthSize,PreludeZipMapRuntime,PreludeZipRuntime,ZipMinimum}.hs .
 
+# Check the proof using a freshly typechecked provider and no object files.
+for opt in 0 2; do
+    build="no-code-$opt"
+    "${ghc[@]}" -O"$opt" -fno-code -fwrite-interface --make -outputdir "$build" PreludeZipMapRuntime.hs
+    "${ghc[@]}" --show-iface "$build/PreludeMapLengthSize.hi" >minimum.iface
+    grep -Fq 'FinalCoreSourceTable T:minSize' minimum.iface
+    [[ ! -e "$build/PreludeMapLengthSize.o" && ! -e "$build/PreludeZipMapRuntime.o" ]]
+done
+
 # Read both proofs in bytecode with debugger breakpoints enabled.
 for module in PreludeZipRuntime ZipMinimum; do
     "${ghc[@]}" "$@" --interactive -ignore-dot-ghci -fbyte-code -O0 \

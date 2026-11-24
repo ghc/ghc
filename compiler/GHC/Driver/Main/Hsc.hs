@@ -39,6 +39,7 @@ module GHC.Driver.Main.Hsc
     , genModDetails
     , nativeOptLevel
     , checkNativeDependentModule
+    , hasNativeDependentModuleBody
     , nativeCodeGenFlags
 
     ) where
@@ -172,13 +173,7 @@ initHscEnv mb_top_dir = do
 -- Return whether the module needs the checked native pipeline.
 checkNativeDependentModule :: HscEnv -> CoreProgram -> [CoreRule] -> [TyCon] -> IO Bool
 checkNativeDependentModule hsc_env binds rules tycons = do
-  let implicit_cons = [ Type (idType (dataConWorkId dc))
-                      | tc <- tycons
-                      , Just dcs <- [tyConDataCons_maybe tc]
-                      , dc <- dcs
-                      , not (null (dataConRepArgBinders dc)) ]
-      native_body = hasNativeDependentProgram binds rules
-                    || any hasNativeDependentExpr implicit_cons
+  let native_body = hasNativeDependentModuleBody binds rules tycons
   -- A closed user rule can mention its imported retained function only
   -- through ru_fn. See Note [Rules at a retained function head].
   retained_heads <- if native_body then pure [] else
@@ -190,7 +185,7 @@ checkNativeDependentModule hsc_env binds rules tycons = do
       opt_level = nativeOptLevel dflags
       reject phase = do
         rejectNativeDependentProgram phase binds rules
-        mapM_ (rejectNativeDependentExpr phase) (implicit_cons ++ retained_heads)
+        mapM_ (rejectNativeDependentExpr phase) (nativeDependentConstructors tycons ++ retained_heads)
   when native $ do
     -- See Note [Compiling native dependent modules] in GHC.Driver.Main.Passes.
     unless (backendGeneratesCode (backend dflags)) $
@@ -211,6 +206,19 @@ checkNativeDependentModule hsc_env binds rules tycons = do
     unless (null (pluginsWithArgs (hsc_plugins hsc_env)) && null (pluginModNames dflags)) $
       reject "module plugins"
   return native
+
+-- | Detect retained Core in the checked module, including implicit constructors.
+hasNativeDependentModuleBody :: CoreProgram -> [CoreRule] -> [TyCon] -> Bool
+hasNativeDependentModuleBody binds rules tycons =
+  hasNativeDependentProgram binds rules || any hasNativeDependentExpr (nativeDependentConstructors tycons)
+
+nativeDependentConstructors :: [TyCon] -> [CoreExpr]
+nativeDependentConstructors tycons =
+  [ Type (idType (dataConWorkId dc))
+  | tc <- tycons
+  , Just dcs <- [tyConDataCons_maybe tc]
+  , dc <- dcs
+  , not (null (dataConRepArgBinders dc)) ]
 
 -- | Select a standard -O1 or -O2 object-code schedule.
 -- See Note [Disabling rewrite rules in retained modules].
