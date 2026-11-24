@@ -175,6 +175,7 @@ import qualified OrdinaryFamilyBranches
 import qualified PreludeFoldrProof
 import qualified PreludeZipProof
 import qualified HaskLib
+import qualified BookCalculations as Book
 import qualified CastedConstructorGivens as TreeProof
 import qualified SumOfSizes
 import qualified Client as HaskLibClient
@@ -1957,6 +1958,12 @@ main = do
     prefixBound <- newIORef (1 :: HaskLib.Nat) >>= readIORef
     observe "apply the same partially applied addition to equal sizes"
         (HaskLibClient.addUnder prefixBound prefixBound HaskLib.Zero)
+    count <- newIORef (3 :: HaskLib.Nat) >>= readIORef
+    observe "prove the length of a countdown"
+        (Book.downFrom count, Book.lengthDownFrom count)
+    let arrow = Book.Arrow Book.Bottom (error "forced the arrow output")
+    observe "take the domain of a join of function values"
+        (Book.dom (Book.Join arrow Book.Bottom), Book.domJoin arrow Book.Bottom)
     observe "compare a runtime size with itself" (HaskLib.eqSize prefixBound prefixBound, HaskLib.eqSizeRefl prefixBound)
     let treeProof = TreeProof.Both TreeProof.Here (TreeProof.Both TreeProof.Here TreeProof.Here)
         relation = TreeProof.Branches TreeProof.Same (TreeProof.Branches TreeProof.Same TreeProof.Same)

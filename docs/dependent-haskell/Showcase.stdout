@@ -550,6 +550,8 @@ prove that folding a mapped list composes the step: (Refl,(True,True),(True,True
 prove that reverse preserves list length: (Refl,Succ (Succ Zero))
 pass size as a callback and check the reversed list length: Succ (Succ Zero)
 apply the same partially applied addition to equal sizes: Refl
+prove the length of a countdown: ([Succ (Succ Zero),Succ Zero,Zero],Refl)
+take the domain of a join of function values: (Join Bottom Bottom,Refl)
 compare a runtime size with itself: (True,Refl)
 transport evidence for three leaves across related trees: True
 read the sum with its equality proof: Succ (Succ Zero)
