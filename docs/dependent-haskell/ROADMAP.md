@@ -32,6 +32,10 @@ GHC behavior on the fork.
 | Declaration dependencies, families and GADTs | R21, R23, R24, plus R41, complete on the fork |
 | Namespace management and warnings | R27, plus R35 and R36, both complete on the fork |
 
+The [PLFH preservation proof](CHECKPOINTS.md#one-step-preservation-with-same-module-substitution)
+checks ordinary same-module substitution in a GADT result. It exercises the
+partial binder and evaluation cards.
+
 ### Release readiness
 
 Four cards meet their documented scope on the fork. R35 and R36 were

@@ -8,6 +8,47 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
+The compiler changes for the PLFH preservation proof are on
+[`dependent-haskell` at `692eae0778`](https://github.com/Tritlo/ghc/commit/692eae077896a00384fecf15a3d5d92d828a6415).
+The beta rules use the ordinary substitution function from the same module.
+Job 2381 checked 27 book modules and audited their interfaces at both
+optimization levels in native and no-code builds. Job 2384 matched all 599
+Showcase observations at native `-O0`, default `-O2`, and in GHCi.
+These checks used the changed compiler components linked into a stage-one
+compiler. [Proof and verification](CHECKPOINTS.md#one-step-preservation-with-same-module-substitution).
+
+The next [compiler fix at `9cc4065fab`](https://github.com/Tritlo/ghc/commit/9cc4065fab4f2f106859b39daa9bdad23f00f0fd)
+keeps equality evidence used by an inner retained case. Job 2389 checked the
+nested `subInvDist` proof from the Denotational chapter with Core and STG Lint
+at `-O0` and `-O2`. Both clients ran and the wrong witness failed with GHC-83865.
+
+The book patch is separate from the compiler. In the book checkout, retrieve
+it with `git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/unsplit-preservation-85f90be`.
+Inspect `git show FETCH_HEAD` before applying it to a working chapter.
+The patch is based on PLFH `85f90be`. The [shared notebook](../../PLFH-NOTES.md)
+records updates from the book author and the compiler team.
+
+## Next compiler work
+
+- Job 2356 built both stages of the earlier `923571c2c8` revision. Job 2395
+  builds `9cc4065fab` and runs 41 registrations and the broader suites.
+- Prioritize PLFH. Job 2394 checked all 29 reports on `9cc4065fab`. Fifteen
+  compiled at `-O0` and fourteen at default `-O2`. The latter rejects the
+  append proof in `R13_ShuntAccumOpenEq` with GHC-83605.
+- Integrate the truncated subtraction fix after checking its right-operand
+  demand on the current compiler. Select the next retained GADT case from
+  an open book theorem. Defer the older R21 keyed-tree change until a PLFH
+  example needs it.
+
+The [roadmap](ROADMAP.md#where-this-fork-stands) counts 27 of 50 cards complete.
+The [open obligations](ROADMAP.md#remaining-work-by-roadmap-area) cover
+retained binders, promotion, evaluation, matchability and language cleanup.
+
+<details>
+<summary>Earlier PLFH verification through the 599-example candidate</summary>
+
+### The 590 compiler
+
 Both stages built from `1a02a866e7`. A caller can prove equality of two
 schema transformers before supplying any rows. A closed validation schema
 checks with `NoUndecidableInstances`. All 590 Showcase observations
@@ -28,7 +69,7 @@ exports `rewrite` to use an equality in a proof body. Job 2307 checked
 all 590 Showcase observations at both optimization levels and in GHCi
 with the library at `54d74a0067`.
 
-## Next compiler work
+### PLFH results before publication
 
 Read [PLFH-NOTES.md](../../PLFH-NOTES.md) on resuming work and after each
 compiler batch. Reply with the compiler revision and the result of running
@@ -126,6 +167,8 @@ replayed all 23 failures on normal 590. Job 2239 checked the general
 client. The [PLFH results](../../PLFH-NOTES.md#compiler-reply--the-bisimulation-chapters-general-value-proof)
 include the scope of the comparison. The private source and receipts
 are in `_build/on-demand/plfh-bisimulation-carry-post596-20261124`.
+
+</details>
 
 | Area | Verified result and next step |
 | --- | --- |

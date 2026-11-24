@@ -6,6 +6,58 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## One-step preservation with same-module substitution
+
+The [published compiler revision](https://github.com/Tritlo/ghc/commit/692eae077896a00384fecf15a3d5d92d828a6415)
+checks these declarations from the PLFH Lambda and Properties chapters.
+
+```haskell
+-- Constructor of Step
+BetaLam :: forall v x n. Value v
+        -> Step ('App ('Lam x n) v) (substTerm n x v)
+
+preserve :: foreach (m :: Term)
+         -> HasType 'CEmpty m a -> Step m n -> HasType 'CEmpty n a
+```
+
+The result of beta reduction is the term computed by the book's ordinary
+`substTerm` function in the same module. A caller supplies evidence that the
+closed source term has type `a` and takes a step. The proof returns a typing
+derivation for the target at the same `a`. The fixed-point rule also uses
+substitution. Its replacement can itself be a fixed-point term.
+
+Job 2381 built all 27 modules from PLFH proof revision `3251159` in four
+fresh directories. At `-O0` and default `-O2`, native and no-code providers
+passed the interface audit. A source-hidden client read each provider.
+The native clients exercised all eight reduction constructors. The no-code runs
+produced no object or bytecode files. The compiler rejected a false beta
+target (GHC-83865) and an extra substitution argument (GHC-95781) in all
+four runs. This covers one-step preservation for the book's closed,
+simply typed language.
+
+Job 2384 used the same compiler components. All 599 lines in
+[the Showcase](Showcase.stdout) matched at native `-O0`, default `-O2`,
+and in GHCi. Jobs 2376 and 2377 also tested a fresh no-code interface
+that exports both a structural equation and a list-accumulator equation.
+The [handoff](HANDOFF.md#current-checkpoint) records the separate two-stage build.
+
+### Nested equality evidence and the PLFH reproducer corpus
+
+The [fix at `9cc4065fab`](https://github.com/Tritlo/ghc/commit/9cc4065fab4f2f106859b39daa9bdad23f00f0fd)
+keeps equality evidence that an inner dependent case uses. On the earlier
+revision, Core Lint reported a variable out of scope in the Denotational
+chapter's nested `subInvDist`. Job 2389 checked the proof at both optimization
+levels and ran a client through compiled interfaces. The client exercised
+six impossible-branch witnesses and the successful factorization. The compiler
+rejected the wrong witness. Job 2396 verified the registered regression.
+
+Job 2394 repeated the four book checks on this revision with the preservation
+patch on PLFH `7c38276`. All 27 modules passed each interface audit. Of 29
+standalone PLFH reports, 15 compiled at `-O0` and 14 at default `-O2`.
+The difference was `R13_ShuntAccumOpenEq`, which uses `(++)` in its theorem.
+Default `-O2` reported GHC-83605. Truncated subtraction, exponentiation,
+and reverse remained open on this revision at both optimization levels.
+
 ## Compare schema transformers before supplying the rows
 
 ```haskell
