@@ -977,7 +977,7 @@ keepValidatedSourceMappers original final
     owners = mkNameSet (map idName failed)
     failed = filter (not . verifyFinalCoreMapper (mg_binds final))
                     (finalCoreMappers (mg_binds original))
-    rejected_list_tables = failedFinalListTables (mg_binds final) (mg_tcs final)
+    rejected_list_tables = failedFinalListTables (mg_binds original) (mg_binds final) (mg_tcs final)
     families = close (mkNameSet (map tyConName
                    (rejected_list_tables ++ concatMap finalCoreSourceFamilies failed)))
     invalidFamily invalid tc = tyConName tc `elemNameSet` invalid

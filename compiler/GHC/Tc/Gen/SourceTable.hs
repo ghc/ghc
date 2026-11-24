@@ -50,7 +50,7 @@ import GHC.Core.Type
 import GHC.Core.Utils (dataConRepInstPat, exprType, findAlt, mergeAlts, stripTicksE, stripTicksTopE)
 import GHC.Data.Graph.Directed (Node(..), SCC(..), stronglyConnCompFromEdgedVerticesUniq)
 import GHC.Data.FastString (fsLit)
-import GHC.Data.Bag (isEmptyBag)
+import GHC.Data.Bag (emptyBag, isEmptyBag)
 import GHC.Data.OrdList (fromOL)
 import GHC.Driver.Backend (backendGeneratesCode)
 import GHC.Driver.Config (initSimpleOpts)
@@ -75,6 +75,7 @@ import GHC.Tc.Utils.Monad (TcM, addErr, failWithTc, getEps, getGblEnv, getGlobal
                            checkNoErrs, getTopEnv, goptM, keepAlive, liftZonkM, newSysName, readTcRef, writeTcRef, newTcRef, setGblEnv,
                            recordHomeRuleDependencies, setSrcSpan, setSrcSpanA, updTcRef, xoptM)
 import GHC.Tc.Utils.TcType (isTyFamFree)
+import GHC.Tc.Zonk.Type (zonkTopDecls)
 import GHC.Tc.Zonk.TcType (zonkTcType, zonkTcTypes)
 import GHC.Types.Avail (availNames, availsToNameSet)
 import GHC.Types.Basic (Origin(..), LeftOrRight(..), SourceTableOrigin(..), UnfoldingSource(VanillaSrc),
@@ -1970,7 +1971,10 @@ sourceTableTyCons local binds = do
     structural <- if local && not strict
                   then catMaybes <$> traverse (runMaybeT . localStructuralTable . unLoc) binds
                   else pure []
-    collect strict structural candidates
+    reverse_workers <- if local && not strict
+                       then catMaybes <$> traverse (runMaybeT . localListReverseTable) binds
+                       else pure []
+    collect strict (structural ++ reverse_workers) candidates
   where
     candidates = mapMaybe (sourceRows . unLoc) binds
     candidate_names = extendNameSetList emptyNameSet [idName f | (f, _, _, _) <- candidates]
@@ -2260,14 +2264,6 @@ sourceCaseTables binds = do
       | otherwise = False
       where
         enumVisible = maybe False (publicCaseType env exported imported . fst) . caseDatatype
-
-    bindingCore bind owner = do
-      (messages, bindings) <- initDsTc (dsTopLHsBinds [bind])
-      pure $ case bindings of
-        Just core | not (errorsFound messages)
-          , [rhs] <- [expr | (ident, expr) <- fromOL core, idName ident == idName owner] ->
-            Just rhs
-        _ -> Nothing
 
     certifyBinding env exported enum_enabled rdr_env helpers owner rhs
       | Just build <- checkedPairBuilder owner rhs = build
@@ -2854,9 +2850,10 @@ isTwoStructuralCaseTable table =
     isJust (closedFamilyTyConCoAxiom_maybe table) &&
     maybe False isTwoStructuralCase (constructorCaseType (tyConKind table))
 
--- | Check that the family scrutinises its second structural operand.
+-- | Identify a structural family that can be checked before final Core.
 isStructuralSourceTable :: TyCon -> Bool
 isStructuralSourceTable table
+  | isReverseWorkerTable table = True
   | isTwoStructuralCaseTable table
   , Just axiom <- closedFamilyTyConCoAxiom_maybe table
   = any matches_second (fromBranches (coAxiomBranches axiom))
@@ -3818,6 +3815,13 @@ position. It can return a constructor only after traversing the input
 spine. Match the recursive callee, type argument, and both operands.
 The simple optimizer removes desugaring aliases before this check.
 
+For a local signature, run the same check on the solved, zonked source
+binding. The renamer can schedule a signed worker in a separate group.
+Publish a nominal equation only after matching both rows of its Core.
+Keep that equation through final optimization because the local signature
+can refer to its axiom. Check visible RULES as for other local structural
+equations.
+
 The wrapper calls that checked local worker with its original input
 and an empty accumulator. Publish both equations from the desugared
 Core and recheck both at their original names after optimization. A
@@ -3856,6 +3860,34 @@ directListReverseWorker owner rhs = do
                  (CaseSelf [kind] [CaseField input_tail,
                     CaseConstructor cons [kind] [CaseField input_head, CaseField acc]]) ]
   pure (ConstructorCaseType [Bndr element visibility] tc core_args core_domains position core_output, rows)
+
+-- | Check a signed local worker before typechecking the signatures that use its equations.
+-- See Note [Checked list reverse].
+localListReverseTable :: LHsBind GhcTc -> MaybeT TcM (Id, TyCon)
+localListReverseTable bind = do
+  (fun, _, Just _, evidence, matches) <- MaybeT (pure (sourceMatches (unLoc bind)))
+  guard (lengthIs matches 2)
+  guard =<< lift (allM emptyEvidence evidence)
+  ty <- lift (liftZonkM (zonkTcType (varType fun)))
+  candidate <- MaybeT (pure (constructorCaseType ty))
+  guard (isBinaryListCase candidate)
+  (_, _, [zonked], _, _, _, _) <- lift (zonkTopDecls emptyBag [bind] [] [] [] [])
+  let owner = setIdType fun ty
+  body <- MaybeT (bindingCore zonked owner)
+  dflags <- lift getDynFlags
+  (signature, rows) <- MaybeT (pure (directListReverseWorker owner (simpleOptExpr (initSimpleOpts dflags) body)))
+  family <- lift (publishConstructorCase owner signature rows)
+  pure (owner, family)
+
+-- | Read the named binding from desugared top-level bindings.
+bindingCore :: LHsBind GhcTc -> Id -> TcM (Maybe Core.CoreExpr)
+bindingCore bind owner = do
+  (messages, bindings) <- initDsTc (dsTopLHsBinds [bind])
+  pure $ case bindings of
+    Just core | not (errorsFound messages)
+      , [rhs] <- [expr | (ident, expr) <- fromOL core, idName ident == idName owner] ->
+        Just rhs
+    _ -> Nothing
 
 -- | Recognize the wrapper's ordinary polymorphic list signature.
 listReverseWrapperType :: Type -> Maybe [ForAllTyBinder]
@@ -4369,15 +4401,19 @@ isFinalCoreListCaseTable table =
     isReverseWorkerTable table || isJust (reverseWrapperWorker table) ||
     isTwoListCaseTable table || isSizeListCaseTable table
 
--- | Check list tables even if earlier Core simplification dropped Id details.
--- Structural size tables use the original owner's FinalCoreSourceTable
--- marker. Their kind can also describe a source table checked before Core.
-failedFinalListTables :: [Core.CoreBind] -> [TyCon] -> [TyCon]
-failedFinalListTables binds tables =
+-- | Recheck provisional list tables even when simplification dropped the owner's IdDetails.
+-- The original owner identifies tables that already have nominal authority.
+failedFinalListTables :: [Core.CoreBind] -> [Core.CoreBind] -> [TyCon] -> [TyCon]
+failedFinalListTables original binds tables =
     [table | table <- tables
            , isFinalCoreListCaseTable table
+           , not (tyConName table `elemNameSet` early)
            , not (checkedFinalCaseTable bindings table)]
   where
+    early = extendNameSetList emptyNameSet
+      [tyConName table | (owner, _) <- Core.flattenBinds original
+                       , SourceTableId _ table NominalSourceTable <- [idDetails owner]
+                       , isReverseWorkerTable table]
     bindings = Core.flattenBinds binds
 
 -- | Check the same final owner and any exact call from a reverse wrapper.

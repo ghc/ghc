@@ -2689,8 +2689,20 @@ localSourceTableBinders binds sigs =
             | r `elem` fields || r `elem` carried -> null args
             | is_self r, Just (field : rest) <- traverse variable args
             -> field `elem` fields && rest == carried
+            | is_self r, [next, pushed] <- args, [x, xs] <- fields, [acc] <- carried
+            -> variable next == Just xs && cons_onto x acc pushed
             | not (is_self r), not (null args) -> all (check []) args
           _ -> False
+        -- The solved Core must use the original head, tail and accumulator.
+        -- See Note [Checked list reverse] in GHC.Tc.Gen.SourceTable.
+        cons_onto x acc expr = case unLoc (stripParensLHsExpr expr) of
+          OpApp _ left op right -> cons op left right
+          HsApp _ fun right
+            | HsApp _ op left <- unLoc (stripParensLHsExpr fun) -> cons op left right
+          _ -> False
+          where
+            cons op left right = variable op == Just consDataCon_RDR &&
+                                 variable left == Just x && variable right == Just acc
         variable :: LHsExpr GhcPs -> Maybe RdrName
         variable e = case unLoc (stripParensLHsExpr e) of
           HsVar _ (L _ r) -> Just r
@@ -2822,6 +2834,10 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
     result_dependencies :: HsOuterSigTyVarBndrs GhcRn -> LHsType GhcRn -> Maybe [(Name, Int)]
     result_dependencies outer ty = case unLoc (ignoreParens ty) of
       HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) carried result
+        | Just [_] <- outer_vars outer -> do
+            deps <- domain_dependencies outer carried
+            res <- domain_dependencies outer result
+            pure (deps ++ res)
         | Just [] <- outer_vars outer -> do
             deps <- domain_dependencies outer carried
             res <- result_dependencies outer result
