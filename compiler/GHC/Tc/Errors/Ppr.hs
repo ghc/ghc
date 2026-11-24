@@ -3856,6 +3856,8 @@ pprRetainedQuantificationError reason = case reason of
     text "This retained constructor pair is matched by an earlier equation."
   RetainedMatrixFallback ->
     text "A retained constructor matrix permits only one final equation with bare variables or wildcards in both selected index columns."
+  RetainedLaterConstructorPattern ->
+    text "Use a strict data constructor pattern with variable or wildcard fields to refine this retained argument."
   RetainedMatrixPattern ->
     vcat [text "The first index column requires constructor patterns with variables or wildcards as fields."
          ,text "The second index column also accepts bare variables or wildcards."
@@ -3880,7 +3882,7 @@ pprRetainedQuantificationError reason = case reason of
     text "The retained argument currently requires a bare variable pattern or a wildcard."
   RetainedFunctionPatterns ->
     vcat [ text "Function-valued retained binders require bare variable patterns or wildcards."
-         , text "Use a single equation, or a leading retained function column followed by two retained constructor columns." ]
+         , text "Use a single equation, or match constructors in a later retained column." ]
   RetainedContextPattern ->
     text "A strict prefix pattern before a retained context is not supported when later value patterns remain."
   RetainedResultWrapper ->
