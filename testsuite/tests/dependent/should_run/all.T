@@ -517,7 +517,7 @@ test('NativeRetainedSiblingFields',
 test('NativeNamedRetainedSiblingFields',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/' + f
-                   for f in ['PackedVecLibrary.hs', 'NamedSiblingColumns.hs']])],
+                   for f in ['PackedVecLibrary.hs', 'NamedSiblingColumns.hs', 'ParamColumns.hs']])],
      run_command, ['bash NativeNamedRetainedSiblingFields.sh "{compiler}" "{libdir}"'])
 
 test('NativeNamedRetainedRecordReify',

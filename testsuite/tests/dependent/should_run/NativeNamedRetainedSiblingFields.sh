@@ -10,18 +10,7 @@ ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint
 for opt in -O0 -O2; do
     mkdir -p "$out/$opt"/{provider,client}
     cd "$out/$opt/provider"
-    cp "$src/"{PackedVecLibrary,NamedSiblingColumns}.hs .
-    cat > ParamColumns.hs <<'HS'
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}
-module ParamColumns (Columns(..)) where
-
-import PackedVecLibrary (Nat, Vec)
-
-data Columns a = Columns
-  { storedLength :: Nat
-  , cells :: Vec a storedLength
-  }
-HS
+    cp "$src/"{PackedVecLibrary,NamedSiblingColumns,ParamColumns}.hs .
     "${ghc[@]}" "$opt" --make -no-link NamedSiblingColumns.hs ParamColumns.hs
     cp ./*.hi ../client/
 

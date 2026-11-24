@@ -233,6 +233,7 @@ import qualified SiblingColumns
 import qualified SiblingColumnsClient
 import qualified NamedSiblingColumns as Named
 import qualified NamedSiblingColumnsClient
+import qualified ParamColumns
 import qualified QualifiedPiLibrary as Qualified
 import qualified QuantifiedGadtIndex as QuantifiedIndex
 import qualified ReadNatural
@@ -1735,6 +1736,8 @@ main = do
         (TypeLambda.Field count (TypeLambda.Field flag TypeLambda.End),
          TypeLambda.Field label TypeLambda.End) ->
             observe "splice a column schema and attach a caller-supplied label" (count, flag, label)
+    observe "splice the validated count from a typed expression quote"
+        $$(TypeLambdaQuote.checkedCountCode)
     observe "read two named sensors with a missing slot" QuotedSensorRow.readings
     let reported :: TypeLambda.Fields '[Either Ordering Int, Either Ordering Bool]
         reported = TypeLambdaArgument.rowFor @(\cell -> Either Ordering cell) Proxy (Right 42) (Left LT)
@@ -2531,6 +2534,13 @@ listBoundaries = do
             }
     observe "replace the stored length and both named payloads"
         (natToInt (Named.storedLength emptied), NamedSiblingColumnsClient.readPairs emptied)
+    let values :: forall a. ParamColumns.Columns a -> [a]
+        values column = toList (ParamColumns.cells column)
+        letters = ParamColumns.Columns
+            { ParamColumns.storedLength = S Z, ParamColumns.cells = VCons 'x' VNil }
+        flags = ParamColumns.Columns
+            { ParamColumns.storedLength = S (S Z), ParamColumns.cells = VCons True (VCons False VNil) }
+    observe "read parameterized columns at their own stored lengths" (values letters, values flags)
     let copyFlags q = NamedSiblingColumnsClient.readPairs
                        <$> NamedSiblingColumnsClient.copyFlagsAtSameLength named q
     observe "copy flags after comparing two stored lengths" (copyFlags defaults, copyFlags emptied)

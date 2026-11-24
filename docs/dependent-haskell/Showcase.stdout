@@ -290,6 +290,7 @@ read a supplied field when its sibling is omitted: [True]
 replace a named field at the original stored length: (1,[('x',False)])
 reset both columns at their stored length: (1,[('-',False)])
 replace the stored length and both named payloads: (0,[])
+read parameterized columns at their own stored lengths: ("x",[True,False])
 copy flags after comparing two stored lengths: (Just [('x',False)],Nothing)
 put two columns in a row indexed by the record length: ("rs",[True,False])
 project the length of a known dependent package in a type: Refl
@@ -480,6 +481,7 @@ give every field in a row the same error type: (Right 'x',Right True)
 map row cells with a lambda in a local signature: (Right 'x',Right True)
 tag a row cell with a local type lambda that infers the capture kind: True
 splice a column schema and attach a caller-supplied label: (Right 42,Left "missing flag",("column",True))
+splice the validated count from a typed expression quote: Right 42
 read two named sensors with a missing slot: (21,(),54)
 pass a row schema as a visible type argument: (Right 42,Left LT)
 splice a two-binder row schema into a visible type argument: (Right 42,Left "missing flag")
