@@ -188,6 +188,7 @@ import qualified BookDeBruijn
 import qualified BookAnyWitness
 import qualified BookAnyWitnessProof
 import qualified BookParallel
+import qualified BookEnvironment
 import qualified BookReverseProof
 import qualified BookNaturals
 import qualified CastedConstructorGivens as TreeProof
@@ -339,6 +340,11 @@ powSuccessor _ _ = Refl
 -- | Multiplication by zero ignores its second argument.
 timesZeroLeft :: foreach (n :: HaskLib.Nat) -> BookNaturals.times 0 n :~: 0
 timesZeroLeft _ = Refl
+
+-- | The ordinary lookup returns the closure identified by the evidence.
+lookupEvidence :: BookEnvironment.EnvLookup e x c -> BookEnvironment.lookupEnv e x :~: c
+lookupEvidence BookEnvironment.ELZ = Refl
+lookupEvidence (BookEnvironment.ELS p) = lookupEvidence p
 
 -- | Return the measurement and certify that reversal preserves it.
 measureReverseLength :: forall a. foreach (measure :: [a] -> HaskLib.Size)
@@ -2018,6 +2024,8 @@ main = do
         (BookBetaReduction.replacementOrder BookDeBruijn.Zero (BookDeBruijn.Suc BookDeBruijn.Zero))
     observe "rename the free variable under a lambda and preserve the bound variable"
         BookBetaReduction.weakenUnderLambda
+    observe "find the identity closure at the second environment binding"
+        (lookupEvidence BookEnvironment.secondIdentity)
     observe "preserve an open predicate proof in a promoted existential witness"
         (BookAnyWitnessProof.packHeadPreservesProof @(BookAnyWitnessProof.EvidenceBit False))
     let firstMember :: BookAnyWitness.Any ((:~:) True) '[True]
