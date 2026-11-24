@@ -2761,15 +2761,19 @@ An identity certificate can supply a bare callback without an unfolding.
 It does not record the aliases exposed by optimizer inlining. A consumer
 of the certificate must disable rewriting.
 
-Keep the ordinary evaluator for a written application. The expected kind
-of a closed call can determine the result of its operand, as in
-(id (fromIntegral x) :: Nat). A closed executable call also uses the
-ordinary staging rules. See GHC.Rename.Env. The open evaluator reads
-each definition it visits, including aliases, and records its instantiated
-rule head. Present those identities as ordinary Ids to the rule check.
-Their Names, types, and attached rules are the same. The late rule
-check can identify them in tcg_evaluated_term_uses. Keep the stricter
-rule policy for nominal uses and for non-identity final Core owners.
+Use the checked projection when a written application depends on a
+retained index of arbitrary lifted type. The open evaluator represents
+polymorphic operands at kind Type. It cannot observe such an index.
+Keep the ordinary evaluator for a closed application. Its expected kind
+can determine the result of its operand, as in (id (fromIntegral x) :: Nat).
+It also preserves the ordinary staging rules. See GHC.Rename.Env.
+
+The open evaluator reads each definition it visits, including aliases,
+and records its instantiated rule head. Present those identities as
+ordinary Ids to the rule check. Their Names, types, and attached rules
+are the same. The late rule check can identify them in
+tcg_evaluated_term_uses. Keep the stricter rule policy for uses of the
+checked family and for non-identity final Core owners.
 -}
 
 -- | Recognize a private constructor-case family and its nominal equations.

@@ -60,13 +60,60 @@ main = case symmetric sample of
         print (to Clear, from True, case left Set of Refl -> case right False of Refl -> True)
 HS
 
+cat > IsoIdentity.hs <<'HS'
+{-# LANGUAGE BangPatterns #-}
+module IsoIdentity (identity, strictIdentity) where
+
+identity :: a -> a
+identity x = x
+
+strictIdentity :: a -> a
+strictIdentity !x = x
+HS
+
+cat > ReadIsoIdentity.hs <<'HS'
+{-# LANGUAGE CPP, ExperimentalDependentTypes, GADTs, TypeOperators #-}
+module Main where
+
+import Data.Type.Equality ((:~:)(Refl))
+import BookIsomorphism
+import IsoIdentity
+
+roundTrip :: foreach (x :: a) -> identity (identity x) :~: x
+roundTrip _ = Refl
+
+reflIso :: Iso a a
+reflIso = MkIso identity identity roundTrip roundTrip
+
+#ifdef WRONG_ROUND_TRIP
+wrong :: foreach (x :: Bool) -> identity (identity x) :~: True
+wrong _ = Refl
+#endif
+
+#ifdef STRICT_IDENTITY
+strict :: foreach (x :: a) -> strictIdentity (strictIdentity x) :~: x
+strict _ = Refl
+#endif
+
+#ifdef CHANGED_RULE
+{-# RULES "change identity at False" identity False = True #-}
+#endif
+
+main :: IO ()
+main = case reflIso :: Iso Bool Bool of
+    MkIso to from left right ->
+        case left False of
+            Refl -> case right True of
+                Refl -> print (to False, from True, const True (from (error "forced input")))
+HS
+
 for level in 0 2; do
     mkdir -p "iso-O$level/"{provider,client}
     (
         cd "iso-O$level/provider"
-        cp "$area/BookIsomorphism.hs" .
-        "${g[@]}" "-O$level" "${flags[@]}" -c BookIsomorphism.hs
-        cp BookIsomorphism.hi "$tmp/ReadIso.hs" ../client/
+        cp "$area/BookIsomorphism.hs" "$tmp/IsoIdentity.hs" .
+        "${g[@]}" "-O$level" "${flags[@]}" -c BookIsomorphism.hs IsoIdentity.hs
+        cp BookIsomorphism.hi IsoIdentity.hi "$tmp/ReadIso.hs" "$tmp/ReadIsoIdentity.hs" ../client/
         cd ../client
         "${g[@]}" "-O$level" -c ReadIso.hs
         "${g[@]}" ReadIso.o ../provider/BookIsomorphism.o -o observe
@@ -74,6 +121,27 @@ for level in 0 2; do
         if "${g[@]}" "-O$level" -fforce-recomp -DWRONG_FIELD -c ReadIso.hs >wrong.log 2>&1 ||
            ! grep -Fq 'error: [GHC-83865]' wrong.log; then
             cat wrong.log >&2
+            exit 1
+        fi
+
+        identity_cmd=("${g[@]}" "-O$level" -fno-enable-rewrite-rules)
+        "${identity_cmd[@]}" -c ReadIsoIdentity.hs
+        "${identity_cmd[@]}" ReadIsoIdentity.o ../provider/{BookIsomorphism,IsoIdentity}.o -o identity
+        [[ $(./identity) == '(False,True,True)' ]]
+        if "${identity_cmd[@]}" -fforce-recomp -DWRONG_ROUND_TRIP -c ReadIsoIdentity.hs >wrong-trip.log 2>&1 ||
+           ! grep -Fq 'error: [GHC-83865]' wrong-trip.log; then
+            cat wrong-trip.log >&2
+            exit 1
+        fi
+        if "${identity_cmd[@]}" -fforce-recomp -DSTRICT_IDENTITY -c ReadIsoIdentity.hs >strict.log 2>&1 ||
+           ! grep -Fq 'error: [GHC-70565]' strict.log; then
+            cat strict.log >&2
+            exit 1
+        fi
+        if "${g[@]}" "-O$level" -fenable-rewrite-rules -Wno-inline-rule-shadowing -fforce-recomp \
+             -DCHANGED_RULE -c ReadIsoIdentity.hs >rule.log 2>&1 ||
+           ! grep -Fq 'with the current rewrite rules' rule.log; then
+            cat rule.log >&2
             exit 1
         fi
     )
