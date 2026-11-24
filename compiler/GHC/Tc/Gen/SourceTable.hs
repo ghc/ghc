@@ -1990,8 +1990,10 @@ second argument unchanged:
   plus (S n) m = S (plus n m)
 
 As in Agda's definition of addition, only the first argument decreases.
-A row can carry any number of ordinary variable operands. Compare the
-whole list with the recursive call's operands in the original order.
+A row can carry ordinary variable operands and can discard an operand
+with a wildcard. Keep every position in the family left-hand side.
+A recursive call must pass the original variable at every carried
+position in source order. A wildcard supplies no variable to pass.
 For the first operand, look up the Id among the fields of the matched
 constructor. When both arguments have type Nat, a call such as plus m m
 would otherwise pass the type check without decreasing.
@@ -2009,11 +2011,11 @@ and recursive arguments. Restore source order in the family telescope,
 each equation, and each recursive application. Calls to checked helpers
 already use source order.
 
-Represent each carried variable by a fresh nominal binder in each axiom
-branch. The equation can return it or put it in a constructor. With
+Represent each carried variable or wildcard by a fresh nominal binder in
+each axiom branch. The equation can use only the named variables. With
 Strict, desugaring adds bangs to these variable patterns. Skip equations
 with carried arguments in that case. The local renamer uses the same
-variable pattern restriction before the solved clauses are available.
+carried pattern restriction before the solved clauses are available.
 -}
 
 -- | Derive closed families after solving the group's top-level constraints.
@@ -2077,8 +2079,8 @@ sourceTableTyCons local binds = do
 
 -- | Publish checked case and pair equations, with their private field families.
 -- See Note [Checked Char cases] and Note [Checked pair cases].
-sourceCaseTables :: LHsBinds GhcTc -> TcM ([(Id, TyCon)], [TyCon])
-sourceCaseTables binds = do
+sourceCaseTables :: NameSet -> LHsBinds GhcTc -> TcM ([(Id, TyCon)], [TyCon])
+sourceCaseTables nominal_owners binds = do
   env <- getGblEnv
   char_tables <- xoptM LangExt.ExperimentalDependentTypes
   dflags <- getDynFlags
@@ -2117,6 +2119,7 @@ sourceCaseTables binds = do
         | otherwise = False
       partial_case_candidate owner =
         (generates_code || no_code_structural) &&
+        not (idName owner `elemNameSet` nominal_owners) &&
         isNothing (sourceTableOccurrence env owner >>= sourceTableId_maybe) &&
         isJust (partialConstructorCaseType (varType owner))
       final_candidate owner = isJust (list_case_position owner) || indexed_candidate owner ||
@@ -5837,8 +5840,8 @@ not equate a neutral pair with its fieldwise reconstruction. A case
 that also forces a field retains the ordinary term entry.
 -}
 
--- | The first constructor pattern, any carried variable, and the checked RHS.
-data SourceRow = SourceRow SrcSpan DataCon [Type] [Maybe Id] [Id] SourceRhs
+-- | The constructor pattern, carried operands, and checked RHS.
+data SourceRow = SourceRow SrcSpan DataCon [Type] [Maybe Id] [Maybe Id] SourceRhs
 
 -- | The expression forms allowed in one source equation.
 data SourceRhs = Field Id | Construct DataCon [SourceRhs] | Recur [Type] Id
@@ -5944,7 +5947,7 @@ checkedStructuralSource order binding = do
           let predecessors = case right of
                 CaseConstructor _ [] [CaseField field] -> [field]
                 _ -> []
-          output <- MaybeT (pure (sourceRhs False CLeft self predecessors body))
+          output <- MaybeT (pure (sourceRhs False CLeft self (map Just predecessors) body))
           let visit under_constructor = \case
                 Field v | any (hasCaseField v) [left, right] -> Just (CaseField v)
                 Construct dc args | dataConTyCon dc == root
@@ -6147,7 +6150,7 @@ sourceRow bracket_lists order self (L loc (Match { m_pats = L _ pats, m_grhss = 
         InfixCon _ p1 p2 -> Just [p1,p2]
         _                -> Nothing
       binders <- traverse fieldBinder fields
-      carried <- traverse carriedBinder rest
+      carried <- traverse fieldBinder rest
       output <- sourceRhs bracket_lists order self carried rhs
       pure (evs, SourceRow (locA loc) input params binders carried output)
   where
@@ -6160,13 +6163,10 @@ sourceRow bracket_lists order self (L loc (Match { m_pats = L _ pats, m_grhss = 
       WildPat _        -> Just Nothing
       _                -> Nothing
 
-    carriedBinder p = case unParen p of
-      VarPat _ (L _ v) -> Just v
-      _ -> Nothing
 sourceRow _ _ _ _ = Nothing
 
 -- | Recognise constructors, helper calls, and decreasing self calls.
-sourceRhs :: Bool -> LeftOrRight -> (Id -> Bool) -> [Id] -> HsExpr GhcTc -> Maybe SourceRhs
+sourceRhs :: Bool -> LeftOrRight -> (Id -> Bool) -> [Maybe Id] -> HsExpr GhcTc -> Maybe SourceRhs
 sourceRhs bracket_lists order self carried = go []
   where
     go :: [HsExpr GhcTc] -> HsExpr GhcTc -> Maybe SourceRhs
@@ -6206,7 +6206,7 @@ sourceRhs bracket_lists order self carried = go []
     call tys args = do
       arg : rest <- pure (sourceOperandOrder order args)
       variables <- traverse variable rest
-      guard (variables == carried)
+      guard (map Just variables == carried)
       Recur tys <$> variable arg
 
     variable e = do { Field v <- go [] e; pure v }
@@ -6236,10 +6236,12 @@ sourceBranch :: (Id -> TcM (Maybe (TyCon, [TyVar], [Type], Type)))
              -> LeftOrRight -> SourceInput -> [Type] -> Type -> SourceRow -> TcM (Maybe (TyCon -> CoAxBranch))
 sourceBranch lookup_call order input carried_types result (SourceRow loc con pat_args fields carried output) = do
     args <- liftZonkM (zonkTcTypes pat_args)
-    carried_tys <- liftZonkM (zonkTcTypes (map varType carried))
+    carried_tys <- liftZonkM (traverse (traverse (zonkTcType . varType)) carried)
     checked_output <- runMaybeT (checkCalls output)
     callees <- traverse (\f -> fmap (f,) <$> lookup_call f) (sourceCalls output)
-    if eqTypes args pattern_args && eqTypes carried_tys carried_types
+    let carried_ok = equalLength carried_tys carried_types &&
+          and (zipWith (\expected actual -> maybe True (eqType expected) actual) carried_types carried_tys)
+    if eqTypes args pattern_args && carried_ok
        && length fields == dataConSourceArity con then do
       (quantified, domain, params) <- freshInput input
       let field_types = map scaledThing (dataConInstOrigArgTys con params)
@@ -6247,13 +6249,13 @@ sourceBranch lookup_call order input carried_types result (SourceRow loc con pat
           instantiate = instantiateInput input quantified
           carried_kinds = map instantiate carried_types
       tvs <- zipWithM fieldVar fields field_types
-      carried_tvs <- zipWithM (fieldVar . Just) carried carried_kinds
+      carried_tvs <- zipWithM fieldVar carried carried_kinds
       pure $ do
         checked_callees <- sequence callees
         let lhs = mkTyConApp (promoteDataCon con) (params ++ mkTyVarTys tvs)
             patterns = family_args ++ sourceOperandOrder order (lhs : mkTyVarTys carried_tvs)
             binders = quantified ++ tvs ++ carried_tvs
-            carried_scope = zip (map Just carried) carried_tvs
+            carried_scope = zip carried carried_tvs
         guard (all isTyFamFree patterns)
         rhs <- check_rhs checked_callees instantiate domain family_args (zip fields tvs) carried_scope
                          (instantiate result) =<< checked_output

@@ -2689,7 +2689,7 @@ localSourceTableBinders binds sigs =
 
     right_constructor_row :: Name -> LMatch GhcPs (LHsExpr GhcPs) -> Bool
     right_constructor_row self (L _ Match{m_pats = L _ [left, right], m_grhss = rhss})
-      | Just carried <- carried_binder left
+      | Just carried <- callback_binder (unparen left)
       , Just fields <- constructor_fields (unparen right)
       , all plain_field fields
       , GRHSs _ (L _ (GRHS _ [] rhs) :| []) (L _ EmptyLocalBinds{}) <- rhss
@@ -2754,19 +2754,14 @@ localSourceTableBinders binds sigs =
       isJust (constructor_fields (unparen p))
     matches_second _ = False
 
-    carried_binders :: Bool -> [LPat GhcPs] -> Maybe [RdrName]
+    carried_binders :: Bool -> [LPat GhcPs] -> Maybe [Maybe RdrName]
     -- See Note [Carried arguments of a source equation] in GHC.Tc.Gen.SourceTable.
-    carried_binders False ps = traverse carried_binder ps
+    carried_binders False ps = traverse (callback_binder . unparen) ps
     carried_binders True [p]
-      | Just v <- carried_binder p = Just [v]
-      | WildPat{} <- unparen p = Just []
+      | Just carried <- callback_binder (unparen p) = Just (maybe [] (pure . Just) carried)
       | Just fields <- constructor_fields (unparen p)
-      , all plain_field fields = Just (collectPatsBinders CollNoDictBinders fields)
+      , all plain_field fields = Just (map Just (collectPatsBinders CollNoDictBinders fields))
     carried_binders True _ = Nothing
-
-    carried_binder p
-      | VarPat _ (L _ v) <- unparen p = Just v
-      | otherwise = Nothing
 
     constructor_fields :: Pat GhcPs -> Maybe [LPat GhcPs]
     constructor_fields ConPat{pat_args = PrefixCon _ fields} = Just fields
@@ -2775,7 +2770,7 @@ localSourceTableBinders binds sigs =
     constructor_fields (ListPat _ []) = Just []
     constructor_fields _ = Nothing
 
-    row_result :: Name -> [RdrName] -> [RdrName] -> [RdrName] -> LHsExpr GhcPs -> Bool
+    row_result :: Name -> [Maybe RdrName] -> [RdrName] -> [Maybe RdrName] -> LHsExpr GhcPs -> Bool
     row_result self leading fields trailing = check []
       where
         check :: [LHsExpr GhcPs] -> LHsExpr GhcPs -> Bool
@@ -2790,12 +2785,12 @@ localSourceTableBinders binds sigs =
                 _ -> False
           HsVar _ (L _ r)
             | isRdrDataCon r -> all (check []) args
-            | r `elem` fields || r `elem` leading || r `elem` trailing -> null args
+            | r `elem` fields || Just r `elem` leading || Just r `elem` trailing -> null args
             | is_self r, Just operands <- traverse variable args
             , (before, field : after) <- splitAt (length leading) operands
-            -> before == leading && field `elem` fields && after == trailing
+            -> map Just before == leading && field `elem` fields && map Just after == trailing
             | is_self r, null leading, [next, pushed] <- args
-            , [x, xs] <- fields, [acc] <- trailing
+            , [x, xs] <- fields, [Just acc] <- trailing
             -> variable next == Just xs && cons_onto x acc pushed
             | not (is_self r), not (null args) -> all (check []) args
           _ -> False
