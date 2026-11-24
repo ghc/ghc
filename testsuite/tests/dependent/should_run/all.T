@@ -173,6 +173,9 @@ test('NativeOpenMinimum',
                    ['PreludeMapLengthSize.hs', 'PreludeZipMapRuntime.hs', 'PreludeZipRuntime.hs',
                     'ZipMinimum.hs']])],
      run_command, ['bash NativeOpenMinimum.sh "{compiler}" "{libdir}" ' + config.ghc_th_way_flags])
+test('NativeStructuralCarriedArgs',
+     [only_ways(['normal'])],
+     run_command, ['bash NativeStructuralCarriedArgs.sh "{compiler}" "{libdir}"'])
 test('NativeStructuralSizePredicate',
      [only_ways(['normal'])],
      run_command, ['bash NativeStructuralSizePredicate.sh "{compiler}" "{libdir}"'])
