@@ -34,7 +34,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Instantiate ( freshenCoVarBndrsX )
 import GHC.Tc.Instance.Family ( tcUnwrapNewtype_maybe )
 import qualified GHC.Tc.Utils.Monad    as TcM
-import GHC.Tc.Zonk.TcType ( unpackCoercionHole_maybe )
+import GHC.Tc.Zonk.TcType ( zonkCoHoleSet )
 
 import GHC.Core.Type
 import GHC.Core.Predicate
@@ -489,20 +489,18 @@ can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
   where
     -- A Given can rewrite a deferred Wanted to an equality whose proof
     -- uses a checked source synonym. Record that use only if this expansion
-    -- fills the Wanted's hole with a reflexive coercion. Follow the source
-    -- location in the Wanted, which survives the Given rewrite.
-    expand_proof_synonym (TyConApp tc []) solve
+    -- leads to a complete hole-free proof. Follow the source location in
+    -- the Wanted, which survives the Given rewrite.
+    expand_proof_synonym (TyConApp tc _) solve
       | NomEq <- eq_rel
       , deps@(_ : _) <- synTyConSourceProofRules tc
       , CtWanted (WantedCt { ctev_dest = HoleDest hole }) <- ev
       = do { result <- solve
-           ; filled <- wrapTcS (TcM.liftZonkM (unpackCoercionHole_maybe hole))
-           ; case filled of
-               Just (CPH { cph_co = co }) | isReflCo co ->
-                 wrapTcS $ TcM.setCtLocM (ctEvLoc ev) $ do
-                   loc <- TcM.getSrcSpanM
-                   TcM.recordSourceProofUse loc (tyConName tc) deps
-               _ -> pure ()
+           ; solved <- isEmptyCoHoleSet <$> wrapTcS (TcM.liftZonkM (zonkCoHoleSet (unitCoHoleSet hole)))
+           ; when solved $
+               wrapTcS $ TcM.setCtLocM (ctEvLoc ev) $ do
+                 loc <- TcM.getSrcSpanM
+                 TcM.recordSourceProofUse loc (tyConName tc) deps
            ; pure result }
     expand_proof_synonym _ solve = solve
 
@@ -773,9 +771,10 @@ can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
                NomEq -> tryRetainedFamilyEquality new_ev xi1 xi2
                ReprEq -> return Nothing
            ; case proof of
-               Just (co, uses) -> do
+               Just (co, tables, uses) -> do
                  { let holes = foldr (flip addRewriter) emptyCoHoleSet
                               (univCoDepsHoles (mkUnivCoDeps [co]))
+                 ; record_table_uses tables
                  ; record_source_uses (deps1 ++ deps2 ++ uses)
                  ; setEqIfWanted new_ev (CPH co holes)
                  ; stopWith new_ev "Solved by retained family congruence" }
@@ -790,12 +789,14 @@ can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
     -- in GHC.Tc.Solver.Rewrite.
     record_reduction_uses hole uses@(_ : _) solve
       = do { result <- solve
-           ; filled <- wrapTcS (TcM.liftZonkM (unpackCoercionHole_maybe hole))
-           ; case filled of
-               Just (CPH { cph_co = proof }) | isReflCo proof -> record_source_uses uses
-               _ -> pure ()
+           ; solved <- isEmptyCoHoleSet <$> wrapTcS (TcM.liftZonkM (zonkCoHoleSet (unitCoHoleSet hole)))
+           ; when solved $ record_source_uses uses
            ; pure result }
     record_reduction_uses _ _ solve = solve
+
+    record_table_uses [] = pure ()
+    record_table_uses tables = wrapTcS $ TcM.setCtLocM (ctEvLoc ev) $
+      mapM_ (uncurry sourceTableFamilyAppUse) tables
 
     record_source_uses [] = pure ()
     record_source_uses uses = wrapTcS $ TcM.setCtLocM (ctEvLoc ev) $ do
@@ -3193,57 +3194,68 @@ sides have the same head, prove every argument equal. This is forward
 congruence, even for a non-injective family.
 
 A Given can also fix an argument to a promoted constructor. Lift that
-Given through the family, then reduce the family axioms. Use constructor
-targets with no runtime indices so this step cannot chase a recursive
-index equation. The result must already agree with the other side.
-An ordinary family can reach a checked family through its result.
-Keep the selected branch dependencies when this proof solves the Wanted.
-See Note [Committing checked source family branches] in GHC.Tc.Solver.Rewrite.
+Given through the family, then reduce the family axioms. Exclude targets
+that mention the refined runtime index itself, and track refined indices
+across rounds so specialization always terminates. Compare the reduced
+endpoints up to generative constructors, checked synonyms and scoped
+nominal index Givens. Keep both private source-table applications and
+checked branch or synonym dependencies only when this proof solves the
+Wanted. See Note [Committing checked source family branches] in
+GHC.Tc.Solver.Rewrite.
 
 This step solves nominal Wanteds only. No new equality enters the inerts.
 Do not use this step inside a retained function equality comparison.
 See Note [Native runtime binder scopes] in GHC.Tc.Solver.Monad.
 -}
 
--- | Try a scoped nominal proof for an ordinary closed-family Wanted.
-tryRetainedFamilyEquality :: CtEvidence -> Type -> Type
-                          -> TcS (Maybe (Coercion, [(Name, [SourceProofRule])]))
+-- | Try a scoped nominal proof for an ordinary closed-family or retained-index Wanted.
+tryRetainedFamilyEquality
+  :: CtEvidence -> Type -> Type
+  -> TcS (Maybe (Coercion, [(TyCon, [TcType])], [(Name, [SourceProofRule])]))
 tryRetainedFamilyEquality ev lhs rhs
   | isWanted ev
-  , isJust left || isJust right
+  , isJust left || isJust right || hasOpaqueIndex lhs || hasOpaqueIndex rhs
   = do { binders <- getNativeBinderScope
        ; mode <- getTcSMode
        ; if not (isEmptyVarSet binders) || tcsmGivenOnly mode
          then return Nothing
          else do { irreds <- inert_irreds <$> getInertCans
                  ; case sameFamily irreds of
-                     Just co -> return (Just (co, []))
+                     Just result -> return (Just result)
                      Nothing -> do
-                       { (Reduction co1 lhs', uses1) <- specialize irreds lhs left
-                       ; (Reduction co2 rhs', uses2) <- specialize irreds rhs right
-                       ; return $ if lhs' `tcEqType` rhs'
-                           then Just (co1 `mkTransCo` mkSymCo co2, uses1 ++ uses2)
-                           else Nothing } } }
+                       { (Reduction co1 lhs', tables1, uses1) <- specialize emptyVarSet irreds lhs left
+                       ; (Reduction co2 rhs', tables2, uses2) <- specialize emptyVarSet irreds rhs right
+                       ; return $ do
+                           (mid_co, mid_uses) <- endpointProof irreds lhs' rhs'
+                           guard (not (isReflCo co1 && isReflCo co2 && isReflCo mid_co))
+                           let co = co1 `mkTransCo` mid_co `mkTransCo` mkSymCo co2
+                           pure (co, tables1 ++ tables2, uses1 ++ uses2 ++ mid_uses) } } }
   | otherwise = return Nothing
   where
     left = family lhs
     right = family rhs
 
     family (TyConApp tc args)
-      | Just ax <- closedFamilyTyConCoAxiom_maybe tc
-      , null (co_ax_source_proof_rules ax)
+      | isJust (closedFamilyTyConCoAxiom_maybe tc)
       , not (saturatedSourceHead tc args)
       , lengthIs args (tyConArity tc)
       , any isOpaqueTermIndex args
       = Just (tc, args)
     family _ = Nothing
 
+    hasOpaqueIndex (TermVarTy v) = isNativeOpaqueValueId v
+    hasOpaqueIndex (CastTy ty _) = hasOpaqueIndex ty
+    hasOpaqueIndex (TyConApp tc args)
+      | isGenerativeTyCon tc Nominal = any hasOpaqueIndex args
+    hasOpaqueIndex _ = False
+
     sameFamily irreds = do
       (tc, args) <- left
       (other, targets) <- right
       guard (tc == other)
-      proofs <- zipWithM (argument irreds) args targets
-      pure (mkTyConAppCo Nominal tc proofs)
+      results <- zipWithM (endpointProof irreds) args targets
+      let (proofs, uses) = unzip results
+      pure (mkTyConAppCo Nominal tc proofs, [], concat uses)
 
     argument irreds a b
       | not (typeKind a `tcEqType` typeKind b) = Nothing
@@ -3251,32 +3263,75 @@ tryRetainedFamilyEquality ev lhs rhs
       | isOpaqueTermIndex a || isOpaqueTermIndex b = findRetainedIndexProof irreds a b
       | otherwise = Nothing
 
-    specialize irreds _ (Just (tc, args))
-      | let (proofs, targets) = unzip (map (refine irreds) args)
+    endpointProof irreds a b
+      | not (typeKind a `tcEqType` typeKind b) = Nothing
+      | a `tcEqType` b = Just (mkNomReflCo a, expandedProofSynonyms a b)
+      | Just a' <- coreView a = do
+          (co, uses) <- endpointProof irreds a' b
+          pure (co, synonymStep a ++ uses)
+      | Just b' <- coreView b = do
+          (co, uses) <- endpointProof irreds a b'
+          pure (co, synonymStep b ++ uses)
+      | isOpaqueTermIndex a || isOpaqueTermIndex b = do
+          co <- findRetainedIndexProof irreds a b
+          pure (co, [])
+      | Just (tc1, as1) <- splitTyConAppNoView_maybe a
+      , Just (tc2, as2) <- splitTyConAppNoView_maybe b
+      , tc1 == tc2, isGenerativeTyCon tc1 Nominal, equalLength as1 as2 = do
+          results <- zipWithM (endpointProof irreds) as1 as2
+          let (cos, uses) = unzip results
+          pure (mkTyConAppCo Nominal tc1 cos, concat uses)
+      | otherwise = Nothing
+
+    synonymStep (TyConApp tc _)
+      | deps@(_ : _) <- synTyConSourceProofRules tc = [(tyConName tc, deps)]
+    synonymStep _ = []
+
+    specialize seen irreds _ (Just (tc, args))
+      | let (proofs, targets, refined) = unzip3 (map (refine seen irreds) args)
+            seen' = unionVarSets (seen : refined)
       , any (not . isReflCo) proofs
       , wellKinded (tyConKind tc) targets
-      = do { (reduced, uses) <- rewriteFamilyAxiomsWithSourceProofs (ctEvLoc ev) (mkTyConApp tc targets)
-           ; pure (mkTyConAppCo Nominal tc proofs `mkTransRedn` reduced, uses) }
-    specialize _ ty _ = pure (mkReflRedn Nominal ty, [])
+      = do { (Reduction co_red ty', tables, uses) <-
+               rewriteFamilyAxiomsWithSourceProofs (ctEvLoc ev) (mkTyConApp tc targets)
+           ; let step_co = mkTyConAppCo Nominal tc proofs `mkTransCo` co_red
+           ; (rest_redn, tables', uses') <- specialize seen' irreds ty' (family ty')
+           ; pure (step_co `mkTransRedn` rest_redn, tables ++ tables', uses ++ uses') }
+    specialize _ _ ty _ = pure (mkReflRedn Nominal ty, [], [])
 
-    refine irreds a
-      | isOpaqueTermIndex a
-      , Just target <- foldIrreds (\irred rest -> candidate irreds a irred <|> rest) irreds Nothing
-      = target
-      | otherwise = (mkNomReflCo a, a)
+    refine seen irreds a@(TermVarTy root)
+      | isNativeOpaqueValueId root
+      , not (root `elemVarSet` seen)
+      , Just (proof, target) <- foldIrreds (\irred rest -> candidate irreds root a irred <|> rest) irreds Nothing
+      = (proof, target, unitVarSet root)
+    refine _ _ a = (mkNomReflCo a, a, emptyVarSet)
 
-    candidate irreds a irred
+    candidate irreds root a irred
       | given@CtGiven{} <- irredCtEvidence irred
       , EqPred NomEq l r <- classifyCtEvidence given
       = known l <|> known r
       | otherwise = Nothing
       where
+        known (CastTy ty _) = known ty
         known ty@(TyConApp tc _)
           | isPromotedDataCon tc
-          , not (anyFreeVarsOfType isId ty)
+          , safeRetainedTarget root ty
           , Just proof <- argument irreds a ty
           = Just (proof, ty)
         known _ = Nothing
+
+    safeRetainedTarget root = go
+      where
+        go (TyVarTy tv) = go (varType tv)
+        go (TermVarTy v) = v /= root && isNativeOpaqueValueId v && go (varType v)
+        go (LitTy _) = True
+        go (CoercionTy _) = True
+        go (CastTy ty _) = go ty
+        go (AppTy f a) = go f && go a
+        go (TyConApp _ as) = all go as
+        go (FunTy _ ma m a r) = go ma && go m && go a && go r
+        go (ForAllTy ma (Bndr tv _) b) = go ma && go (varType tv) && go b
+        go _ = False
 
     wellKinded _ [] = True
     wellKinded kind (a:as)

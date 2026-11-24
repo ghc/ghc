@@ -11,7 +11,7 @@
 module GHC.Tc.Solver.Rewrite(
    rewrite, rewriteForErrors, rewriteArgsNom, rewriteWithSourceProofs,
    rewriteType, rewriteFamilyAxioms, rewriteFamilyAxiomsWithSourceProofs,
-   rewriteTyConAppArgsNom
+   rewriteTyConAppArgsNom, expandedProofSynonyms
  ) where
 
 import GHC.Prelude
@@ -37,6 +37,7 @@ import GHC.Core.TyCo.FVs( tyCoVarsOfTypes, tyCoVarsOfCo
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom ( CoAxiomRule(BranchedAxiom), coAxiomName, coAxiomTyCon
                                , co_ax_source_proof_rules, sourceProofAxiomRules )
+import GHC.Core.FamInstEnv ( reduceTyFamApp_maybe )
 import GHC.Core.Lint( lintTcCoercion )
 import GHC.Core.Reduction
 import GHC.Types.Name ( Name, SourceProofRule, nameOccName, sourceTableTermOcc )
@@ -324,12 +325,27 @@ rewriteWithSourceProofs ev ty
 -- | Return the checked branches that supply part of this reduction.
 collectSourceProofs :: RewriteM Reduction -> RewriteM (Reduction, [(Name, [SourceProofRule])])
 collectSourceProofs action = do
+  (redn, _, uses) <- collectSourceProofsAndTables action
+  return (redn, uses)
+
+-- | Return both private source-table applications and checked proof branches.
+collectSourceProofsAndTables
+  :: RewriteM Reduction
+  -> RewriteM (Reduction, [(TyCon, [TcType])], [(Name, [SourceProofRule])])
+collectSourceProofsAndTables action = do
   synonyms_ref <- liftTcS $ newTcRef []
   withRewriteEnv (\env -> env { re_source_proof_synonyms = Just synonyms_ref }) $ do
     redn <- action
     axioms <- reductionSourceAxioms redn
     synonyms <- liftTcS $ readTcRef synonyms_ref
-    return (redn, sourceProofUses axioms synonyms)
+    let tables =
+          [ (tc, args)
+          | (BranchedAxiom axiom _, proof) <- axioms
+          , let tc = coAxiomTyCon axiom
+          , isMethodSourceFamily tc
+          , Just (tc', args) <- [splitTyConAppNoView_maybe (coercionLKind proof)]
+          , tc == tc' ]
+    return (redn, tables, sourceProofUses axioms synonyms)
 
 -- | See Note [Rewriting]
 -- `rewriteForErrors` is a variant of 'rewrite' that rewrites
@@ -399,10 +415,12 @@ rewriteTyConAppArgsNom loc tc args
 rewriteFamilyAxioms :: CtLoc -> TcType -> TcS Reduction
 rewriteFamilyAxioms loc ty = runFamilyAxioms loc (rewrite_one ty)
 
--- | Also return the checked branches selected by axiom-only reduction.
-rewriteFamilyAxiomsWithSourceProofs :: CtLoc -> TcType -> TcS (Reduction, [(Name, [SourceProofRule])])
+-- | Also return source-table applications and checked branches selected by axiom-only reduction.
+rewriteFamilyAxiomsWithSourceProofs
+  :: CtLoc -> TcType
+  -> TcS (Reduction, [(TyCon, [TcType])], [(Name, [SourceProofRule])])
 rewriteFamilyAxiomsWithSourceProofs loc ty =
-  runFamilyAxioms loc (collectSourceProofs (rewrite_one ty))
+  runFamilyAxioms loc (collectSourceProofsAndTables (rewrite_one ty))
 
 -- | Disable inert equalities, plugins and local definitions for this rewrite.
 runFamilyAxioms :: CtLoc -> RewriteM a -> TcS a
@@ -1290,19 +1308,16 @@ rewriteExactFamAppWithOrigins origins tc tys =
 reductionSourceAxioms :: Reduction -> RewriteM [(CoAxiomRule, Coercion)]
 reductionSourceAxioms redn = mkRewriteM $ \env _ -> do
     marked_family <- readTcRef (re_source_proof_family env)
-    return $ if marked_family then sourceProofAxioms (reductionCoercion redn) else []
+    has_synonyms <- maybe (pure False) (fmap (not . null) . readTcRef) (re_source_proof_synonyms env)
+    return $ if marked_family then sourceProofAxioms has_synonyms (reductionCoercion redn) else []
 
 -- | Collect selected branches and private source-family axioms in a reduction.
-sourceProofAxioms :: Coercion -> [(CoAxiomRule, Coercion)]
-sourceProofAxioms co = go co []
+sourceProofAxioms :: Bool -> Coercion -> [(CoAxiomRule, Coercion)]
+sourceProofAxioms has_synonyms co = go co []
   where
     go proof@(AxiomCo rule args) rest =
       let arg_uses = foldr go rest args
-      in case rule of
-           BranchedAxiom axiom _
-             | isMethodSourceFamily (coAxiomTyCon axiom)
-               || not (null (sourceProofAxiomRules rule)) -> (rule, proof) : arg_uses
-           _ -> arg_uses
+      in if has_synonyms || relevant rule then (rule, proof) : arg_uses else arg_uses
     go (TyConAppCo _ _ args) rest = foldr go rest args
     go (AppCo fun arg) rest = go fun (go arg rest)
     go (TermAppCo _ arg) rest = go arg rest
@@ -1326,6 +1341,56 @@ sourceProofAxioms co = go co []
 
     go_mco MRefl rest = rest
     go_mco (MCo inner) rest = go inner rest
+
+    relevant rule@(BranchedAxiom axiom _) =
+      isMethodSourceFamily (coAxiomTyCon axiom) || not (null (sourceProofAxiomRules rule))
+    relevant _ = False
+
+-- | Collect checked synonyms whose expansion is required to equate two equal types.
+expandedProofSynonyms :: Type -> Type -> [(Name, [SourceProofRule])]
+expandedProofSynonyms = go Nothing
+  where
+    eq_under Nothing  a b = a `tcEqType` b
+    eq_under (Just e) a b = eqTypeX e a b
+
+    init_env a b = mkRnEnv2 (mkInScopeSet (tyCoVarsOfTypes [a, b]))
+    bind_env mb a b v1 v2 = rnBndr2 (fromMaybe (init_env a b) mb) v1 v2
+
+    go env (CastTy t1 _) t2 = go env t1 t2
+    go env t1 (CastTy t2 _) = go env t1 t2
+    go env (TyConApp tc1 as1) (TyConApp tc2 as2)
+      | tc1 == tc2
+      , equalLength as1 as2
+      , and (zipWith (eq_under env) as1 as2)
+      = concat (zipWith (go env) as1 as2)
+    go env t1 t2
+      | Just t1' <- coreView t1 = maybeToList (checkedSynonymOrigin t1) ++ go env t1' t2
+      | Just t2' <- coreView t2 = maybeToList (checkedSynonymOrigin t2) ++ go env t1 t2'
+    go env (TyConApp _ as1) (TyConApp _ as2)
+      = concat (zipWith (go env) as1 as2)
+    go env (FunTy _ ma1 m1 a1 r1) (FunTy _ ma2 m2 a2 r2)
+      = go env ma1 ma2 ++ go env m1 m2 ++ go env a1 a2 ++ go env r1 r2
+    go env t1@(ForAllTy ma1 (Bndr tv1 _) b1) t2@(ForAllTy ma2 (Bndr tv2 _) b2)
+      = go env ma1 ma2 ++ go env (varType tv1) (varType tv2)
+        ++ go (Just (bind_env env t1 t2 tv1 tv2)) b1 b2
+    go env t1@(DepFunTy _ v1 b1) t2@(DepFunTy _ v2 b2)
+      = go env (varType v1) (varType v2)
+        ++ go (Just (bind_env env t1 t2 v1 v2)) b1 b2
+    go env t1@(ExistsTy _ tv1 b1) t2@(ExistsTy _ tv2 b2)
+      = go env (varType tv1) (varType tv2)
+        ++ go (Just (bind_env env t1 t2 tv1 tv2)) b1 b2
+    go env t1@(DepDictTy v1 b1) t2@(DepDictTy v2 b2)
+      = go env (varType v1) (varType v2)
+        ++ go (Just (bind_env env t1 t2 v1 v2)) b1 b2
+    go env (TermAppTy f1 a1) (TermAppTy f2 a2)
+      = go env (varType f1) (varType f2) ++ go env a1 a2
+    go env (ClassAppTy _ a1 d1 x1 k1) (ClassAppTy _ a2 d2 x2 k2)
+      = concat (zipWith (go env) [a1, d1, x1, k1] [a2, d2, x2, k2])
+    go env t1 t2
+      | Just (f1, a1) <- splitAppTyNoView_maybe t1
+      , Just (f2, a2) <- splitAppTyNoView_maybe t2
+      = go env f1 f2 ++ go env a1 a2
+      | otherwise = []
 
 -- | The private family that implements a checked source method.
 isMethodSourceFamily :: TyCon -> Bool
@@ -1513,15 +1578,27 @@ rewrite_exact_fam_app_step origins tc tys
   where
     try_reduce args rewriters = do
       result <- try_to_reduce tc args rewriters
-      case (origins, result) of
-        (_ : _, FreshReduction (Reduction co _)) -> do
+      case result of
+        FreshReduction (Reduction co _) -> do
           ref <- getRewriteEnvField re_source_proof_synonyms
-          case (ref, co) of
-            (Just uses, proof@(AxiomCo rule@(BranchedAxiom axiom _) _)) | coAxiomTyCon axiom == tc ->
-              liftTcS $ updTcRef uses ([(rule, proof, owner, deps) | (owner, deps) <- origins] ++)
+          case (ref, axiom_step co) of
+            (Just uses, Just (rule, proof)) -> do
+              let arg_syns = expandedProofSynonyms (mkTyConApp tc args) (coercionLKind proof)
+                  recorded = (if matches_origin rule then origins else []) ++ arg_syns
+              unless (null recorded) $ do
+                env <- getRewriteEnv
+                liftTcS $ writeTcRef (re_source_proof_family env) True
+                liftTcS $ updTcRef uses ([(rule, proof, owner, deps) | (owner, deps) <- recorded] ++)
             _ -> return ()
         _ -> return ()
       return result
+      where
+        axiom_step proof@(AxiomCo rule _) = Just (rule, proof)
+        axiom_step (TransCo _ proof@(AxiomCo rule _)) = Just (rule, proof)
+        axiom_step _ = Nothing
+
+        matches_origin (BranchedAxiom axiom _) = coAxiomTyCon axiom == tc
+        matches_origin _ = False
 
 -- | Follow inert or cached family evidence while rewriting its right-hand side.
 -- See Note [Mixed-flavour family rewrite cycles].
@@ -2256,9 +2333,14 @@ try_to_reduce tc tys tc_rewriters = mkRewriteM $ \env path ->
              ; updTcRef (re_used_cos env) (`addUnivCoDep` reductionCoercion redn)
              ; finish origin redn }
 
-           match_fam = do
-             { match <- wrapTcS $ TcM.setCtLocM (re_loc env) $ matchFamTcM tc tys
-             ; maybe (return NoFamilyReduction) (finish FreshReduction) match }
+           match_fam
+             | re_fam_axioms_only env, isJust (re_source_proof_synonyms env) = do
+                 fam_envs <- TcS.getFamInstEnvs
+                 maybe (return NoFamilyReduction) (finish FreshReduction)
+                   (reduceTyFamApp_maybe fam_envs Nominal tc tys)
+             | otherwise = do
+                 match <- wrapTcS $ TcM.setCtLocM (re_loc env) $ matchFamTcM tc tys
+                 maybe (return NoFamilyReduction) (finish FreshReduction) match
 
            -- STEP 1b & STEP 4b, followed by the top-level instances.
            try_cache = do
