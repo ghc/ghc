@@ -20,6 +20,29 @@ test('size_hello_unicode_gzip', [extra_files(['./size_hello_unicode.hs']),
   pre_cmd('$MAKE -s --no-print-directory size_hello_unicode_gzip' + ' exe_extension_from_python="' + exe_extension() + '"'), ignore_stdout, ignore_stderr],
   multimod_compile, ['size_hello_unicode', ''])
 
+test(
+    'size_bytecode',
+    [
+        extra_files(['bytecode_example.hs']),
+        collect_size(5, 'bytecode_example.gbc'),
+        ignore_stdout,
+        ignore_stderr
+    ],
+    makefile_test,
+    []
+)
+test(
+    'size_bytecode_optimized',
+    [
+        extra_files(['bytecode_example.hs']),
+        collect_size(5, 'bytecode_example.gbc'),
+        ignore_stdout,
+        ignore_stderr
+    ],
+    makefile_test,
+    []
+)
+
 size_acceptance_threshold = 100
 
 test('array_dir'           ,[collect_size_ghc_pkg(size_acceptance_threshold , 'array')]           , static_stats , [] )
