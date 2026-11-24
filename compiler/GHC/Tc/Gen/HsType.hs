@@ -533,6 +533,8 @@ tc_lhs_sig_type retained_sig skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = hs
                     ; stuff <- tcOuterTKBndrsX binder_mode skol_info hs_outer_bndrs $
                                (case retained_sig of
                                   Just allow_function -> tcCheckRetainedSigType allow_function skol_info
+                                  Nothing | SigTypeSkol ExprSigCtxt{} <- getSkolemInfo skol_info
+                                          -> tcCheckExprSigType
                                   Nothing -> tcCheckLHsType) hs_ty exp_kind
                     ; return (exp_kind, outer_ma, stuff) }
 
@@ -599,6 +601,23 @@ tcRetainedAmbientIndices invalid_reason hs_ty
       | Just _ <- (cast thing :: Maybe Name) = []
       | Just _ <- (cast thing :: Maybe Type) = []
       | otherwise = concat (gmapQ ambient_names thing)
+
+-- | Check an expression annotation with the runtime indices already in scope.
+-- See Note [Runtime indices in expression signatures].
+tcCheckExprSigType :: LHsType GhcRn -> TcKind -> TcM TcType
+tcCheckExprSigType hs_ty kind = do
+  indices <- tcRetainedAmbientIndices RetainedLocalSignatureIndex hs_ty
+  tc_check_lhs_type (typeLevelMode { mode_indices = indices }) hs_ty kind
+
+{- Note [Runtime indices in expression signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Inside a function with a retained argument n, a proof can have the
+expression signature (plusZero n :: plus n 'Zero :~: n). Use the same
+lexical Id for n in the proof and the annotation. The signature checker
+validates the Id in the current context, as for a visible type argument.
+Use the ordinary type checker with those indices in scope. The annotation
+does not introduce a retained binder or evaluate its operand.
+-}
 
 -- | Check retained telescopes in function positions of a complete signature.
 -- See Note [Higher-order retained signatures].
