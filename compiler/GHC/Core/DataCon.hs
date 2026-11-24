@@ -2247,7 +2247,7 @@ equality].
 
 Neither form permits existential binders,
 data families, newtypes, type data, strict fields, or unpacked fields.
-The parent and all fields are lifted. A named field has a supported closed
+The parent and all fields are lifted. A named field has a checked
 domain and multiplicity Many. Its Id must be fresh. Only earlier retained
 fields can occur free in a field type. Rebuild the worker and wrapper types
 with DepFunTy at each dependent field. Each runtime field remains an ordinary
@@ -2261,10 +2261,10 @@ it as the final argument of its type.
 Check the payload types after the parent TyCon is available.
 See Note [Source retained constructor declarations] in GHC.Tc.TyCl.
 
-A function field uses the existing retained-binder policy. Its closed ordinary
-Many arrow has independently supported scalar domains. The actual field Id
-scopes the head of TermAppTy in later fields; it is not a scalar TermVarTy.
-Keep the function and its argument as separate runtime fields. No call equality
+A function field has an ordinary Many arrow. Its endpoints are supported
+closed scalar domains or lifted erased type parameters. The actual field Id
+scopes the head of TermAppTy in later fields. Keep the function and its
+argument as separate runtime fields. No call equality
 implies function or argument equality. See Note [Function-valued retained
 binders] in GHC.Core.Type and
 docs/dependent-haskell/REFERENCES.md#function-valued-retained-package-fields-prior-art.

@@ -2794,7 +2794,7 @@ isNativeRetainedField :: Id -> Bool
 isNativeRetainedField v
   = isNativeOpaqueValueId v
     && (isNativeIndexType ty || isTyVarTy ty
-        || (noFreeVarsOfType (idMult v) && isNativeStructuralFunctionType ty))
+        || (noFreeVarsOfType (idMult v) && isNativeRetainedFieldFunctionType ty))
   where
     ty = varType v
 
@@ -2802,8 +2802,17 @@ isNativeRetainedField v
 -- See Note [Opaque algebraic retained binders].
 isNativeRetainedFieldType :: Type -> Bool
 isNativeRetainedFieldType ty
-  = isNativeIndexType ty || isNativeStructuralFunctionType ty
+  = isNativeIndexType ty || isNativeRetainedFieldFunctionType ty
     || (isTyVarTy ty && isNativeOpaqueValueType ty)
+
+-- | Check a retained function field over closed or abstract endpoints.
+-- See Note [Abstract witness domains].
+isNativeRetainedFieldFunctionType :: Type -> Bool
+isNativeRetainedFieldFunctionType ty
+  | Just (arg, res) <- nativeIndexFunctionTypeTys_maybe ty
+  , isTyVarTy arg, isTyVarTy res
+  = True
+  | otherwise = isNativeStructuralFunctionType ty
 
 -- | Test the head of an opaque value domain after expanding synonyms.
 -- The caller checks the full domain's lifted kind.
@@ -2865,6 +2874,13 @@ established which field binds x. For example, matching a DPair Int p
 binds a local Int witness. Check the instantiated field as an opaque Id.
 Requiring Int to be a structural index domain here would prevent an
 ordinary client from opening that package.
+
+Iso a b can store an ordinary function from a to b as a retained field.
+Both endpoints are lifted erased type parameters. The existing native
+call judgement checks the arrow and records the identity of the field.
+A later proof can use the field as a call head. Neither constructor
+validation nor interface loading needs to inspect the endpoint schemas.
+The structural index judgement still uses closed function endpoints.
 -}
 
 {- Note [Function fields in native index domains]
