@@ -229,6 +229,9 @@ import PackedVecLibrary (Nat(..), Vec(..), natToInt, replicateNative, toList, zi
 payload :: Columns a -> [a]
 payload r = let vec = cells r in toList vec
 
+direct :: Columns a -> [a]
+direct r = toList (cells r)
+
 beside :: Columns Char -> [(Char, Char)]
 beside r = toList (zipVec (cells @Char r) (replicateNative (storedLength r) '-'))
 
@@ -237,13 +240,13 @@ made = Columns {cells = VCons 'a' VNil, storedLength = S Z}
 
 main :: IO ()
 main = do
-  print (payload made, beside made)
+  print (payload made, direct made, beside made)
   print (natToInt (storedLength @Bool (Columns Z undefined)))
 HS
     "${ghc[@]}" "$opt" -c ParamMain.hs
     "${ghc[@]}" ParamMain.o ../provider/{PackedVecLibrary,ParamColumns}.o -o param-observe
     timeout 15 ./param-observe > actual
-    printf '%s\n' "(\"a\",[('a','-')])" '0' | cmp - actual
+    printf '%s\n' "(\"a\",\"a\",[('a','-')])" '0' | cmp - actual
 
     cat > Signature.hs <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, ScopedTypeVariables #-}

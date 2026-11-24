@@ -448,10 +448,9 @@ data Columns a = Columns {storedLength :: Nat, cells :: Vec a storedLength}
 The type parameter is erased. The generated selector has type
 `forall a. foreach (r :: Columns a) -> Vec a (storedLength r)`.
 An ordinary importing module can write
-`payload r = let vec = cells r in toList vec` at type
-`Columns a -> [a]`. In this case the local binding lets GHC infer the
-index before it checks the call to `toList`. A direct nested
-`toList (cells r)` still requires that inference step.
+`payload r = toList (cells r)` at type `Columns a -> [a]`.
+The selector's receiver supplies both the erased type parameter
+and the vector index.
 The parameterized declaration supports construction and field
 selection. Dependent record update still requires a nullary datatype.
 
