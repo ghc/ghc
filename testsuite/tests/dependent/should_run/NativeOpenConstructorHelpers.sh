@@ -374,3 +374,6 @@ if "${ghc[@]}" -c Proof.hs >reject.log 2>&1 ||
     cat reject.log >&2
     exit 1
 fi
+
+# Observe a known indexed operand through an imported worker.
+bash "$src/NativeOpenIndexedSubst.sh" "$1" "$2"
