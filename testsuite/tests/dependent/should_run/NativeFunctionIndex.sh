@@ -85,6 +85,12 @@ roundTrip _ = Refl
 reflIso :: Iso a a
 reflIso = MkIso identity identity roundTrip roundTrip
 
+preludeRoundTrip :: foreach (x :: a) -> id (id x) :~: x
+preludeRoundTrip _ = Refl
+
+preludeReflIso :: Iso a a
+preludeReflIso = MkIso id id preludeRoundTrip preludeRoundTrip
+
 #ifdef WRONG_ROUND_TRIP
 wrong :: foreach (x :: Bool) -> identity (identity x) :~: True
 wrong _ = Refl
@@ -100,8 +106,12 @@ strict _ = Refl
 #endif
 
 main :: IO ()
-main = case reflIso :: Iso Bool Bool of
-    MkIso to from left right ->
+main = do
+    observe reflIso
+    observe preludeReflIso
+  where
+    observe :: Iso Bool Bool -> IO ()
+    observe (MkIso to from left right) =
         case left False of
             Refl -> case right True of
                 Refl -> print (to False, from True, const True (from (error "forced input")))
@@ -127,7 +137,7 @@ for level in 0 2; do
         identity_cmd=("${g[@]}" "-O$level" -fno-enable-rewrite-rules)
         "${identity_cmd[@]}" -c ReadIsoIdentity.hs
         "${identity_cmd[@]}" ReadIsoIdentity.o ../provider/{BookIsomorphism,IsoIdentity}.o -o identity
-        [[ $(./identity) == '(False,True,True)' ]]
+        printf '(False,True,True)\n(False,True,True)\n' | diff -u - <(./identity)
         if "${identity_cmd[@]}" -fforce-recomp -DWRONG_ROUND_TRIP -c ReadIsoIdentity.hs >wrong-trip.log 2>&1 ||
            ! grep -Fq 'error: [GHC-83865]' wrong-trip.log; then
             cat wrong-trip.log >&2
