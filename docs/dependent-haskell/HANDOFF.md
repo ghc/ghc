@@ -8,6 +8,14 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
+[Public compiler `2e4fbb752a`](https://github.com/Tritlo/ghc/commit/2e4fbb752a2fca6d9d4ac4b7901e2aa07b3c1534)
+also checks PLFH exponentiation, case-based De Bruijn value classification
+and keyed-tree declaration ordering. Job 2433
+checked all 27 patched PLFH modules in four configurations on the exponentiation
+compiler. Of the 29 original reports, 17 compiled at `-O0` and 16 at default
+`-O2`. Jobs 2436–2438 tested the keyed-tree change with both arithmetic fixes.
+[Proofs and scope](CHECKPOINTS.md#exponentiation-and-keyed-trees).
+
 [Compiler `63e2f0974b`](https://github.com/Tritlo/ghc/commit/63e2f0974b174dc86bef79c3a84d1d76fea3dadf)
 checks PLFH's ordinary truncated subtraction. The Induction chapter proves
 that subtracting twice subtracts the sum of the two operands. With both
@@ -40,14 +48,16 @@ records updates from the book author and the compiler team.
 
 - Job 2356 built both stages of `923571c2c8` and passed the 599-output
   Showcase in all modes. Its registration run timed out after reporting
-  GHC-45510 on a GADT field and an independent type index both named
-  `gLength`. Job 2413 confirmed the compatibility regression. Check the
-  repair against the record and the book's false substitution target.
-- For PLFH, check ordinary exponentiation and the retained GADT case in
+  GHC-45510 on an independent index named like the record label `gLength`.
+  Job 2413 confirmed the regression. A candidate restored the record and
+  passed the false substitution target, but job 2445 found that it could
+  silently quantify an applied record selector. Keep this candidate local.
+- Job 2429 builds both stages of `76e67f4fdb` and runs the 42 registrations.
+  For PLFH, check the retained GADT case in
   the De Bruijn progress proof. Default optimization still rejects the append
   equation in `R13_ShuntAccumOpenEq`. Job 2395 did not run because its
   prerequisite required the entire earlier qualification run to pass.
-- Recheck the R21 keyed-tree declaration-order patch in parallel. The three
+- Run the full Showcase on the R21 compiler. The three
   GHC slots share the same 16-core and 64 GB slice. Local benchmark jobs
   pause the GHC queue and freeze its active builds.
 
@@ -212,7 +222,7 @@ Jobs 1947 and 1949 were exploratory allocation measurements.
 Both pilot harnesses are retired. Their prompts, draft code and measurements
 are archived for reference under `_build/reference-only`. Active performance
 work needs independently written benchmarks. OpenCode reviews stopped on 24 November 2026. The coordinator and the
-two compiler owners handle implementation, review and testing.
+three compiler owners handle implementation, review and testing.
 
 The previous 577 compiler was `893d2ebc06`. Its qualified records are
 in `r04-r16-r17-normal-after-574-20261123/published-qualification.tsv`.
@@ -809,7 +819,7 @@ defaults and an opt-in migration warning.
    The earlier WSL restart erased `/tmp` while Git and Pueue retained
    records for its old paths. Keep active builds under `_build/on-demand/`.
 3. Restore the [shared WSL build queue](CHECKPOINTS.md#restore-the-shared-wsl-build-queue)
-   before submitting work. Use at most two subagents. The coordinator
+   before submitting work. Use three subagents for the current assignments. The coordinator
    reviews and integrates their results. Check the live assignments and
    queue before resuming a roadmap card. The group has three slots. All GHC jobs share
    16 logical CPUs, 64,000,000,000 bytes of memory and zero swap.

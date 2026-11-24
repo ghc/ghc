@@ -6,6 +6,35 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Exponentiation and keyed trees
+
+The [ordinary exponentiation fix](https://github.com/Tritlo/ghc/commit/1f873969e589e84b632e5d0304399ab4d2c997e3)
+checks three PLFH laws through compiled Naturals and Induction interfaces.
+For example, the book can state the following law about its own functions.
+
+```haskell
+powPlus :: foreach (m :: Nat) -> foreach (n :: Nat) -> foreach (p :: Nat)
+        -> pow m (plus n p) :~: times (pow m n) (pow m p)
+```
+
+Job 2420 checked all three laws at both optimization levels. A worker that
+changed its carried base published no equation. At runtime, raising an
+undefined base to zero returned one. Job 2433 checked 27 book modules with
+the preservation and subtraction patches in four configurations. Of 29 original
+reports, 17 compiled at `-O0` and 16 at default `-O2`.
+
+The [R21 fix](https://github.com/Tritlo/ghc/commit/3c380131aec0954c2a2cae17abeea46fb0ab40ca)
+checks `nodes (mapValues f t) :~: nodes t` for a tree with independent key
+and value types. Jobs 2436–2438 tested four declaration and splice
+arrangements at both optimization levels and an independent proof through
+interfaces. Crossed key types and a wrong branch count still failed.
+The combined compiler passed the PLFH subtraction and exponentiation checks.
+
+Job 2441 checked the [De Bruijn value-classification change](https://github.com/Tritlo/ghc/commit/2e4fbb752a2fca6d9d4ac4b7901e2aa07b3c1534)
+on the exponentiation build. An ordinary client checked the chapter's value
+classifier at both optimization levels and observed that inspecting a lambda
+leaves its body unevaluated. The separate equation-form example remains open.
+
 ## Truncated subtraction in the Induction chapter
 
 The [published compiler](https://github.com/Tritlo/ghc/commit/63e2f0974b174dc86bef79c3a84d1d76fea3dadf)

@@ -4,6 +4,12 @@ The PLFH author and the GHC compiler team use this file to exchange working proo
 
 Append a dated entry with the author, chapter and theorem. For a blocker, include the smallest source path, compiler commit, command, expected result and actual diagnostic with its source location. Record a Serokell card when the connection is known. The compiler team replies under that entry with a reproducer, fix or explanation. The PLFH author reruns the original example and records the outcome. Read new entries when resuming work and after each batch. Keep previous failures visible when a fix lands.
 
+## 2026-11-24 04:27 CET · Exponentiation and the De Bruijn value case
+
+The [exponentiation fix](https://github.com/Tritlo/ghc/commit/1f873969e589e84b632e5d0304399ab4d2c997e3) checks ordinary `pow` from Naturals. Job 2420 checked `powPlus`, `powMul` and `powTimes` through compiled interfaces at both optimization levels. The proofs are in `_build/on-demand/r13-pow-open-eq-20261124/inputs/PowLaws.hs` on this host. Job 2433 passed all 27 patched modules in four configurations. Of 29 reports, 17 compiled at `-O0` and 16 at default `-O2`.
+
+The [De Bruijn fix](https://github.com/Tritlo/ghc/commit/2e4fbb752a2fca6d9d4ac4b7901e2aa07b3c1534) checks the case-based value classification over the chapter's actual term constructors. This is one prerequisite of progress. Job 2441 checked the chapter proof and its source-hidden client at both optimization levels. The separate direct-equation example remains open. [Verification record](docs/dependent-haskell/CHECKPOINTS.md#exponentiation-and-keyed-trees).
+
 ## 2026-11-24 04:15 CET · Published compiler for the PLFH Induction exercises
 
 The [subtraction fix and regression](https://github.com/Tritlo/ghc/commit/63e2f0974b174dc86bef79c3a84d1d76fea3dadf) are on `dependent-haskell`. The unchanged `R13_MonusOpenEq` compiles. Induction can prove `zeroMonus` and `monusPlusAssoc` with ordinary `monus` from Naturals. Its clause order still determines which operand is forced.
