@@ -2,9 +2,9 @@
 {-# LANGUAGE DataKinds, ExplicitNamespaces, ExperimentalDependentTypes, GADTs, Modifiers, TypeOperators #-}
 
 -- | Peano naturals and their arithmetic laws.
-module HaskLib.Nat (Nat(..), eqSize, eqSizeRefl, plus, type (+), plusZero, plusSucc, congSucc, congFirst) where
+module HaskLib.Nat (Nat(..), eqSize, eqSizeRefl, plus, type (+), plusZero, plusSucc, plusComm, congSucc, congFirst) where
 
-import Data.Type.Equality ((:~:)(Refl))
+import Data.Type.Equality ((:~:)(Refl), trans)
 import GHC.Exts (U)
 import PreludeMapLengthSize (Nat(..), eqSize, plus)
 
@@ -22,6 +22,11 @@ plusSucc :: foreach (m :: Nat) -> foreach (n :: Nat)
          -> plus m ('Succ n) :~: 'Succ (plus m n)
 plusSucc Zero _ = Refl
 plusSucc (Succ m) n = congSucc (plusSucc m n)
+
+-- | Adding two naturals gives the same result in either order.
+plusComm :: foreach (m :: Nat) -> foreach (n :: Nat) -> plus m n :~: plus n m
+plusComm m Zero     = plusZero m
+plusComm m (Succ k) = plusSucc m k `trans` congSucc (plusComm m k)
 
 -- | Equal naturals have equal successors.
 congSucc :: m :~: n -> 'Succ m :~: 'Succ n
