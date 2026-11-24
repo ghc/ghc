@@ -8,18 +8,17 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
-Both stages built from `d15cbd41fe`. All 588 Showcase observations
-matched at native `-O0`, default `-O2` and in GHCi. An ordinary client
-can compare two records' stored lengths, keep the letters from one
-record and copy the matching flags from the other.
-[Source and results](CHECKPOINTS.md#copy-one-field-between-records-after-comparing-their-lengths).
+Both stages built from `1a02a866e7`. A caller can prove equality of two
+schema transformers before supplying any rows. A closed validation schema
+checks with `NoUndecidableInstances`. All 590 Showcase observations
+matched at native `-O0`, default `-O2` and in GHCi.
+[Source and verification](CHECKPOINTS.md#compare-schema-transformers-before-supplying-the-rows).
 
-Job 2027 passed all 20 selected registrations, four upgrade checks, both
-package checks and 234 compatibility cases. The focused suite passed
-137 of 138. The remaining failure was the existing `MTrans` diagnostic.
-Job 2125 passed the fusion regression from the published branch on the
-same compiler. Run `verify-publication.py` in
-`_build/on-demand/r04-r16-r17-post-585-20261123` to check the receipts.
+Job 2080 passed all 20 selected registrations, four upgrade checks,
+map-fusion and package checks, and all 234 compatibility cases. The
+focused suite passed 137 of 138. The remaining failure was the known
+`MTrans` diagnostic. The verification script is in
+`_build/on-demand/r17-schema-transformer-post-588-20261124`.
 
 ## Next compiler work
 
@@ -27,18 +26,9 @@ Read [PLFH-NOTES.md](../../PLFH-NOTES.md) on resuming work and after each
 compiler batch. Reply with the compiler revision and the result of running
 the PLFH author's example.
 
-PLFH can continue using the pinned 585 compiler while its author compares
-the yardstick with newer compilers.
-
-The next R17 candidate is `1a02a866e7` at
-`refs/spikes/r17-schema-transformer-590`. Job 2055 checked equality of
-two schema transformers before the caller supplied any rows. Job 2074
-checked the closed cell schema with `NoUndecidableInstances`. Its
-ordinary interface-only client printed `((),Right 42)` at `-O0` and
-`-O2`. Job 2080 built both stages at `1a02a866e7`. Its remaining
-checks include all 590 Showcase observations, fusion and compatibility.
-Its source is in
-`_build/on-demand/r17-schema-transformer-post-588-20261124/source`.
+The book's current baseline is the 588 compiler at `d15cbd41fe`.
+Job 2236 confirmed the same 23 failures on the 590 compiler at
+`1a02a866e7`. Both results apply to PLFH revision `d0e4fa73df`.
 
 The next combined compiler is `984647892b`. Job 2209 follows job 2080.
 It builds both stages and checks 594 Showcase observations, 24 selected

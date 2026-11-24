@@ -3223,7 +3223,7 @@ checkTyFamEqnWithSelectors selectors fam_tc typats rhs
        ; undecidable_ok <- xoptM LangExt.UndecidableInstances
        ; traceTc "checkVTFE" (ppr fam_tc $$ ppr rhs $$ ppr (tcTyFamInsts rhs))
        ; unless undecidable_ok $
-         mapM_ addErrTc (checkFamInstRhs selectors fam_tc typats (tcTyFamInsts rhs)) }
+         mapM_ addErrTc (checkFamInstRhs selectors fam_tc typats rhs) }
 
 -- | Check the family domains in an equation under its owning class.
 -- See Note [Class evidence in associated family equations].
@@ -3337,7 +3337,7 @@ checkValidAssocTyFamDeflt fam_tc pats =
 
 checkFamInstRhs :: NameEnv [TyFamEqnValidityInfo] -- original rows of generated cases
                 -> TyCon -> [Type]         -- LHS
-                -> [(TyCon, [Type])]       -- type family calls in RHS
+                -> Type                    -- RHS
                 -> [TcRnMessage]
 -- Ensure that the type family instance terminates. Specifically:
 -- ensure that each type family application in the RHS is
@@ -3347,8 +3347,8 @@ checkFamInstRhs :: NameEnv [TyFamEqnValidityInfo] -- original rows of generated 
 --          - strictly smaller than the lhs,
 --          - mentions no type variable more often than the lhs, and
 --          - does not contain any further type family applications
-checkFamInstRhs selectors lhs_tc lhs_tys famInsts
-  = concatMap check famInsts
+checkFamInstRhs selectors lhs_tc lhs_tys rhs
+  = concatMap check (tcTyFamInsts rhs)
   where
    lhs_size = pSizeTypes lhs_tys
    check (tc, tys)
@@ -3356,7 +3356,8 @@ checkFamInstRhs selectors lhs_tc lhs_tys famInsts
       , Just pc_failure <- pSizeTypes tys `ltPatersonSize` lhs_size  -- (TF2)
       = case case_calls tc tys of
           Just errors -> errors
-          Nothing | forwards_payload pc_failure tc tys -> []
+          Nothing | forwards_payload pc_failure tc tys
+                 || forwards_lambda pc_failure tc tys -> []
           Nothing -> [TcRnPatersonCondFailure pc_failure InTyFamEquation
                         (TyConApp lhs_tc lhs_tys) (TyConApp tc tys)]
       | otherwise
@@ -3387,7 +3388,21 @@ checkFamInstRhs selectors lhs_tc lhs_tys famInsts
    constructor_row VI{vi_rhs = rhs} = isConstructorCaseType rhs
    constructor_row _ = False
 
-   check_branch (lhs, rhs) = checkFamInstRhs emptyNameEnv lhs_tc lhs (tcTyFamInsts rhs)
+   check_branch (lhs, refined_rhs) = checkFamInstRhs emptyNameEnv lhs_tc lhs refined_rhs
+
+   -- See Note [Termination of a forwarding type lambda].
+   forwards_lambda PCF_Size tc tys
+      | Just (root, False) <- closedFamilyScope_maybe lhs_tc
+      , root == tyConName lhs_tc
+      , all isTyVarTy lhs_tys
+      , TyConApp target args <- coreFullView rhs
+      , target == tc, eqTypes args tys
+      , lengthIs tys (tyConArity tc), eqTypes lhs_tys tys
+      , Nothing <- closedFamilyScope_maybe tc
+      , Just ax <- closedFamilyTyConCoAxiom_maybe tc
+      = all (isConstructorCaseType . coAxBranchRHS)
+            (fromBranches (coAxiomBranches ax))
+   forwards_lambda _ _ _ = False
 
    forwards_payload PCF_Size tc tys
       | Just (root, True) <- closedFamilyScope_maybe lhs_tc
@@ -3467,6 +3482,22 @@ isCaseSelectorType check_selector = go
       not (isTypeSynonymTyCon tc) &&
       (not (isFamilyTyCon tc) || check_selector tc args) && all go args
     go _ = False
+
+{- Note [Termination of a forwarding type lambda]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The lambda in 'type Stamped tag = \cell -> Stamp tag cell' produces
+an equation that passes its complete variable telescope to Stamp. Its
+synthetic family fails the size test even if Stamp is a closed family
+that only builds constructor types.
+
+Permit this one size-neutral edge when the saturated target is a named
+closed family and its checked branches satisfy isConstructorCaseType.
+Those branches cannot introduce a call to another family or apply a
+captured callback. A fresh generated name alone does not establish this.
+The source can refer to the surrounding synonym from a target equation.
+An open family can also gain equations in another module. Leave the
+standard checks in place for these cases and for other calls.
+-}
 
 {- Note [Termination of lifted sum payloads]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

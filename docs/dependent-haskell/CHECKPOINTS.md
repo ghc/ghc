@@ -6,6 +6,30 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Compare schema transformers before supplying the rows
+
+```haskell
+forwardSchemaTransformer :: forall (e :: Type). Proxy e
+                         -> Map (Prefixes ('Just e))
+                            :~: Map (\cells -> Prefixes ('Just e) cells)
+forwardSchemaTransformer _ = Refl
+```
+
+A caller can use the equality while the column groups are still unknown.
+The compiler compares the named and lambda callbacks at their function
+kind. A second example defines `type Validate err = \cell -> CheckCell err cell`.
+The closed family has no recursive call. The declaration checks with
+`NoUndecidableInstances`. [Schema transformer](examples/open-evaluation/TypeLambdaSchema.hs)
+and [closed validation family](examples/open-evaluation/CellValidation.hs).
+
+Both compiler stages built from `1a02a866e7`. Job 2080 checked all
+590 Showcase observations at native `-O0`, default `-O2` and in GHCi.
+The 20 selected registrations, four upgrade checks, map-fusion checks and
+both package checks passed. Both compatibility and focused results are
+recorded by `verify-publication.py` in
+`_build/on-demand/r17-schema-transformer-post-588-20261124`.
+The R17 roadmap card remains partial.
+
 ## Copy one field between records after comparing their lengths
 
 ```haskell

@@ -11,6 +11,9 @@ import NativeTypeLambdaEtaLib
 #if defined(WRONG_CAPTURE)
 bad :: (Stamp Bool) :~: (\cell -> Stamp Int cell)
 bad = Refl
+#elif defined(WRONG_SPINE_CAPTURE)
+bad :: Stage (Stamp Int) :~: Stage (\cell -> Stamp Char cell)
+bad = Refl
 #elif defined(REORDERED)
 bad :: (Stamp Int) :~: (\cell -> Stamp cell Int)
 bad = Refl

@@ -12,6 +12,44 @@ mkdir eta-results
 cd eta-results
 result=$PWD/results.tsv
 
+if [[ "$mode" == candidate ]]; then
+    mkdir termination
+    (
+        cd termination
+        cat >ForwardTermination.hs <<'HS'
+{-# LANGUAGE CPP, ExperimentalDependentTypes, Modifiers, NoUndecidableInstances #-}
+{-# LANGUAGE StandaloneKindSignatures, TypeFamilies #-}
+module ForwardTermination where
+
+import Data.Kind (Type)
+import GHC.Matchability (U)
+
+#ifdef CALLABLE
+type Apply :: (Type %U -> Type) %U -> Type %U -> Type
+type family Apply f cell where
+  Apply f cell = f cell
+type Applied f = \cell -> Apply f cell
+#else
+type Stamped tag = \cell -> Stamp tag cell
+type family Stamp tag cell where
+#ifdef CAPTURED
+  Stamp tag cell = Stamped tag cell
+#else
+  Stamp tag cell = Either tag cell
+#endif
+#endif
+HS
+        "${run[@]}" -c ForwardTermination.hs
+        for reject in CALLABLE CAPTURED; do
+            if "${run[@]}" -fforce-recomp "-D$reject" -c ForwardTermination.hs >"$reject.log" 2>&1 ||
+               ! grep -Fq 'error: [GHC-22979]' "$reject.log"; then
+                cat "$reject.log" >&2
+                exit 1
+            fi
+        done
+    )
+fi
+
 for opt in O0 O2; do
     mkdir "$opt"
     (
@@ -51,28 +89,36 @@ module Main where
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
-import NativeTypeLambdaEta (reverseMap, visible)
+import NativeTypeLambdaEta (overRoute, partialStage, reverseMap, routed, visible)
 
 fromImportedProof :: forall (xs :: [Type]). Proxy xs -> Int
 fromImportedProof witness =
   case reverseMap @Int @xs witness of
     Refl -> visible
 
+fromRoute :: forall (flag :: Bool). Proxy flag -> (Int, Int)
+fromRoute _ =
+  case partialStage @Int Proxy of
+    Refl -> case overRoute @Int @flag Proxy of
+      Refl -> (fromImportedProof (Proxy @'[Bool]), routed)
+
 main :: IO ()
-main = print (fromImportedProof (Proxy @'[Bool]))
+main = print (fromRoute (Proxy @'True))
 HS
                 test ! -e NativeTypeLambdaEta.hs
                 "${run[@]}" "-$opt" -ddump-inlinings -dsuppress-uniques -c Main.hs >reader.log 2>&1
                 if [[ "$opt" == O2 ]]; then
-                    grep -Eq 'Inlining done: (NativeTypeLambdaEta\.)?reverseMap' reader.log
+                    for proof in reverseMap partialStage overRoute; do
+                        grep -Eq "Inlining done: (NativeTypeLambdaEta\.)?$proof" reader.log
+                    done
                 fi
                 "${run[@]}" "-$opt" Main.o NativeTypeLambdaEta.o NativeTypeLambdaEtaLib.o -o eta
-                printf '42\n' | cmp - <(./eta)
+                printf '(42,42)\n' | cmp - <(./eta)
             )
         fi
 
         cp "$root/NativeTypeLambdaEtaReject.hs" .
-        for reject in WRONG_CAPTURE REORDERED CONSTANT INVERSE MATCHABLE FALLBACK; do
+        for reject in WRONG_CAPTURE WRONG_SPINE_CAPTURE REORDERED CONSTANT INVERSE MATCHABLE FALLBACK; do
             status=0
             "${run[@]}" "-$opt" "-D$reject" -c NativeTypeLambdaEtaReject.hs >"$reject.log" 2>&1 || status=$?
             printf '%s\t%s\t%s\n' "$opt" "$reject" "$status" >>"$result"

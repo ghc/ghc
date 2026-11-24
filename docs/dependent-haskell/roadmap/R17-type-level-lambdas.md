@@ -220,9 +220,42 @@ lambda parameter. The named family's equations stay opaque. Thus
 constant lambda `\cell -> tag` still cannot, even if `Discard` returns
 `tag` for every argument. The constructor synonym `WithError` above
 also remains a separate case.
-The example enables `UndecidableInstances` because the generated family
-calls `Stamp` with arguments the same size as its own.
+The example enables `UndecidableInstances` because `Stamp` is open and
+the generated family calls it with arguments the same size as its own.
+An exact forwarding lambda can omit that extension when every equation
+of the closed target only builds types from constructors, variables
+and literals.
+
+```haskell
+type family Stamp tag cell where
+  Stamp tag cell = Either tag cell
+
+type Stamped tag = \cell -> Stamp tag cell
+```
+
+A recursive target and a target that applies a captured callback still
+use the ordinary termination check. For an open target, an ordinary
+parameterized synonym `type Stamped tag cell = Stamp tag cell` works
+without the extension. In the Showcase, the closed `CheckCell` family
+leaves an empty cell at `()` and validates an `Int` cell as
+`Either String Int`. The client can supply the error type before it
+knows the cell type.
+[Cell schema and termination references](../REFERENCES.md#termination-of-a-forwarding-type-lambda).
 [Forwarding regression](../../../testsuite/tests/dependent/should_run/NativeTypeLambdaEta.hs).
+
+The same conversion applies to a captured callback in a partially
+applied family. Here `Stage` still needs its cell argument.
+
+```haskell
+throughStage :: forall tag. Ticket (Stage (Stamp tag)) -> Int
+throughStage ticket = choose @(Stage (\cell -> Stamp tag cell)) ticket
+```
+
+A family can also return a callback. The check can compare
+`Route (Stamp tag) flag Bool` with the forwarding form when `flag`
+is unknown. Both types have the same family head and the same
+arguments after the callback. The compiler can prove their equality
+without selecting a family equation.
 
 At `-O0` and `-O2`, the source-hidden reader prints `42`. The optimized
 reader also inlines the imported equality proof. Interfaces that contain

@@ -473,6 +473,8 @@ compare two column readers before choosing the cell type: Refl
 partially apply a two-argument type lambda: Refl
 map a callback that captures a closed family pattern: (Refl,Refl)
 forward a list of column groups to the named error schema: Refl
+compare schema transformers before choosing any column groups: Refl
+assign validation types to empty and populated cells: ((),Right 42)
 capture a type before and after a local let: Refl
 give every field in a row the same error type: (Right 'x',Right True)
 map row cells with a lambda in a local signature: (Right 'x',Right True)
