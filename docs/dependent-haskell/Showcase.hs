@@ -317,6 +317,12 @@ zeroMonus :: foreach (n :: HaskLib.Nat) -> BookNaturals.monus 'HaskLib.Zero n :~
 zeroMonus HaskLib.Zero     = Refl
 zeroMonus (HaskLib.Succ _) = Refl
 
+-- | Raising the exponent by one multiplies by the same base.
+powSuccessor :: foreach (m :: HaskLib.Nat) -> foreach (n :: HaskLib.Nat)
+             -> BookNaturals.pow m ('HaskLib.Succ n)
+                :~: BookNaturals.times m (BookNaturals.pow m n)
+powSuccessor _ _ = Refl
+
 -- | Return the measurement and certify that reversal preserves it.
 measureReverseLength :: forall a. foreach (measure :: [a] -> HaskLib.Size)
                      -> foreach (xs :: [a])
@@ -1969,6 +1975,8 @@ main = do
         (Book.downFrom count, Book.lengthDownFrom count)
     observe "subtract a runtime natural from zero"
         (BookNaturals.monus 0 count, zeroMonus count)
+    observe "raise three to the fourth power and prove the successor equation"
+        (HaskLib.eqSize (BookNaturals.pow count 4) 81, powSuccessor count 3)
     let arrow = Book.Arrow Book.Bottom (error "forced the arrow output")
     observe "take the domain of a join of function values"
         (Book.dom (Book.Join arrow Book.Bottom), Book.domJoin arrow Book.Bottom)

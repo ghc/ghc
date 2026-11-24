@@ -43,6 +43,32 @@ plan](PLAN.md) for scope, decisions, and acceptance criteria. The first experime
 extends Core from Eisenberg's historical branch. The singleton translation remains
 a comparison implementation. External solvers remain later work.
 
+## PLFH arithmetic, dependent patterns and callback inference
+
+- **Exponentiation.** PLFA Naturals defines exponentiation by recursion on the
+  exponent and asks the reader to compute three to the fourth power. PLFH
+  Induction proves laws about that ordinary function. The Showcase checks the
+  successor equation for two unknown naturals. Its provider enables
+  `ExperimentalDependentTypes` to export the equations for `times` and `pow`.
+  [Agda Naturals](https://plfa.github.io/Naturals/),
+  [PLFH Induction](https://github.com/Tritlo/PLFH/blob/49903d04bdde2b140a763c16cca23768a9f8dd08/content/part1/Induction.md).
+- **Dependent patterns.** PLFA DeBruijn defines progress by matching a
+  closed, intrinsically typed term. The fork checks the value-classification
+  part in a Haskell `case` and in function equations using the GADT constructor's
+  equality evidence. A Haskell guard can fall through to the next equation.
+  Inspecting a lambda leaves its body unevaluated.
+  [Agda progress](https://plfa.github.io/DeBruijn/#progress),
+  [PLFH DeBruijn](https://github.com/Tritlo/PLFH/blob/49903d04bdde2b140a763c16cca23768a9f8dd08/content/part2/DeBruijn.md).
+- **Callback inference.** Agda can infer implicit arguments from the
+  signature of a partially applied function. In `lengthMapLaw = lengthMap`,
+  GHC already infers the callback's input and output types. The fix reads those
+  assignments before comparing the dependent types of the proof. Proposal
+  287 explains how inserting a runtime lambda can change `seq`. Forcing an
+  alias of a bottom-valued proof must still raise the original exception.
+  [Agda implicit arguments](https://agda.readthedocs.io/en/latest/language/implicit-arguments.html),
+  [GHC proposal 287](https://ghc-proposals.readthedocs.io/en/latest/proposals/0287-simplify-subsumption.html),
+  [PLFH alias](https://github.com/Tritlo/PLFH/blob/49903d04bdde2b140a763c16cca23768a9f8dd08/reproducers/R04_EtaAliasForEachFunctionBinder.hs).
+
 ## References by roadmap feature
 
 For a design question, search the GHC proposals, including open and

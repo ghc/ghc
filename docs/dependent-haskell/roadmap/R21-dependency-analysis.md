@@ -485,6 +485,15 @@ and [proposal #378 on lexical scoping](https://ghc-proposals.readthedocs.io/en/l
 
 ### A tree with two type parameters
 
+[Compiler `3c380131ae`](https://github.com/Tritlo/ghc/commit/3c380131aec0954c2a2cae17abeea46fb0ab40ca)
+checks the proof below in one declaration group and through a compiled
+interface. The test maps leaf values and preserves branch keys. PLFA's
+tree-map exercise also permits a function that maps branch values. Jobs
+2436–2438 covered declaration and splice order, crossed key types and
+a false branch count. Job 2444 passed all 600 Showcase outputs. The
+general R21 card remains open. [PLFA tree map](https://plfa.github.io/Lists/).
+
+
 Job 1271 repeated the comparison on normal 555 with a tree of kind
 `Type -> Type -> Type`. Its mapper preserves a branch key and changes
 the leaf payload. At both `-O0` and `-O2`, the ordinary workers compiled.
