@@ -8,7 +8,7 @@ ghc=("$1" "-B$2" -v0 -package-env - -i -i. -dcore-lint -dstg-lint -fdiagnostics-
 
 cat >"$work/Tree.hs" <<'HS'
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
-module Tree (Tree(..), focus, known) where
+module Tree (Tree(..), focus, known, pairRoundTrip) where
 
 import Data.Type.Equality ((:~:)(Refl))
 
@@ -37,8 +37,11 @@ swapPair :: (a, b) -> (b, a)
 swapPair (x, y) = (y, x)
 
 pairRoundTrip :: foreach (p :: (a, b)) -> swapPair (swapPair p) :~: p
-pairRoundTrip p = case p of
-    (,) _ _ -> Refl
+pairRoundTrip (x, y) = Refl
+
+pairRoundTripCase :: foreach (p :: (a, b)) -> swapPair (swapPair p) :~: p
+pairRoundTripCase p = case p of
+    (_, _) -> Refl
 
 -- Keep the existing open-evaluator route for a local projection.
 first :: (a, b) -> a
@@ -63,7 +66,9 @@ wrong _ = Refl
 #endif
 
 main :: IO ()
-main = case open (Arrow Empty Other) of Refl -> putStrLn "Refl"
+main = case open (Arrow Empty Other) of
+    Refl -> case pairRoundTrip (False, EQ) of
+        Refl -> putStrLn "Refl"
 HS
 
 for opt in -O0 -O2; do
