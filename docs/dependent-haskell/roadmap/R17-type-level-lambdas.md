@@ -494,6 +494,28 @@ subject to the ordinary checks at the splice site.
 [Sheard and Peyton Jones, Template Meta-programming for Haskell, §5](https://doi.org/10.1145/636517.636528).
 
 
+## Type lambdas in typed expression quotations
+
+A typed quote can choose a callback in a visible argument.
+
+```haskell
+after :: Code Q (Either Char Int)
+after = [|| atInt @((\err cell -> Either err cell) Char) Proxy (Left 'x') ||]
+```
+
+`atInt` takes a callback of kind `Type %U -> Type`. The quote checks
+that kind in the producer. GHC lifts the lambda to a private type
+declaration, and the typed splice resolves its name from the
+producer's interface. The consuming module can use `$$(after)`
+without the producer's source or `ExperimentalDependentTypes`.
+An expression annotation inside the quote can also use an inline
+lambda. Typed quotes evaluated during an untyped splice still require
+a named callback because the surrounding declarations have yet to be
+checked.
+
+[External-interpreter regression](../../../testsuite/tests/dependent/should_run/NativeTypeLambdaTypedQuote.sh)
+and [Template Haskell levels and stages](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/template_haskell.html#levels-and-stages).
+
 ## Prior art
 
 Agda uses ordinary lambda syntax and accepts unannotated binders when
