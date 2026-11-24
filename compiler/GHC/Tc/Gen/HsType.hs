@@ -4034,9 +4034,14 @@ tcPlanClosedTree mode ordinary hint root arguments = do
           eligible <- if closedConstructorLiteral arg
                         then pure True
                         else closedConstructorAlias arg
-          unless eligible $
-            failWithTc (TcRnClosedTypeEval name
-              "Each constructor field must be a closed literal. This operand contains an open or unsupported field.")
+          unless eligible $ do
+            let reason
+                  | L _ (HsTyVar _ NotPromoted (L _ (WithUserRdr _ var))) <- ignoreParens arg
+                  , isTyVarName var
+                  = "This argument is a type variable. Closed evaluation requires a known value."
+                  | otherwise
+                  = "Each constructor field must be a closed literal. This operand contains an open or unsupported field."
+            failWithTc (TcRnClosedTypeEval name reason)
           unless (bare_empty arg) $
             forM_ (closedCallLiteralKind arg) $ \actual -> do
               -- Keep the closed-call diagnostic for direct operands.

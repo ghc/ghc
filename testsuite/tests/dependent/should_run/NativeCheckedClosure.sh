@@ -34,6 +34,14 @@ for opt in -O0 -O2; do
 
     cd "$work/$opt/withheld"
     cp "$inputs/NativeCheckedClosureProvider.hs" .
+    "${ghc[@]}" "$opt" -fno-write-source-equations -fomit-interface-pragmas -c NativeCheckedClosureProvider.hs
+    cp "$inputs/NativeCheckedClosure.hs" .
+    if "${ghc[@]}" "$opt" -fno-code -c NativeCheckedClosure.hs >open.log 2>&1; then
+        exit 1
+    fi
+    grep -Fq '[GHC-70565]' open.log
+    grep -Fq 'This argument is a type variable. Closed evaluation requires a known value.' open.log
+
     for variant in STRICT_CAPTURE HIDE_LOOP; do
         "${ghc[@]}" "$opt" -fwrite-source-equations -fexpose-all-unfoldings \
             -fforce-recomp "-D$variant" -c NativeCheckedClosureProvider.hs
