@@ -3226,10 +3226,12 @@ tc_app_ty_external mode rn_ty exp_kind
                          , all isOpenTypeOperand args
                          -> do { result <- tcOpenTypeCall mode name instantiated result_kind (zip args domains)
                                ; checkExpKind mode rn_ty result result_kind exp_kind }
-                         | ordinary_call, lengthIs args 2
+                         | ordinary_call
                          , all (\arg -> known_constructor arg || isOpenTypeOperand arg) args
                          , any known_constructor args, any open_indexed_operand args
                          , Just telescope <- indexedOpenTypeFunction fun
+                         , let (_, inputs, _) = telescope
+                         , equalLength inputs args
                          -> do { observed <- tcIndexedOpenTypeCall mode fun telescope args
                                ; case observed of
                                    Just (result, result_kind) ->
@@ -3522,7 +3524,7 @@ tcOpenTypeCall mode name instantiated result_kind args = do
       checked <- if local then solveEqualities "tcOpenTypeCall operand" check else check
       liftZonkM (zonkTcType checked)
 
--- | Find the erased telescope of a binary indexed source call with ordinary arrows.
+-- | Find the erased telescope of a unary or binary indexed source call with ordinary arrows.
 -- See Note [Known indexed operands in source calls].
 indexedOpenTypeFunction :: Id -> Maybe ([TyVar], [Kind], Kind)
 indexedOpenTypeFunction fun = do
@@ -3531,7 +3533,8 @@ indexedOpenTypeFunction fun = do
         domains = map scaledThing arrows
     tvs <- traverse namedPiTyBinder_maybe binders
     guard (all isTyVar tvs && any (not . isLiftedTypeKind . varType) tvs &&
-           lengthIs domains 2 && rho `tcEqType` foldr mkVisFunTyManyU result domains)
+           (lengthIs domains 1 || lengthIs domains 2) &&
+           rho `tcEqType` foldr mkVisFunTyManyU result domains)
     guard (any indexed_domain domains)
     pure (tvs, domains, result)
   where
@@ -3572,7 +3575,7 @@ tcIndexedOpenTypeCall mode fun (tvs, domains, result) args = do
 The ordinary open observer instantiates its universals at Type. This
 does not work for a term indexed by a syntax type or context. Use the
 actual checked operand kinds to instantiate the invisible telescope of
-a binary indexed function.
+a unary or binary indexed function.
 
 Require a known constructor and a symbolic operand. The existing
 closed path still owns fully closed calls. If this observer cannot represent
