@@ -2130,7 +2130,7 @@ lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt 
     ; lintBinders CasePatBind ordinary_args $ do
       { rhs_ue <- case native_proof of
           Nothing -> lintAltExpr rhs alt_ty
-          Just cv | Just index <- scrut_index, isNativeCaseValueIndex index
+          Just cv | Just index <- scrut_index, isNativeIndexedCaseScrutinee con index
                   , Just constructor <- nativeIndexedCon_maybe scrut_ty con ordinary_args ->
             do { lintL (isLocalId cv && isCoVar cv
                         && all (not . (`elemInScopeSet` in_scope)) args

@@ -37,7 +37,7 @@ module GHC.Core (
         exprToNativeIndex, normaliseNativeIndexExpr, mapNativeIndex, mapNativeIndexWithNatural,
         nativeSourceCallIndex, nativeComputedIndex, retainedArgIndex, nativeDeferredArgIndex,
         exprToNativeCaseIndex, exprToPreparedNativeCaseIndex,
-        isNativeCaseValueIndex, isNativeIndexedCaseScrutinee,
+        isNativeIndexedCaseScrutinee,
         termVar_maybe, nativeIndexFunctionVar_maybe, nativeIndexFunctionArgIndex,
         nativeLocalFunctionArgIndex, nativeIndexArgKinds,
         nativeClassSelectorTys, nativeClassSelectorIndex, nativeIndexedConArgs,
@@ -48,7 +48,7 @@ module GHC.Core (
         containsRetainedNaturalLiteral, isBoxedBigNaturalLiteral,
         isNativeIndexAlt, isNativeIndexDataAlt, isNativeIndexAliasAlt, isNativeIndexAliasBinder,
         isNativeIndexedDataAlt, splitNativeIndexedDataAlt, isNativeIndexedGadtCon,
-        isNativeIndexedOrdinaryCon, isNativeIndexedDiagonalCon,
+        isNativeIndexedOrdinaryCon, isNativeOpaqueOrdinaryCon, isNativeIndexedDiagonalCon,
         splitNativeIndexedPatternEvidence, nativeIndexedCon_maybe,
 
         mkBinds,
@@ -2971,8 +2971,10 @@ isNativeCaseValueIndex (CastTy ty _) = isNativeCaseValueIndex ty
 isNativeCaseValueIndex index = isNativeConstructedGadtIndex index
 
 -- | Check the index of the actual scrutinee of a GADT alternative.
-isNativeIndexedCaseScrutinee :: Type -> Bool
-isNativeIndexedCaseScrutinee = isNativeCaseValueIndex
+isNativeIndexedCaseScrutinee :: DataCon -> Type -> Bool
+isNativeIndexedCaseScrutinee con index
+  = isNativeCaseValueIndex index
+    || (isNativeOpaqueOrdinaryCon con && isNativeIndexType (typeKind index))
 
 -- | Return a supported runtime normal form together with its native index.
 -- The caller must check the original expression's typing and scope with Lint.
@@ -3630,6 +3632,18 @@ isNativeIndexedOrdinaryCon con
   | (_, [], [], [], _, _) <- dataConFullSig con = isNativeIndexedGadtCon con
   | otherwise = False
 
+-- | Check whether an ordinary constructor needs opaque branch evidence.
+-- See Note [Native indexed branch evidence].
+isNativeOpaqueOrdinaryCon :: DataCon -> Bool
+isNativeOpaqueOrdinaryCon con
+  = isVanillaAlgTyCon tc && isBoxedDataTyCon tc && not (isTypeDataTyCon tc)
+    && all plain (tyConDataCons tc)
+    && not (isNativeIndexType (mkTyConApp tc (mkTyVarTys (tyConTyVars tc))))
+  where
+    tc = dataConTyCon con
+    plain dc = isVanillaDataCon dc && null (dataConRepArgBinders dc)
+               && isNothing (dataConWrapId_maybe dc)
+
 -- | Separate the ordinary GADT equalities from the virtual branch proof.
 -- See Note [Native indexed branch evidence].
 splitNativeIndexedPatternEvidence :: DataCon -> [Var] -> Maybe ([Var], Var)
@@ -3700,7 +3714,9 @@ nativeIndexedGadtSpecs_maybe = eligible True
       , all (not . isBanged) (dataConImplBangs con)
       , case specs of
           [] -> not (null exs)
-                || (allow_ordinary && any supports_ordinary_sibling (tyConDataCons tc))
+                || (allow_ordinary &&
+                    (any supports_ordinary_sibling (tyConDataCons tc) ||
+                     isNativeOpaqueOrdinaryCon con))
           [spec] -> not (null fields) || not (null exs) || noFreeVarsOfType (eqSpecType spec)
                     || isNativeIndexedDiagonalCon con
           _ -> False
@@ -3762,6 +3778,19 @@ existential arguments. Its branch still identifies the retained scrutinee
 with Mu applied to the actual field. The kind conversion is reflexive.
 Use the indexed representation for these mixed alternatives. Keep this
 case disjoint from isNativeIndexDataAlt, which serves structural domains.
+
+A datatype with a nonuniform recursive field can lack a structural
+schema even when every constructor has an ordinary result. For example,
+ULam :: UTerm (S n) -> UTerm n changes the field's parameter. Use the
+indexed representation with an empty equality telescope. Instantiate the
+field types at the scrutinee's parameters and check the exact field Ids.
+The kind conversion is reflexive. Select this representation from the
+declaration at its abstract parameters. A concrete instance can still
+have a structural schema, as in Swap Bool Bool for a field Swap b a.
+Accept an older structural proof tag at such an instance only after
+checking the instantiated schema. Restrict the new path to ordinary
+constructors without wrappers. Their
+fields have the boxed representation of the declared field types.
 
 Agda's indexed constructor split refines the indices and binds the
 constructor fields in the branch context. See
