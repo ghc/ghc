@@ -3701,9 +3701,15 @@ nativeIndexedGadtSpecs_maybe = eligible True
           [] -> not (null exs)
                 || (allow_ordinary && any (isJust . eligible False) (tyConDataCons tc))
           [spec] -> not (null fields) || not (null exs) || noFreeVarsOfType (eqSpecType spec)
+                    || diagonal con spec
           _ -> False
       = Just specs
       | otherwise = Nothing
+
+    diagonal con spec
+      | Just rhs <- getTyVar_maybe (eqSpecType spec)
+      = rhs /= eqSpecTyVar spec && rhs `elem` dataConUnivTyVars con
+      | otherwise = False
 
 {- Note [Native indexed branch evidence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3730,6 +3736,11 @@ An indexed branch can bind erased arguments without binding any fields.
 For FZ :: Fin (S n), the ordinary alternative binds n and the nominal
 equality with S n. Form the promoted FZ at that n. The proof identifies
 the matched value at the scrutinee kind and adds no runtime argument.
+
+A nullary constructor can also refine one universal to another.
+Refl refines the right endpoint to the left endpoint. Use the nominal
+equality from the actual alternative to cast the promoted constructor
+to the scrutinee kind. The case forces the equality proof itself.
 
 An ordinary constructor can be a sibling of an eligible GADT constructor.
 For example, Mu :: Term (Ext g a) a -> Term g a has no EqSpec or
