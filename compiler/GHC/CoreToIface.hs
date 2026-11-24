@@ -805,6 +805,7 @@ toIfaceAlt alt@(Alt (DataAlt con) bs rhs)
   = case splitAt (length bs - 1) bs of
       (_, [cv]) | isCoVar cv, isLocalId cv ->
         let iface_con
+              | isNativeOpaqueOrdinaryCon con = IfaceOpaqueOrdinaryAltWithProof
               | isNativeIndexedOrdinaryCon con = IfaceIndexedOrdinaryAltWithProof
               | isNativeIndexedDiagonalCon con = IfaceIndexedDiagonalAltWithProof
               | dataConSourceArity con > 0 = IfaceIndexedFieldsAltWithProof

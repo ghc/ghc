@@ -885,6 +885,7 @@ data IfaceConAlt = IfaceDefaultAlt
                  | IfaceIndexedExistentialAltWithProof IfExtName
                  | IfaceRetainedSiblingsAltWithProof IfExtName
                  | IfaceIndexedDiagonalAltWithProof IfExtName
+                 | IfaceOpaqueOrdinaryAltWithProof IfExtName
 
 type IfaceBinding b = IfaceBindingX IfaceExpr b
 
@@ -2110,6 +2111,7 @@ instance Outputable IfaceConAlt where
     ppr (IfaceIndexedFieldsAltWithProof d) = ppr d
     ppr (IfaceIndexedOrdinaryAltWithProof d) = ppr d
     ppr (IfaceIndexedDiagonalAltWithProof d) = ppr d
+    ppr (IfaceOpaqueOrdinaryAltWithProof d) = ppr d
     ppr (IfaceIndexedExistentialAltWithProof d) = ppr d
 
 ------------------
@@ -2480,6 +2482,7 @@ freeNamesIfExpr (IfaceCase s _ alts)
     fn_cons (IfaceAlt (IfaceIndexedFieldsAltWithProof con) _ _ : _) = unitNameSet con
     fn_cons (IfaceAlt (IfaceIndexedOrdinaryAltWithProof con) _ _ : _) = unitNameSet con
     fn_cons (IfaceAlt (IfaceIndexedDiagonalAltWithProof con) _ _ : _) = unitNameSet con
+    fn_cons (IfaceAlt (IfaceOpaqueOrdinaryAltWithProof con) _ _ : _) = unitNameSet con
     fn_cons (IfaceAlt (IfaceIndexedExistentialAltWithProof con) _ _ : _) = unitNameSet con
     fn_cons (_                               : _ ) = emptyNameSet
 
@@ -3702,6 +3705,10 @@ instance Binary IfaceConAlt where
         requireIfaceEvidenceVersion bh IndexedDiagonalConstructorCaseEvidence
         putByte bh 10
         put_ bh con
+    put_ bh (IfaceOpaqueOrdinaryAltWithProof con) = do
+        requireIfaceEvidenceVersion bh OpaqueOrdinaryConstructorCaseEvidence
+        putByte bh 11
+        put_ bh con
     get bh = do
         h <- getByte bh
         case h of
@@ -3716,6 +3723,7 @@ instance Binary IfaceConAlt where
             7 -> liftM IfaceIndexedExistentialAltWithProof $ get bh
             9 -> liftM IfaceIndexedOrdinaryAltWithProof $ get bh
             10 -> liftM IfaceIndexedDiagonalAltWithProof $ get bh
+            11 -> liftM IfaceOpaqueOrdinaryAltWithProof $ get bh
             _ -> fail ("Unknown interface case alternative tag " ++ show h)
 
 instance (Binary r, Binary b) => Binary (IfaceBindingX b r) where
@@ -3995,6 +4003,7 @@ instance NFData IfaceConAlt where
     IfaceIndexedFieldsAltWithProof nm -> rnf nm
     IfaceIndexedOrdinaryAltWithProof nm -> rnf nm
     IfaceIndexedDiagonalAltWithProof nm -> rnf nm
+    IfaceOpaqueOrdinaryAltWithProof nm -> rnf nm
     IfaceIndexedExistentialAltWithProof nm -> rnf nm
     IfaceLitAlt lit -> rnf lit `seq` ()
 
