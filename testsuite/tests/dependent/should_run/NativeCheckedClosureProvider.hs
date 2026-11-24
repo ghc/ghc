@@ -3,6 +3,8 @@ module NativeCheckedClosureProvider
 #ifdef HIDE_LOOP
     (Sort (..), Scope (..), Slot (..), Expr (At, Bind, Call, Lit, Test),
      extendName, renameExpr, extendExpr, walk, replace)
+#elif defined HIDE_MARKED
+    (Sort (..), Scope (..), Slot (..), Stamp (..), Marked, Found (..), findMarked)
 #endif
 where
 
@@ -57,3 +59,23 @@ replace n w = walk (\case
   Old x -> At x
 #endif
   ) n
+
+data Stamp (a :: Sort) = Stamp Bool
+
+data Marked (g :: Scope) where
+    Marked :: Slot g a -> Stamp a -> Marked g
+
+data Found (g :: Scope) where
+    AtHead :: Stamp a -> Found (Push g a)
+    InTail :: Found g -> Found (Push g a)
+
+findMarked :: Marked g -> Found g
+findMarked (Marked New stamp) = AtHead stamp
+findMarked (Marked (Old next) stamp) =
+#ifdef STRICT_TAIL
+    next `seq` InTail (findMarked (Marked next stamp))
+#elif defined CHANGED_STAMP
+    InTail (findMarked (Marked next (Stamp False)))
+#else
+    InTail (findMarked (Marked next stamp))
+#endif
