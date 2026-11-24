@@ -84,8 +84,9 @@ bound the witness can also terminate on an infinite list.
 The proofs use the ordinary definitions of `size`, `plus` and `minSize`.
 They share the Peano `Nat` from `HaskLib.Nat`. The same type accepts
 ordinary numerals at runtime and natural literals in indices, as in
-`plus 2 3 :~: 5`. Import `Nat(..)` for the constructors. `HaskLib.Size`
-still exports the `Size` alias.
+`plus 2 3 :~: 5`. Import `type (+)` from `HaskLib.Nat` to write the same
+equality as `(2 + 3 :: Nat) :~: 5`. Import `Nat(..)` for the constructors.
+`HaskLib.Size` still exports the `Size` alias.
 Forcing a proof can traverse the list spines. The empty-left zip case
 leaves the right list unevaluated. The list elements and the `zipWith`
 callback can remain unevaluated throughout.

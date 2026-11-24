@@ -68,9 +68,13 @@ fi
 )
 
 # An ordinary client uses the installed map and size equations with a recursive proof.
+ordinary_size_source() {
+    sed '1s/ExperimentalDependentTypes/NoExperimentalDependentTypes/' "$src/PreludeMapLengthSize.hs"
+}
 mkdir "$out"/{length-source,length-client}
 cd "$out/length-source"
-cp "$src"/PreludeMapLength{Size,Source}.hs .
+cp "$src/PreludeMapLengthSource.hs" .
+ordinary_size_source >PreludeMapLengthSize.hs
 "${ghc[@]}" -O1 -fenable-rewrite-rules -fomit-interface-pragmas -c PreludeMapLengthSize.hs PreludeMapLengthSource.hs
 "${ghc[@]}" --show-iface PreludeMapLengthSize.hi >size.iface
 grep -Fxq '  SourceTable T:size' size.iface
@@ -112,8 +116,7 @@ HS
 # The ordinary provider can change this option without changing its source.
 mkdir "$out/length-no-code"
 cd "$out/length-no-code"
-sed '/^{-# OPTIONS_GHC -fwrite-source-equations #-}$/d' \
-    "$src/PreludeMapLengthSize.hs" >PreludeMapLengthSize.hs
+ordinary_size_source | sed '/^{-# OPTIONS_GHC -fwrite-source-equations #-}$/d' >PreludeMapLengthSize.hs
 no_code=("${ghc[@]}" -O1 -fno-code -fwrite-interface -c PreludeMapLengthSize.hs)
 "${no_code[@]}" -fno-write-source-equations
 "${ghc[@]}" --show-iface PreludeMapLengthSize.hi >size.iface
@@ -128,7 +131,8 @@ grep -Fxq '  SourceTable T:size' size.iface
 # Recheck the ordinary proof when its producer changes through a type alias.
 mkdir "$out/length-rebuild"
 cd "$out/length-rebuild"
-cp "$src"/PreludeMapLength{Size,Source}.hs .
+cp "$src/PreludeMapLengthSource.hs" .
+ordinary_size_source >PreludeMapLengthSize.hs
 cat >CountOne.hs <<'HS'
 {-# LANGUAGE DataKinds, GADTs, NoExperimentalDependentTypes, TypeOperators #-}
 module CountOne where
@@ -141,17 +145,17 @@ one = Refl
 HS
 rebuild=("${ghc[@]}" -O1 -fomit-interface-pragmas -fno-code -fwrite-interface --make CountOne.hs)
 "${rebuild[@]}"
-sed 's/= Succ (size xs)$/= Succ (Succ (size xs))/' "$src/PreludeMapLengthSize.hs" >PreludeMapLengthSize.hs
+ordinary_size_source | sed 's/= Succ (size xs)$/= Succ (Succ (size xs))/' >PreludeMapLengthSize.hs
 if "${rebuild[@]}" >changed.log 2>&1 || ! grep -Fq 'CountOne.hs:8:7: error: [GHC-83865]' changed.log; then
     cat changed.log >&2
     exit 1
 fi
-sed '/^{-# OPTIONS_GHC -fwrite-source-equations #-}$/d' "$src/PreludeMapLengthSize.hs" >PreludeMapLengthSize.hs
+ordinary_size_source | sed '/^{-# OPTIONS_GHC -fwrite-source-equations #-}$/d' >PreludeMapLengthSize.hs
 if "${rebuild[@]}" >withdrawn.log 2>&1 || ! grep -Eq 'PreludeMapLengthSource.hs:[0-9]+:[0-9]+: error: \[GHC-70566\]' withdrawn.log; then
     cat withdrawn.log >&2
     exit 1
 fi
-cp "$src/PreludeMapLengthSize.hs" .
+ordinary_size_source >PreludeMapLengthSize.hs
 "${rebuild[@]}"
 
 # The installed filter needs a known predicate result before choosing a branch.

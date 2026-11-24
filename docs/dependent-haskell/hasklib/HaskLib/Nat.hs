@@ -1,12 +1,16 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, Modifiers, TypeOperators #-}
+{-# LANGUAGE DataKinds, ExplicitNamespaces, ExperimentalDependentTypes, GADTs, Modifiers, TypeOperators #-}
 
 -- | Peano naturals and their arithmetic laws.
-module HaskLib.Nat (Nat(..), plus, plusZero, plusSucc, congSucc, congFirst) where
+module HaskLib.Nat (Nat(..), plus, type (+), plusZero, plusSucc, congSucc, congFirst) where
 
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Exts (U)
 import PreludeMapLengthSize (Nat(..), plus)
+
+-- | Add two naturals in a type using the ordinary definition of 'plus'.
+type (m :: Nat) + (n :: Nat) = plus m n
+infixl 6 type +
 
 -- | Adding zero on the right preserves the left operand.
 plusZero :: foreach (m :: Nat) -> plus m 'Zero :~: m

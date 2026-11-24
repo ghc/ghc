@@ -1,9 +1,10 @@
-{-# LANGUAGE GHC2024, ExperimentalDependentTypes #-}
+{-# LANGUAGE GHC2024, ExplicitNamespaces, ExperimentalDependentTypes #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 
 module Client (zipLaw, lengthAppendSingleton, checkAppendSingleton, checkReverse, zipMapLaw, checkZipMap, checkNat) where
 
 import qualified HaskLib as H
+import HaskLib.Nat (type (+))
 import qualified HaskLib.Nat as N
 
 -- | Use the public functions and equality in a new dependent signature.
@@ -45,8 +46,8 @@ checkZipMap pre combine xs ys =
 -- | Check numeral conversion in proof types and ordinary runtime expressions.
 checkNat :: Bool
 checkNat = case twoPlusThree of
-    H.Refl -> case zero of
-        H.Refl ->
+    H.Refl -> case (infixAddition, zero, retainedThree) of
+        (H.Refl, H.Refl, H.Refl) ->
             value (0 :: N.Nat) == 0
                 && value (N.plus 2 3) == 5
                 && value (2 + 3) == 5
@@ -54,8 +55,14 @@ checkNat = case twoPlusThree of
     twoPlusThree :: N.plus 2 3 H.:~: 5
     twoPlusThree = H.Refl
 
+    infixAddition :: (2 + 3 :: N.Nat) H.:~: 5
+    infixAddition = H.Refl
+
     zero :: (0 :: N.Nat) H.:~: 'N.Zero
     zero = H.Refl
+
+    retainedThree :: N.plus 3 'N.Zero H.:~: 3
+    retainedThree = N.plusZero 3
 
     value :: N.Nat -> Int
     value N.Zero = 0

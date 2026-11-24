@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, NoExperimentalDependentTypes, TypeFamilies, TypeOperators #-}
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, TypeFamilies, TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fwrite-source-equations #-}
 module PreludeMapLengthSize (Nat(..), Size, plus, size, minSize) where
@@ -20,11 +20,22 @@ plus Zero n = n
 plus (Succ m) n = Succ (plus m n)
 
 -- | Interpret a built-in natural as a Peano natural in a type.
+-- See Note [HaskLib Peano literals].
 type family ToPeano (n :: TN.Nat) :: Nat where
     ToPeano 0 = 'Zero
     ToPeano n = 'Succ (ToPeano (n TN.- 1))
 
 type instance FromNatural Nat n = ToPeano n
+
+{- Note [HaskLib Peano literals]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The FromNatural instance converts type literals when their expected kind
+is Nat. The Num instance converts ordinary term literals. The
+fromInteger method uses the three guards and recursive call checked by
+checkedSourceLiteral in GHC.Tc.TyCl.Instance. ExperimentalDependentTypes
+publishes the checked dictionary so a retained call such as plusZero 3
+can use the same natural on both sides of its index.
+-}
 
 -- | Construct nonnegative runtime naturals from ordinary numeral syntax.
 instance Num Nat where
