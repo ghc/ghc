@@ -61,3 +61,26 @@ openTail = Refl
 {-# RULES "findMarked/replace" forall (marked :: P.Marked NatScope).
     P.findMarked marked = P.AtHead (P.Stamp False) #-}
 #endif
+
+#ifdef CHECK_INDEXED_RECURSION
+encodeTail :: forall g a b (next :: P.Found g) (member :: P.Slot g a) (stamp :: P.Stamp a).
+              P.markFound next :~: 'P.Marked member stamp ->
+              P.markFound ('P.InTail next :: P.Found (P.Push g b)) :~: 'P.Marked ('P.Old member) stamp
+encodeTail Refl = Refl
+
+duplicateRoundTrip :: forall g a (stamp :: P.Stamp a).
+                      P.findMarked
+                        (P.markFound ('P.InTail ('P.AtHead stamp) :: P.Found (P.Push (P.Push g a) a)))
+                      :~:
+#ifdef WRONG_DUPLICATE
+                          'P.AtHead stamp
+#else
+                          'P.InTail ('P.AtHead stamp)
+#endif
+duplicateRoundTrip = Refl
+#endif
+
+#ifdef RULE_ENCODER
+{-# RULES "markFound/replace" forall (found :: P.Found NatScope).
+    P.markFound found = P.Marked P.New (P.Stamp False) #-}
+#endif

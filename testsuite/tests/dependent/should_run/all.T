@@ -753,9 +753,10 @@ test('NativeFunctionIndex',
      run_command, ['bash NativeFunctionIndex.sh "{compiler}" "{libdir}"'])
 
 test('NativeIndexedGadtFields',
-     [req_host_target_ghc, only_ways(['normal']),
+     [req_process, req_host_target_ghc, only_ways(['normal']),
       extra_files(['../../../../docs/dependent-haskell/examples/packed-vector/PackedVecLibrary.hs',
-                   'NativeIndexedGadtFieldsProvider.hs', 'NativeIndexedGadtFields.hs'])],
+                   'NativeIndexedGadtFieldsProvider.hs', 'NativeNonuniformGadtFieldsProvider.hs',
+                   'NativeLegacyGadtFieldsMutate.hs', 'NativeIndexedGadtFields.hs'])],
      run_command, ['bash NativeIndexedGadtFields.sh "{compiler}" "{libdir}"'])
 
 test('NativeRetainedPackage',

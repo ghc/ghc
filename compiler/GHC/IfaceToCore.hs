@@ -2810,7 +2810,10 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
           return (DataAlt dc)
         native_data_alt siblings name names = do
           dc <- tcIfaceDataCon name
-          unless (isNativeIndexDataAlt dc names && dataConHasPromotedRetainedSiblings dc == siblings) $
+          let structural = isNativeIndexDataAlt dc names ||
+                (isNativeOpaqueOrdinaryCon dc && isNativeIndexedDataAlt dc names && hasNoDups names
+                 && isNativeIndexType (exprType scrut'))
+          unless (structural && dataConHasPromotedRetainedSiblings dc == siblings) $
             failIfM (text "Missing or unsupported constructor proof in interface alternative:" <+> ppr dc <+> ppr names)
           return (DataAlt dc)
     resolved <- forM alts $ \ (IfaceAlt con names rhs) -> do
@@ -2834,14 +2837,19 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
         IfaceIndexedExistentialAltWithProof name ->
           indexed_data_alt False (\dc -> dataConSourceArity dc == 0 && not (null (dataConExTyCoVars dc))) name names
         IfaceIndexedOrdinaryAltWithProof name ->
-          indexed_data_alt True (const True) name names
+          indexed_data_alt True (not . isNativeOpaqueOrdinaryCon) name names
+        IfaceOpaqueOrdinaryAltWithProof name ->
+          indexed_data_alt True isNativeOpaqueOrdinaryCon name names
         IfaceDataAltWithProof name -> native_data_alt False name names
         IfaceRetainedSiblingsAltWithProof name -> native_data_alt True name names
       return (alt_con, names, rhs)
-    let native_alt (DataAlt con, names, _) = isNativeIndexDataAlt con names
-        native_alt _ = False
+    let native_alt (DataAlt con, names, _) (IfaceAlt tag _ _) =
+          isNativeIndexDataAlt con names || case tag of
+            IfaceDataAltWithProof{} -> True
+            _ -> False
+        native_alt _ _ = False
         has_alt con = any (\(c, _, _) -> c == con) resolved
-        constructor_proof = any native_alt resolved
+        constructor_proof = or (zipWith native_alt resolved alts)
         indexed_proof = any (\(con, ns, _) -> case con of
                                DataAlt dc -> isNativeIndexedDataAlt dc ns
                                _ -> False) resolved
@@ -3002,7 +3010,7 @@ tcIfaceAlt scrut scrut_index case_bndr (tycon, inst_tys) (DataAlt con, names, rh
              ordinary = exs ++ fields
        ; case scrut_index of
            Just index
-             | isNativeIndexedCaseScrutinee index
+             | isNativeIndexedCaseScrutinee con index
              , Just constructor <- nativeIndexedCon_maybe (exprType scrut) con ordinary ->
                  do { fresh <- newIfaceName (mkVarOccFS (ifLclNameFS proof_name))
                     ; let cv = mkCoVar fresh (mkNomEqPred index constructor)

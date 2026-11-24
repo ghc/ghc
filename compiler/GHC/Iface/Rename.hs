@@ -915,6 +915,7 @@ rnIfaceConAlt (IfaceIndexedDataAltWithProof data_occ) = IfaceIndexedDataAltWithP
 rnIfaceConAlt (IfaceIndexedFieldsAltWithProof data_occ) = IfaceIndexedFieldsAltWithProof <$> rnIfaceGlobal data_occ
 rnIfaceConAlt (IfaceIndexedOrdinaryAltWithProof data_occ) = IfaceIndexedOrdinaryAltWithProof <$> rnIfaceGlobal data_occ
 rnIfaceConAlt (IfaceIndexedDiagonalAltWithProof data_occ) = IfaceIndexedDiagonalAltWithProof <$> rnIfaceGlobal data_occ
+rnIfaceConAlt (IfaceOpaqueOrdinaryAltWithProof data_occ) = IfaceOpaqueOrdinaryAltWithProof <$> rnIfaceGlobal data_occ
 rnIfaceConAlt (IfaceIndexedExistentialAltWithProof data_occ) = IfaceIndexedExistentialAltWithProof <$> rnIfaceGlobal data_occ
 rnIfaceConAlt alt = pure alt
 

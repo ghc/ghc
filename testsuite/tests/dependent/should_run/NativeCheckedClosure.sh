@@ -17,6 +17,7 @@ for opt in -O0 -O2; do
     "${ghc[@]}" --show-iface NativeCheckedClosureProvider.hi >provider.iface
     grep -Fq 'CheckedClosureSourceTable T:replace' provider.iface
     grep -Fq 'SourceTable T:findMarked' provider.iface
+    grep -Fq 'SourceTable T:markFound' provider.iface
 
     for mode in native no-code; do
         cd "$work/$opt/$mode"
@@ -48,6 +49,21 @@ for opt in -O0 -O2; do
     grep -Fq '[GHC-83605]' rule.log
     grep -Fq 'P.findMarked' rule.log
 
+    if "${ghc[@]}" "$opt" -fno-code -fforce-recomp -DCHECK_INDEXED_RECURSION -DWRONG_DUPLICATE \
+         -c NativeCheckedClosure.hs >duplicate.log 2>&1; then
+        exit 1
+    fi
+    grep -Eq '\[GHC-(83865|25897)\]' duplicate.log
+    grep -Fq InTail duplicate.log
+
+    if "${ghc[@]}" "$opt" -fno-code -fforce-recomp -DCHECK_INDEXED_RECURSION -DRULE_ENCODER \
+         -c NativeCheckedClosure.hs >rule-encoder.log 2>&1; then
+        cat rule-encoder.log
+        exit 1
+    fi
+    grep -Fq '[GHC-83605]' rule-encoder.log
+    grep -Fq 'P.markFound' rule-encoder.log
+
     cd "$work/$opt/withheld"
     cp "$inputs/NativeCheckedClosureProvider.hs" .
     "${ghc[@]}" "$opt" -fno-write-source-equations -fomit-interface-pragmas -c NativeCheckedClosureProvider.hs
@@ -71,6 +87,14 @@ for opt in -O0 -O2; do
             -fforce-recomp "-D$variant" -c NativeCheckedClosureProvider.hs
         "${ghc[@]}" --show-iface NativeCheckedClosureProvider.hi >withheld.iface
         if grep -Fq 'SourceTable T:findMarked' withheld.iface; then
+            exit 1
+        fi
+    done
+    for variant in STRICT_ENCODE HIDE_MARKED; do
+        "${ghc[@]}" "$opt" -fwrite-source-equations -fexpose-all-unfoldings \
+            -fforce-recomp "-D$variant" -c NativeCheckedClosureProvider.hs
+        "${ghc[@]}" --show-iface NativeCheckedClosureProvider.hi >withheld.iface
+        if grep -Fq 'SourceTable T:markFound' withheld.iface; then
             exit 1
         fi
     done

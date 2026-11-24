@@ -160,11 +160,15 @@ publishCheckedSourceClosures original_binds final_binds final_types = do
         indexed_candidate (old, original_rhs) = do
           actual <- lookupOwner old
           final_rhs <- lookup actual final
-          original_rows <- indexedSource original old original_rhs
-          final_rows <- indexedSource final actual final_rhs
-          -- The indexed certificate retains every helper identity.
-          helper_ids <- dependencies (const True) old actual
-          pure (actual, (original_rows, final_rows), helper_ids)
+          let decoder = (,,) False <$> indexedSource original old original_rhs
+                                   <*> indexedSource final actual final_rhs
+              encoder = (,,) True <$> indexedEncoder original old original_rhs
+                                  <*> indexedEncoder final actual final_rhs
+          shapes@(is_encoder, _, _) <- decoder <|> encoder
+          -- The decoder retains every helper identity. The encoder checks
+          -- a floated type-only body, which can have an internal Name.
+          helper_ids <- dependencies (\name -> not is_encoder || isExternalName name) old actual
+          pure (actual, shapes, helper_ids)
     case (mapMaybe candidate original, mapMaybe indexed_candidate original) of
       ([], []) -> pure ([], [])
       (closures, indexed) -> do
@@ -211,19 +215,17 @@ data IndexedPattern
 
 data IndexedRow = IndexedRow IndexedPattern [Var] CoreExpr
 
+-- One complete case on a recursive result. The operand is a proper
+-- subfield of an input alternative.
+data IndexedResultCase = IndexedResultCase [Type] Id IndexedPattern CoreExpr
+
 -- The worker's additional type arguments are the package existentials.
-data IndexedSource = IndexedSource [TyVar] Type Type (Maybe Id) [IndexedRow]
+data IndexedSource = IndexedSource [TyVar] Type Type (Maybe Id) [(Id, CoreExpr)] [IndexedRow]
 
 -- | Expose exhaustive case paths and one exact worker wrapper.
 indexedSource :: [(Id, CoreExpr)] -> Id -> CoreExpr -> Maybe IndexedSource
 indexedSource bindings owner rhs = do
-    guard (exprType rhs `eqType` varType owner)
-    (parameters, [input], body) <- function rhs
-    let (_, tau) = splitForAllTyVars (exprType rhs)
-    (_, [Scaled mult input_kind], output_kind) <- pure (splitFunTys tau)
-    guard (isManyTy mult && input_kind `eqType` varType input &&
-           output_kind `eqType` exprType body &&
-           all (isLiftedTypeKind . typeKind) [input_kind, output_kind])
+    (parameters, input, body) <- indexedFunction owner rhs
     [(pack, binders, nested)] <- caseOn input body
     (_, exs@(_:_), [], [], _, _) <- pure (DC.dataConFullSig pack)
     guard (DC.dataConTyCon pack `hasOnly` pack)
@@ -233,7 +235,7 @@ indexedSource bindings owner rhs = do
     guard (not (null (exprSomeFreeVarsList (== fromMaybe owner worker) tree)))
     rows <- descend outer proofs tree
     guard (length rows > 1)
-    pure (IndexedSource parameters (varType input) (exprType body) worker rows)
+    pure (IndexedSource parameters (varType input) (exprType body) worker [] rows)
   where
     tc `hasOnly` con = tyConDataCons tc == [con]
 
@@ -282,6 +284,68 @@ indexedSource bindings owner rhs = do
     isVar (Core.Var actual) expected = actual == expected
     isVar _ _ = False
 
+{- Note [Checked cases on recursive results]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A traversal can inspect the existential package returned by a smaller
+call before it constructs its result. A family for the result case
+preserves this demand. For a branch with E (There r) = H (E r), H
+cannot reduce until it sees the package constructor. The family
+telescope includes the indices of the recursive package and the
+enclosing result, after specialization by the input branch.
+
+Check one exhaustive case on the direct recursive call. The call
+must consume an input field, and the result branch can use only
+fields of the package it scrutinizes. Check both Core versions
+including the private family equation. The simplifier can float
+a constructor expression into a type-only helper. Check the body
+of that helper at its exact type application. Do not treat an
+arbitrary unfolding or function call as a constructor.
+-}
+
+-- | Find an indexed traversal with a complete case over its input.
+indexedEncoder :: [(Id, CoreExpr)] -> Id -> CoreExpr -> Maybe IndexedSource
+indexedEncoder bindings owner rhs = do
+    (parameters, input, body) <- indexedFunction owner rhs
+    (tc, _) <- splitTyConApp_maybe (varType input)
+    alts <- caseOn input body
+    guard (length alts > 1 && [con | (con, _, _) <- alts] == tyConDataCons tc)
+    rows <- traverse (read_alt input) alts
+    guard (length [() | IndexedRow pat _ branch <- rows,
+                        isJust (indexedResultCase owner parameters pat branch)] == 1)
+    pure (IndexedSource parameters (varType input) (exprType body) Nothing bindings rows)
+  where
+    read_alt input (con, binders, body) = do
+      (pat, proofs) <- indexedAlt input con binders
+      pure (IndexedRow pat proofs body)
+
+-- | Check the ordinary unary telescope before reading case branches.
+indexedFunction :: Id -> CoreExpr -> Maybe ([TyVar], Id, CoreExpr)
+indexedFunction owner rhs = do
+    guard (exprType rhs `eqType` varType owner)
+    (parameters, [input], body) <- function rhs
+    let (_, tau) = splitForAllTyVars (exprType rhs)
+    (_, [Scaled mult input_kind], output_kind) <- pure (splitFunTys tau)
+    guard (isManyTy mult && input_kind `eqType` varType input &&
+           output_kind `eqType` exprType body &&
+           all (isLiftedTypeKind . typeKind) [input_kind, output_kind])
+    pure (parameters, input, body)
+
+-- | Check the case and its direct, structurally smaller scrutinee.
+indexedResultCase :: Id -> [TyVar] -> IndexedPattern -> CoreExpr -> Maybe IndexedResultCase
+indexedResultCase owner parameters pat expr = do
+    Core.Case call binder kind [Core.Alt (Core.DataAlt con) binders body] <- pure expr
+    (Core.Var callee, args) <- pure (Core.collectArgs call)
+    let (prefix, suffix) = splitAt (length parameters) args
+    tys <- traverse indexedTypeArg prefix
+    [Core.Var operand] <- pure suffix
+    (tc, _) <- splitTyConApp_maybe (varType binder)
+    (_, _ : _, [], [], _, _) <- pure (DC.dataConFullSig con)
+    guard (callee == owner && length tys == length parameters && operand `elem` indexedFields pat &&
+           varType binder `eqType` exprType call && kind `eqType` exprType body &&
+           tyConDataCons tc == [con])
+    (pattern, []) <- indexedAlt binder con binders
+    pure (IndexedResultCase tys operand pattern body)
+
 indexedTypeArg :: CoreExpr -> Maybe Type
 indexedTypeArg (Core.Type ty) = Just ty
 indexedTypeArg _ = Nothing
@@ -317,11 +381,11 @@ indexedAlt scrutinee con binders = do
              coercionLKind co `eqType` instantiate (mkTyVarTy tv) &&
              coercionRKind co `eqType` instantiate ty)
 
--- | Publish one closed family after both compiler stages justify its rows.
-publishIndexed :: (TyCon -> Bool) -> (Id, (IndexedSource, IndexedSource), [Id])
+-- | Publish closed families after both compiler stages justify their rows.
+publishIndexed :: (TyCon -> Bool) -> (Id, (Bool, IndexedSource, IndexedSource), [Id])
                -> TcM (Maybe (Id, [TyCon]))
-publishIndexed public (owner, (original, final), helpers) = runMaybeT $ do
-    let IndexedSource parameters domain result _ _ = original
+publishIndexed public (owner, (is_encoder, original, final), helpers) = runMaybeT $ do
+    let IndexedSource parameters domain result _ _ _ = original
         (flags, _) = splitForAllForAllTyBinders (varType owner)
     guard (length flags == length parameters)
     name <- lift (newImplicitBinder (idName owner) mkSourceTableOcc)
@@ -330,17 +394,33 @@ publishIndexed public (owner, (original, final), helpers) = runMaybeT $ do
     let binders = zipWith (\(_, Bndr _ flag) -> mkNamedTyConBinder flag) flags parameters ++ [mkAnonTyConBinder operand]
         make = mkFamily name axiom binders result
         header = make []
-    original_rows <- indexedEquations owner header original
-    final_rows <- indexedEquations owner header final
+    private <- if is_encoder then Just <$> lift allocate_case else pure Nothing
+    original_rows <- indexedEquations owner header private original
+    final_rows <- indexedEquations owner header private final
     guard (length original_rows == length final_rows)
-    zipWithM_ same_row (map (`applyRow` header) original_rows) (map (`applyRow` header) final_rows)
-    let table = make (map (`applyRow` table) original_rows)
+    zipWithM_ (same_equation header) original_rows final_rows
+    let table = make [applyRow row table | (row, _) <- original_rows]
+        families = table : [tc | (_, Just (tc, _)) <- original_rows]
         details = case helpers of
           [] -> SourceTableId (idName owner) table NominalSourceTable
           ids -> CheckedClosureSourceTableId (idName owner) table (map idName ids)
-    guard (all public (sourceEquationDatatypes [table]))
-    pure (setIdDetails owner details, [table])
+    guard (all (\tc -> tc `elem` families || public tc) (sourceEquationDatatypes families))
+    pure (setIdDetails owner details, families)
   where
+    allocate_case = do
+      name <- newImplicitBinder (idName owner) (mkTcOcc . ("$case:" ++) . occNameString)
+      axiom <- newImplicitBinder name mkInstTyCoOcc
+      pure (name, axiom)
+
+    same_equation header (old, old_case) (new, new_case) = do
+      same_row (applyRow old header) (applyRow new header)
+      case (old_case, new_case) of
+        (Nothing, Nothing) -> pure ()
+        (Just (left, lhs), Just (right, rhs)) -> do
+          guard (tyConKind left `eqType` tyConKind right)
+          same_row lhs rhs
+        _ -> fail "different indexed result cases"
+
     same_row left right = do
       let old_lhs = coAxBranchLHS left
           new_lhs = coAxBranchLHS right
@@ -356,28 +436,69 @@ applyRow :: IndexedEquation -> TyCon -> CoAxBranch
 applyRow (IndexedEquation vars lhs rhs) family = mkBranch vars lhs (rhs family)
 
 -- | Instantiate only the actual case equalities. Translate the resulting row.
-indexedEquations :: Id -> TyCon -> IndexedSource -> MaybeT TcM [IndexedEquation]
-indexedEquations owner header (IndexedSource parameters domain result worker rows) = traverse row rows
+indexedEquations :: Id -> TyCon -> Maybe (Name, Name) -> IndexedSource
+                 -> MaybeT TcM [(IndexedEquation, Maybe (TyCon, CoAxBranch))]
+indexedEquations owner header private (IndexedSource parameters domain result worker bindings rows) =
+    traverse row rows
   where
     row (IndexedRow pat proofs body) = do
       let equalities = map CoVarCo proofs
       subst <- MaybeT $ pure $ tcUnifyTys alwaysBindTv
           (map coercionLKind equalities) (map coercionRKind equalities)
       let specialize = substTyUnchecked subst
-      variables <- lift $ traverse (freshVar "field" . specialize . varType) (indexedFields pat)
-      let fields = zip (indexedFields pat) (mkTyVarTys variables)
           args = map (specialize . mkTyVarTy) parameters
-          write_pattern (IndexedVariable v) = lookup v fields
-          write_pattern (IndexedConstructor kind con source children) =
-            checkedPromoted con (specialize kind) (map specialize source) =<< traverse write_pattern children
-      packed <- MaybeT $ pure (write_pattern pat)
-      value <- MaybeT $ pure $ indexedResult owner worker parameters domain header specialize proofs pat fields body
+          result_kind = specialize result
+      (packed, fields) <- indexedPatternTypes specialize pat
+      (value, helper) <- case (private, indexedResultCase owner parameters pat body) of
+        (Just names, Just alternative) ->
+          result_case names result_kind specialize proofs fields alternative
+        _ -> do
+          value <- MaybeT $ pure $
+            indexedResult bindings owner worker parameters domain header specialize proofs pat fields body
+          pure (value, Nothing)
       let lhs = args ++ [packed]
           vars = tyCoVarsOfTypesWellScoped lhs
           branch = IndexedEquation vars lhs value
-      guard (all isTyVar vars && typeKind (value header) `eqType` specialize result &&
+      guard (all isTyVar vars && typeKind (value header) `eqType` result_kind &&
              validBranch (applyRow branch header))
-      pure branch
+      pure (branch, helper)
+
+    result_case (name, axiom) result_kind specialize proofs fields
+                (IndexedResultCase types operand pat body) = do
+      let tys = map specialize types
+          input_kind = substTyWith parameters tys domain
+          case_kind = substTyWith parameters tys result
+          locals = tyCoVarsOfTypesWellScoped [case_kind, result_kind]
+          vars = mkTyVarTys locals
+      guard (all isTyVar locals)
+      argument <- MaybeT (pure (lookup operand fields))
+      guard (typeKind argument `eqType` input_kind)
+      (packed, case_fields) <- indexedPatternTypes specialize pat
+      guard (typeKind packed `eqType` case_kind)
+      body_value <- MaybeT $ pure $
+        indexedResult bindings owner Nothing parameters domain header specialize proofs pat case_fields body
+      let rhs = body_value header
+          lhs = vars ++ [packed]
+          branch_vars = tyCoVarsOfTypesWellScoped lhs
+          branch = mkBranch branch_vars lhs rhs
+      guard (all isTyVar branch_vars && typeKind rhs `eqType` result_kind && validBranch branch)
+      operand_ty <- lift (freshVar "case" case_kind)
+      let binders = mkNamedTyConBinders Specified locals ++ [mkAnonTyConBinder operand_ty]
+          helper = mkFamily name axiom binders result_kind [branch]
+          value family = mkTyConApp helper (vars ++ [mkTyConApp family (tys ++ [argument])])
+      pure (value, Just (helper, branch))
+
+indexedPatternTypes :: (Type -> Type) -> IndexedPattern -> MaybeT TcM (Type, [(Id, Type)])
+indexedPatternTypes specialize pat = do
+    variables <- lift $ traverse (freshVar "field" . specialize . varType) ids
+    let fields = zip ids (mkTyVarTys variables)
+        write_pattern (IndexedVariable v) = lookup v fields
+        write_pattern (IndexedConstructor kind con source children) =
+          checkedPromoted con (specialize kind) (map specialize source) =<< traverse write_pattern children
+    packed <- MaybeT (pure (write_pattern pat))
+    pure (packed, fields)
+  where
+    ids = indexedFields pat
 
 -- | Validate a promoted constructor and its exact erased worker layout.
 checkedPromoted :: DC.DataCon -> Type -> [Type] -> [Type] -> Maybe Type
@@ -395,25 +516,37 @@ checkedPromoted con kind source fields = do
     pure value
 
 -- | Read constructors, bound fields and a structurally smaller self call.
-indexedResult :: Id -> Maybe Id -> [TyVar] -> Type -> TyCon -> (Type -> Type)
+indexedResult :: [(Id, CoreExpr)] -> Id -> Maybe Id -> [TyVar] -> Type -> TyCon -> (Type -> Type)
               -> [Var] -> IndexedPattern -> [(Id, Type)] -> CoreExpr -> Maybe (TyCon -> Type)
-indexedResult owner worker parameters domain header specialize proofs pat fields = result False
+indexedResult bindings owner worker parameters domain header specialize proofs pat fields =
+    result bindings False
   where
-    result underneath (Core.Cast body co) = do
+    result floats underneath (Core.Cast body co) = do
       guard (caseCoercion proofs co &&
              specialize (coercionLKind co) `eqType` specialize (coercionRKind co))
-      result underneath body
-    result _ (Core.Var v) = const <$> lookup v fields
-    result underneath expr = do
+      result floats underneath body
+    result floats underneath expr = do
       let (fun, args) = Core.collectArgs expr
       Core.Var callee <- pure fun
       if callee == owner || Just callee == worker
         then recursive underneath callee args
-        else do
-          (con, supplied, values) <- indexedConstructor specialize callee args
-          children <- traverse (result True) values
-          _ <- checkedPromoted con (specialize (exprType expr)) supplied (map ($ header) children)
-          pure (\family -> mkTyConApp (DC.promoteDataCon con) (supplied ++ map ($ family) children))
+        else field callee args <|> constructor floats expr callee args <|> float floats underneath callee expr
+
+    field callee [] = const <$> lookup callee fields
+    field _ _ = Nothing
+
+    constructor floats expr callee args = do
+      (con, supplied, values) <- indexedConstructor specialize callee args
+      guard (null bindings ||
+             all (not . DC.isBanged) (DC.dataConImplBangs con) &&
+             all (caseCoercion proofs) [co | Core.Coercion co <- args])
+      children <- traverse (result floats True) values
+      _ <- checkedPromoted con (specialize (exprType expr)) supplied (map ($ header) children)
+      pure (\family -> mkTyConApp (DC.promoteDataCon con) (supplied ++ map ($ family) children))
+
+    float floats underneath callee expr = do
+      guard (isJust (lookup callee floats))
+      result [] underneath (expandTypeHelper floats expr)
 
     recursive underneath callee args = do
       guard underneath
