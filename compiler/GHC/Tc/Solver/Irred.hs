@@ -3,7 +3,7 @@
 {-# LANGUAGE RecursiveDo #-}
 
 module GHC.Tc.Solver.Irred(
-     solveIrred, isOpaqueTermIndex
+     solveIrred, isOpaqueTermIndex, findRetainedIndexProof
   ) where
 
 import GHC.Prelude

@@ -18,7 +18,7 @@ import GHC.Builtin.WiredIn.Types ( heqClass )
 import GHC.Tc.Gen.SourceTable ( sourceTableFamilyAppUse, sourceTableOwner )
 import GHC.Tc.Errors.Types ( RetainedQuantificationError(..), TcRnMessage(..) )
 
-import GHC.Tc.Solver.Irred( solveIrred, isOpaqueTermIndex )
+import GHC.Tc.Solver.Irred( solveIrred, isOpaqueTermIndex, findRetainedIndexProof )
 import GHC.Tc.Solver.Dict( matchLocalInst, chooseInstance )
 import GHC.Tc.Solver.Rewrite
 import GHC.Tc.Solver.Monad
@@ -68,6 +68,7 @@ import GHC.Data.Pair
 import GHC.Data.Bag
 import GHC.Data.FastString ( fsLit )
 
+import Control.Applicative ( (<|>) )
 import Control.Monad
 import Data.Maybe ( isJust, isNothing )
 import Data.List  ( zip4 )
@@ -768,7 +769,15 @@ can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
                             , ces_rwL = True
                             , ces_rwR = True
                             }
-           ; let solve = can_eq_nc ces' rdr_env envs new_ev eq_rel xi1 xi1 xi2 xi2
+           ; let solve = do
+                   { proof <- tryRetainedFamilyEquality new_ev xi1 xi2
+                   ; case proof of
+                       Just co -> do
+                         { let holes = foldr (flip addRewriter) emptyCoHoleSet
+                                      (univCoDepsHoles (mkUnivCoDeps [co]))
+                         ; setEqIfWanted new_ev (CPH (downgradeRole (eqRelRole eq_rel) Nominal co) holes)
+                         ; stopWith new_ev "Solved by retained family congruence" }
+                       Nothing -> can_eq_nc ces' rdr_env envs new_ev eq_rel xi1 xi1 xi2 xi2 }
            ; case (eq_rel, new_ev) of
                (NomEq, CtWanted (WantedCt { ctev_dest = HoleDest hole }))
                  -> record_reduction_uses hole (deps1 ++ deps2) solve
@@ -3169,6 +3178,102 @@ canEqReflexive :: CtEvidence    -- ty ~ ty
 canEqReflexive ev eq_rel ty
   = do { setEqIfWanted ev (mkReflCPH eq_rel ty)
        ; stopWith ev "Solved by reflexivity" }
+
+{- Note [Nominal Givens for retained family arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A match on Refl can give an equality between two rigid runtime indices.
+They cannot be canonical substitution keys. The equality stays inert.
+Use its evidence to prove a Wanted involving a closed family. If both
+sides have the same head, prove every argument equal. This is forward
+congruence, even for a non-injective family.
+
+A Given can also fix an argument to a promoted constructor. Lift that
+Given through the family, then reduce the family axioms. Use constructor
+targets with no runtime indices so this step cannot chase a recursive
+index equation. The result must already agree with the other side.
+No new equality enters the inerts. Do not use this step inside a
+retained function equality comparison. See Note [Native runtime binder
+scopes] in GHC.Tc.Solver.Monad.
+-}
+
+-- | Try a scoped nominal proof for an ordinary closed-family Wanted.
+tryRetainedFamilyEquality :: CtEvidence -> Type -> Type -> TcS (Maybe Coercion)
+tryRetainedFamilyEquality ev lhs rhs
+  | isWanted ev
+  , isJust left || isJust right
+  = do { binders <- getNativeBinderScope
+       ; mode <- getTcSMode
+       ; if not (isEmptyVarSet binders) || tcsmGivenOnly mode
+         then return Nothing
+         else do { irreds <- inert_irreds <$> getInertCans
+                 ; case sameFamily irreds of
+                     Just co -> return (Just co)
+                     Nothing -> do
+                       { Reduction co1 lhs' <- specialize irreds lhs left
+                       ; Reduction co2 rhs' <- specialize irreds rhs right
+                       ; return $ if lhs' `tcEqType` rhs'
+                           then Just (co1 `mkTransCo` mkSymCo co2)
+                           else Nothing } } }
+  | otherwise = return Nothing
+  where
+    left = family lhs
+    right = family rhs
+
+    family (TyConApp tc args)
+      | Just ax <- closedFamilyTyConCoAxiom_maybe tc
+      , null (co_ax_source_proof_rules ax)
+      , not (saturatedSourceHead tc args)
+      , lengthIs args (tyConArity tc)
+      , any isOpaqueTermIndex args
+      = Just (tc, args)
+    family _ = Nothing
+
+    sameFamily irreds = do
+      (tc, args) <- left
+      (other, targets) <- right
+      guard (tc == other)
+      proofs <- zipWithM (argument irreds) args targets
+      pure (mkTyConAppCo Nominal tc proofs)
+
+    argument irreds a b
+      | not (typeKind a `tcEqType` typeKind b) = Nothing
+      | a `tcEqType` b = Just (mkNomReflCo a)
+      | isOpaqueTermIndex a || isOpaqueTermIndex b = findRetainedIndexProof irreds a b
+      | otherwise = Nothing
+
+    specialize irreds _ (Just (tc, args))
+      | let (proofs, targets) = unzip (map (refine irreds) args)
+      , any (not . isReflCo) proofs
+      , wellKinded (tyConKind tc) targets
+      = do { reduced <- rewriteFamilyAxioms (ctEvLoc ev) (mkTyConApp tc targets)
+           ; pure (mkTyConAppCo Nominal tc proofs `mkTransRedn` reduced) }
+    specialize _ ty _ = pure (mkReflRedn Nominal ty)
+
+    refine irreds a
+      | isOpaqueTermIndex a
+      , Just target <- foldIrreds (\irred rest -> candidate irreds a irred <|> rest) irreds Nothing
+      = target
+      | otherwise = (mkNomReflCo a, a)
+
+    candidate irreds a irred
+      | given@CtGiven{} <- irredCtEvidence irred
+      , EqPred NomEq l r <- classifyCtEvidence given
+      = known l <|> known r
+      | otherwise = Nothing
+      where
+        known ty@(TyConApp tc _)
+          | isPromotedDataCon tc
+          , not (anyFreeVarsOfType isId ty)
+          , Just proof <- argument irreds a ty
+          = Just (proof, ty)
+        known _ = Nothing
+
+    wellKinded _ [] = True
+    wellKinded kind (a:as)
+      | Just (_, binder, _) <- splitPiTy_maybe kind
+      , typeKind a `tcEqType` piTyBinderType binder
+      = wellKinded (piResultTy kind a) as
+      | otherwise = False
 
 -- | Prefer one selected definition when its RHS already proves the equality.
 -- See Note [Prefer a direct local definition].
