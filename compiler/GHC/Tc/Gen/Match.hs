@@ -114,6 +114,7 @@ import GHC.Types.Unique.Set (sizeUniqSet)
 import GHC.Types.Id
 import GHC.Types.Var ( binderFlag, EvVar, DepFunTyFlag(..), ExistsTyFlag(ImplicitExists), FunTyFlag, VarBndr(Bndr), varType, tyVarKind, isId, isCoVar, isTyVar, isVisibleFunArg, isInferredForAllTyFlag )
 import GHC.Types.Var.Env ( mkInScopeSetList, unitVarEnv )
+import GHC.Types.Var.Set ( mkVarSet )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic( VisArity, RecFlag(NonRecursive), TypeOrKind(TypeLevel), Origin(Generated), GenReason(OtherExpansion), DoPmc(SkipPmc) )
 import GHC.Data.Bag ( listToBag, unionBags )
@@ -1531,6 +1532,7 @@ withRetainedRowGivens origin proofs plan arg_cos action
                                      domain_givens domain_cos
        ; branch_binds <- case ev_binds of
            TcEvBinds binds -> do { mapM_ (addTcEvBind binds) given_binds
+                                 ; addNeededEvIds binds (mkVarSet (refined_givens ++ domain_givens))
                                  ; return ev_binds }
            EvBinds binds -> return (EvBinds (listToBag given_binds `unionBags` binds))
        ; return (branch_binds, result) }
@@ -2384,6 +2386,14 @@ cover later patterns, guards, and local bindings. The original dictionary
 parameters have the same Unique in every equation. This is deliberate, as for
 the hidden index AsPat. Native constructors have no existing dictionaries,
 skolems, or evidence bindings; assert this before adding the branch evidence.
+
+A nested retained case can pass a transported Given directly to its motive.
+This use has no Wanted constraint. Register the generated transports as
+needed in the row implication, so the solver keeps their bindings in the
+constructor alternative. They are casts of existing dictionaries or erased
+coercions. They do not select a superclass or force a dictionary. The
+solver can still prune its own unused Given bindings. See Note [Delete dead
+Given evidence bindings] in GHC.Tc.Solver.Solve.
 
 Use one hidden unrestricted index Id across the equations. A generated AsPat makes
 selectMatchVar choose this Id. tidy1 removes the identical alias. The retained
