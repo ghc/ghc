@@ -621,3 +621,7 @@ compose two checked traversals without forcing the inner callback: (Refl,True)
 collect row heads with an ordinary polymorphic callback: Refl
 regroup both partitions at the original length: (4,[3,4,1,2])
 choose either partition at a runtime input length: ((2,[3,4]),(2,[1,2]))
+substitute an open callback under a lambda and weaken the outer image: Refl
+evaluate a variable against a same-module environment lookup: True
+plug an indexed context lazily and avoid capture in untyped substitution: (Refl,Refl)
+refine and transport a closed family across runtime index equalities: Just (Right (Just True))

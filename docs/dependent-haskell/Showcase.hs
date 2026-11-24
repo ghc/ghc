@@ -188,6 +188,7 @@ import qualified BookDeBruijn
 import qualified BookAnyWitness
 import qualified BookAnyWitnessProof
 import qualified BookParallel
+import qualified BookContextPlug
 import qualified BookEnvironment
 import qualified BookReverseProof
 import qualified BookNaturals
@@ -345,6 +346,50 @@ timesZeroLeft _ = Refl
 lookupEvidence :: BookEnvironment.EnvLookup e x c -> BookEnvironment.lookupEnv e x :~: c
 lookupEvidence BookEnvironment.ELZ = Refl
 lookupEvidence (BookEnvironment.ELS p) = lookupEvidence p
+
+-- | Lift a term equality under an untyped lambda constructor.
+congULam :: a :~: b -> BookParallel.ULam a :~: BookParallel.ULam b
+congULam Refl = Refl
+
+-- | Context plugging preserves equality without forcing sibling subterms.
+plugCong :: foreach (c :: BookContextPlug.UCtx m n)
+         -> Proxy (t :: BookParallel.UTerm m)
+         -> t :~: t'
+         -> BookContextPlug.plug c t :~: BookContextPlug.plug c t'
+plugCong c p eq = case c of
+    BookContextPlug.CHole      -> eq
+    BookContextPlug.CLam c'    -> congULam (plugCong c' p eq)
+    BookContextPlug.CAppL c' _ -> case plugCong c' p eq of Refl -> Refl
+    BookContextPlug.CAppR _ c' -> case plugCong c' p eq of Refl -> Refl
+
+-- | Untyped single substitution avoids capture when crossing an inner lambda.
+untypedCaptureAvoided ::
+    BookParallel.substSingleU
+        (BookParallel.ULam (BookParallel.UVar (BookParallel.FS BookParallel.FZ))
+            :: BookParallel.UTerm ('HaskLib.Succ ('HaskLib.Succ 'HaskLib.Zero)))
+        (BookParallel.UVar BookParallel.FZ)
+    :~: BookParallel.ULam (BookParallel.UVar (BookParallel.FS BookParallel.FZ))
+untypedCaptureAvoided = Refl
+
+-- | Nest one layer of Either for each runtime successor step.
+type family NestedStep (n :: Nat) where
+    NestedStep 'Z = Maybe Bool
+    NestedStep ('S n) = Either Bool (NestedStep n)
+
+-- | Open the zero branch of NestedStep from a nominal runtime equality.
+openZeroStep :: foreach (n :: Nat) -> n :~: 'Z -> Maybe Bool -> NestedStep n
+openZeroStep _ proof payload = case proof of
+    Refl -> payload
+
+-- | Refine NestedStep across a successor equality between two runtime indices.
+extendNestedStep :: foreach (from :: Nat) -> foreach (to :: Nat)
+                 -> from :~: 'S to -> Either Bool (NestedStep to) -> NestedStep from
+extendNestedStep _ _ Refl payload = payload
+
+-- | Transport NestedStep payloads between equal runtime indices.
+transportNestedStep :: foreach (from :: Nat) -> foreach (to :: Nat)
+                    -> from :~: to -> NestedStep from -> NestedStep to
+transportNestedStep _ _ Refl payload = payload
 
 -- | Return the measurement and certify that reversal preserves it.
 measureReverseLength :: forall a. foreach (measure :: [a] -> HaskLib.Size)
@@ -2225,6 +2270,25 @@ main = do
                 select kept = ListVectorClient.choosePartition @Int (type total) kept split
                     (\n cells -> (natToInt n, toList cells))
             in observe "choose either partition at a runtime input length" (select True, select False)
+    observe "substitute an open callback under a lambda and weaken the outer image"
+        BookBetaReduction.weakenSubstUnderLambda
+    case BookEnvironment.evalSecondIdentity of
+        BookEnvironment.EVar ->
+            observe "evaluate a variable against a same-module environment lookup" True
+    plugCtx <- newIORef (BookContextPlug.CLam
+        (BookContextPlug.CAppR (error "unused context sibling") BookContextPlug.CHole)) >>= readIORef
+    observe "plug an indexed context lazily and avoid capture in untyped substitution"
+        (plugCong plugCtx (Proxy @('BookParallel.UVar 'BookParallel.FZ)) Refl, untypedCaptureAvoided)
+    runtimeZero <- newIORef (Z :: Nat) >>= readIORef
+    runtimeOne <- newIORef (S Z :: Nat) >>= readIORef
+    let refinedStep = do
+            pz <- sameNat runtimeZero Z
+            ps <- sameNat runtimeOne (S runtimeZero)
+            p1 <- sameNat runtimeOne (S Z)
+            pure (transportNestedStep runtimeOne (S Z) p1
+                (extendNestedStep runtimeOne runtimeZero ps
+                    (Right (openZeroStep runtimeZero pz (Just True)))))
+    observe "refine and transport a closed family across runtime index equalities" refinedStep
 
 -- | Complement one flag at the type level.
 type family FlipFlag (b :: Bool) :: Bool where

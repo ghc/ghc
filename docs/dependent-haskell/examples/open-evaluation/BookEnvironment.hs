@@ -1,7 +1,8 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds, StandaloneKindSignatures #-}
 {-# OPTIONS_GHC -fwrite-source-equations #-}
 -- | Environment lookup from the PLFH BigStep chapter. Adapted under CC BY 4.0.
-module BookEnvironment (Env(..), Clos(..), EnvLookup(..), lookupEnv, secondIdentity) where
+module BookEnvironment (Env(..), Clos(..), EnvLookup(..), EvalBig(..),
+                        lookupEnv, secondIdentity, evalSecondIdentity) where
 
 import BookParallel (Fin(..), UTerm(..))
 import Data.Kind (Type)
@@ -33,3 +34,14 @@ type Identity = MkClos (ULam (UVar FZ)) ENil
 secondIdentity :: EnvLookup (ECons (MkClos (ULam (ULam (UVar FZ))) ENil)
                                    (ECons Identity ENil)) (FS FZ) Identity
 secondIdentity = ELS ELZ
+
+-- | Big-step evaluation of a variable looks up its closure in the same module.
+type EvalBig :: forall n. Env n -> UTerm n -> Clos -> Type
+data EvalBig e t c where
+    EVar :: EvalBig e (UVar x) (lookupEnv e x)
+    ELam :: EvalBig e (ULam b) (MkClos (ULam b) e)
+
+-- | Evaluate the second variable in the same module where lookupEnv is defined.
+evalSecondIdentity :: EvalBig (ECons (MkClos (ULam (ULam (UVar FZ))) ENil)
+                                     (ECons Identity ENil)) (UVar (FS FZ)) Identity
+evalSecondIdentity = EVar

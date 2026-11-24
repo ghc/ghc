@@ -2,7 +2,8 @@
 {-# LANGUAGE Modifiers, RankNTypes, StandaloneKindSignatures, TypeAbstractions, TypeApplications, TypeOperators #-}
 -- | Progress and capture-avoiding beta reduction for the PLFH DeBruijn terms.
 module BookBetaReduction (Step(..), Progress(..), progress, progressExamples,
-                          captureAvoided, freeIndexAfterBeta, replacementOrder, weakenUnderLambda) where
+                          captureAvoided, freeIndexAfterBeta, replacementOrder,
+                          weakenUnderLambda, substUnderLambda, weakenSubstUnderLambda) where
 
 import BookDeBruijn
 import Data.Kind (Type)
@@ -115,6 +116,23 @@ weakenUnderLambda ::
     rename Shift (Lam (Case (Var Z) (Var (S Z)) Zero) :: Term Outer (TArr TNat TNat))
     :~: (Lam (Case (Var Z) (Var (S (S Z))) Zero) :: Term (CExt Outer TNat) (TArr TNat TNat))
 weakenUnderLambda = renameUnderLambda @Outer @(CExt Outer TNat) @Shift @Z
+
+type Substitution g d = forall a. Lookup g a %U -> Term d a
+
+-- | Open substitution keeps the lambda-bound variable and weakens the outer image.
+substUnderLambda :: forall g d (s :: Substitution g d) (v :: Lookup g TNat).
+    subst s (Lam (Case (Var Z) (Var (S v)) Zero) :: Term g (TArr TNat TNat))
+    :~: (Lam (Case (Var Z) (rename (weakenLookup @d @TNat) (s v)) Zero) :: Term d (TArr TNat TNat))
+substUnderLambda = Refl
+
+type WeakenTerm :: forall (a :: Ty). @U Lookup Outer a %U -> Term (CExt Outer TNat) a
+type WeakenTerm x = Var (S x)
+
+-- | Substitute an open variable under a lambda and shift its outer lookup.
+weakenSubstUnderLambda ::
+    subst WeakenTerm (Lam (Case (Var Z) (Var (S Z)) Zero) :: Term Outer (TArr TNat TNat))
+    :~: (Lam (Case (Var Z) (Var (S (S Z))) Zero) :: Term (CExt Outer TNat) (TArr TNat TNat))
+weakenSubstUnderLambda = substUnderLambda @Outer @(CExt Outer TNat) @WeakenTerm @Z
 
 type Fn = TArr TNat TNat
 type Argument = Lam (Var (S Z)) :: Term Outer Fn

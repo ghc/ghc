@@ -4,7 +4,7 @@
 -- | Typed terms and substitution from the PLFH DeBruijn chapter.
 -- Adapted from PLFH batch 21 under CC BY 4.0. See REFERENCES.md.
 module BookDeBruijn (Ty(..), Ctx(..), Lookup(..), Term(..), Value(..),
-                     ext, rename, exts, subst, substSingle, substDouble) where
+                     ext, rename, weakenLookup, exts, subst, substSingle, substDouble) where
 
 import Data.Kind (Type)
 
@@ -45,11 +45,16 @@ rename rho (Suc m)      = Suc (rename rho m)
 rename rho (Case l m n) = Case (rename rho l) (rename rho m) (rename (ext rho) n)
 rename rho (Mu n)       = Mu (rename (ext rho) n)
 
+-- | Shift a typed variable into an extended context.
+{-# NOINLINE weakenLookup #-}
+weakenLookup :: forall g b a. Lookup g a -> Lookup (CExt g b) a
+weakenLookup x = S x
+
 -- | Extend a simultaneous substitution under a binder.
 exts :: (forall a. Lookup g a -> Term d a)
      -> (forall a. Lookup (CExt g b) a -> Term (CExt d b) a)
 exts _     Z     = Var Z
-exts sigma (S x) = rename S (sigma x)
+exts sigma (S x) = rename weakenLookup (sigma x)
 
 -- | Simultaneous substitution on intrinsically typed terms.
 subst :: (forall a. Lookup g a -> Term d a) -> Term g b -> Term d b
