@@ -716,6 +716,13 @@ Restrict this lifting to a body with no inner binders. Resolve source
 call heads in the declaration scope and respect lambda binders that
 shadow those names.
 
+An inline sum in a retained signature also uses these capture parameters.
+For `foreach (m :: Size) -> foreach (n :: Size) -> some (k :: Size) |
+k :~: plus m n`, pass m and n to the lifted synonym in telescope order.
+The payload family binds k in addition to those captures. Permit source
+calls in the copied domain and payload. Only the payload scopes over k.
+Use this path for domains and payloads with no further binders.
+
 Check copied runtime domains for forms whose checking differs between
 types and kinds. A bare arrow defaults to unmatchable in a retained
 domain and can default to matchable in an erased binder kind. Leave
@@ -1043,6 +1050,9 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
       | fieldSite site, copyable ty = Just ("$field-sum:", Nothing)
     liftedAnchor SignatureTypeSite _ ty@(L _ (XHsType HsTypeSome{}))
       | copyable ty = Just ("$signature-sum:", Nothing)
+    liftedAnchor RetainedTypeSite{} _ ty@(L _ (XHsType (HsTypeSome _ _ domain body)))
+      | ordinaryLambdaBody domain, ordinaryLambdaBody body, copyable ty
+      = Just ("$signature-sum:", Nothing)
     liftedAnchor site scope (L _ (XHsType (HsTypeCase _ _ scrutinee alts)))
       | lift_cases
       , caseScrutinee site scope scrutinee
@@ -1099,6 +1109,8 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
           retainedUses site scope (sourceCallHeads scrutinee)
     retainedHeadUses site@RetainedTypeSite{} scope (L _ (XHsType (HsTypeLambda _ binders body))) =
       retainedUses site scope (lambdaCallHeads binders body)
+    retainedHeadUses site@RetainedTypeSite{} scope (L _ (XHsType (HsTypeSome _ binder domain body))) =
+      retainedUses site scope (sumCallHeads binder domain body)
     retainedHeadUses _ _ _ = ([], [])
 
     retainedUses site scope calls =
@@ -1246,6 +1258,7 @@ liftDeclarationTypes source_heads earlier helper_suffix lift_cases named_wildcar
       copyable binder && case ty of
         XHsType HsTypeCase{} -> copyableRetainedKind
         XHsType HsTypeLambda{} -> copyableRetainedKind
+        XHsType HsTypeSome{} | RetainedTypeSite{} <- site -> copyableRetainedKind
         _ -> True
       where
         copyableRetainedKind = unLoc name `notElem` retainedNames site
@@ -1309,6 +1322,10 @@ lambdaCallHeads binders = walk
           , unLoc name `notElem` map unLoc binders = [name]
           | otherwise = []
 
+-- | Find source calls in the witness domain and in its scoped payload.
+sumCallHeads :: LocatedN RdrName -> LHsType GhcPs -> LHsType GhcPs -> [LocatedN RdrName]
+sumCallHeads binder domain body = lambdaCallHeads [] domain ++ lambdaCallHeads [binder] body
+
 -- | The case syntax compared within a single signature.
 data SignatureCasePart
   = CasePartName PromotionFlag RdrName
@@ -1360,7 +1377,7 @@ retainedSourceHeads sigs type_groups = do
   envs@(global, local) <- getRdrEnvs
   let signature_heads = Set.fromList
         [unLoc v | L _ (TypeSig _ _ _ sig) <- sigs
-                 , v <- caseCallHeads sig ++ retainedLambdaCallHeads False sig]
+                 , v <- caseCallHeads sig ++ retainedSignatureCallHeads False sig]
       field_heads = Set.fromList
         [unLoc v | grp <- type_groups
                  , L _ DataDecl{tcdDataDefn = HsDataDefn{dd_cons = cs}} <- group_tyclds grp
@@ -1399,15 +1416,18 @@ caseCallHeads node = here ++ concat (gmapQ caseCallHeads node)
       Just (L _ (XHsType (HsTypeCase _ _ scrutinee _))) -> sourceCallHeads scrutinee
       _ -> []
 
--- | Collect call heads in supported lambda syntax below a retained telescope.
-retainedLambdaCallHeads :: Data a => Bool -> a -> [LocatedN RdrName]
-retainedLambdaCallHeads retained node = case cast node :: Maybe (LHsType GhcPs) of
-  Just (L _ HsForEachTy{hst_body = body}) -> retainedLambdaCallHeads True body
+-- | Collect source calls in lifted types below a retained telescope.
+retainedSignatureCallHeads :: Data a => Bool -> a -> [LocatedN RdrName]
+retainedSignatureCallHeads retained node = case cast node :: Maybe (LHsType GhcPs) of
+  Just (L _ HsForEachTy{hst_body = body}) -> retainedSignatureCallHeads True body
   Just (L _ HsSpliceTy{}) -> []
   Just (L _ (XHsType (HsTypeLambda _ binders body)))
     | retained && ordinaryLambdaBody body -> lambdaCallHeads binders body
     | otherwise -> []
-  _ -> concat (gmapQ (retainedLambdaCallHeads retained) node)
+  Just (L _ (XHsType (HsTypeSome _ binder domain body)))
+    | retained, ordinaryLambdaBody domain, ordinaryLambdaBody body -> sumCallHeads binder domain body
+    | otherwise -> []
+  _ -> concat (gmapQ (retainedSignatureCallHeads retained) node)
 
 -- | The scrutinee followed by the pattern and result in each source row.
 type SignatureCaseKey = (SignatureCasePart, [(SignatureCasePart, SignatureCasePart)])
