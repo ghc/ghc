@@ -329,7 +329,7 @@ if grep -Fq 'D:T:appendVec' strict.iface; then
 fi
 cd "$out/client"
 cp ../provider/PackedVecLibrary.hi "$src/OpenVectorAppend.hs" .
-reject OpenVectorAppend.hs 70565 'This operand contains an open or unsupported field.' -O1 -fforce-recomp
+reject OpenVectorAppend.hs 70565 'This argument is a type variable.' -O1 -fforce-recomp
 
 # Preserve the empty equation if the cons branch forces a field or
 # changes the recursive call's carried operand.
