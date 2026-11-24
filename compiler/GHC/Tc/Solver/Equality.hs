@@ -1012,16 +1012,22 @@ can_eq_nc_depfun :: CtEvidence -> EqRel -> Type -> Type -> MCoercionN
 can_eq_nc_depfun ev eq_rel ty1@(DepFunTy vis1 b1 body1) ty2@(DepFunTy vis2 b2 body2) domain
   | vis1 == vis2
   , CtWanted (WantedCt { ctev_dest = dest, ctev_rewriters = rws, ctev_loc = loc }) <- ev
-  = do { binder <- wrapTcS $ TcM.newSysLocalId (fsLit "retained") ManyTy (varType b1)
+  = do { b_ty <- zonkTcType (varType b1)
+       ; lhs <- zonkTcType body1
+       ; rhs <- zonkTcType body2
+       ; domain' <- case domain of
+                     MRefl -> return MRefl
+                     MCo co -> MCo <$> zonkCo co
+       ; binder <- wrapTcS $ TcM.newSysLocalId (fsLit "retained") ManyTy b_ty
        ; let in_scope = mkInScopeSet $
                           extendVarSet (tyCoVarsOfTypes [ty1,ty2]
-                                        `unionVarSet` tyCoVarsOfMCo domain) binder
+                                        `unionVarSet` tyCoVarsOfMCo domain' `unionVarSet` tyCoVarsOfTypes [lhs,rhs,b_ty]) binder
              subst b arg = Subst.mkIdSubst in_scope (unitVarEnv b arg)
-             right_arg = case domain of
+             right_arg = case domain' of
                            MRefl -> Var binder
                            MCo delta -> Cast (Var binder) (SubCo delta)
-             left_body = Subst.substTy (subst b1 (Var binder)) body1
-             right_body = Subst.substTy (subst b2 right_arg) body2
+             left_body = Subst.substTy (subst b1 (Var binder)) lhs
+             right_body = Subst.substTy (subst b2 right_arg) rhs
        ; nested_binds <- newNoTcEvBinds
        ; (unifs, (body_co, solved)) <- reportFineGrainUnifications $
            do { (level, (body_co, wanteds)) <-
@@ -1034,7 +1040,7 @@ can_eq_nc_depfun ev eq_rel ty1@(DepFunTy vis1 b1 body1) ty2@(DepFunTy vis2 b2 bo
               ; return (body_co, isSolvedWC residual) }
        ; kickOutAfterUnification unifs
        ; if solved
-         then do { all_co <- zonkCo (mkDepFunCoWithVis vis1 vis2 binder domain body_co)
+         then do { all_co <- zonkCo (mkDepFunCoWithVis vis1 vis2 binder domain' body_co)
                  ; left <- zonkTcType ty1
                  ; right <- zonkTcType ty2
                  ; if coercionLKind all_co `tcEqType` left
@@ -1061,6 +1067,12 @@ comparing Consumer (IO Int) p r with Consumer (IO Int) p Char can
 determine r. Opening the two bodies with the same Id does not need the
 constructors of IO. The private body check still rejects an assignment
 that would let the index escape.
+Zonk the binder domain, both bodies and the domain coercion before
+opening the bodies. For an imported polymorphic alias, rewriting can
+update the binder's element type while an occurrence inside a family
+argument still carries the solved metavariable. Core substitution checks
+the occurrence's domain against the fresh binder's domain.
+
 Substitute the same fresh bare variable into both bodies. A function head must remain a Var; a reflexive
 cast around that variable is not a supported native call head.
 
