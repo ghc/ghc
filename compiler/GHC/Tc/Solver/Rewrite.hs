@@ -10,7 +10,8 @@
 
 module GHC.Tc.Solver.Rewrite(
    rewrite, rewriteForErrors, rewriteArgsNom, rewriteWithSourceProofs,
-   rewriteType, rewriteFamilyAxioms, rewriteTyConAppArgsNom
+   rewriteType, rewriteFamilyAxioms, rewriteFamilyAxiomsWithSourceProofs,
+   rewriteTyConAppArgsNom
  ) where
 
 import GHC.Prelude
@@ -315,15 +316,20 @@ rewriteWithSourceProofs :: CtEvidence -> TcType
                         -> TcS ((Reduction, [(Name, [SourceProofRule])]), CoHoleSet)
 rewriteWithSourceProofs ev ty
   = do { traceTcS "rewrite {" (ppr ty)
-       ; synonyms_ref <- newTcRef []
        ; result@((redn, _), _) <- runRewriteCtEv ev $
-           withRewriteEnv (\env -> env { re_source_proof_synonyms = Just synonyms_ref }) $ do
-             redn <- rewrite_one ty
-             axioms <- reductionSourceAxioms redn
-             synonyms <- liftTcS $ readTcRef synonyms_ref
-             return (redn, sourceProofUses axioms synonyms)
+           collectSourceProofs (rewrite_one ty)
        ; traceTcS "rewrite }" (ppr $ reductionReducedType redn)
        ; return result }
+
+-- | Return the checked branches that supply part of this reduction.
+collectSourceProofs :: RewriteM Reduction -> RewriteM (Reduction, [(Name, [SourceProofRule])])
+collectSourceProofs action = do
+  synonyms_ref <- liftTcS $ newTcRef []
+  withRewriteEnv (\env -> env { re_source_proof_synonyms = Just synonyms_ref }) $ do
+    redn <- action
+    axioms <- reductionSourceAxioms redn
+    synonyms <- liftTcS $ readTcRef synonyms_ref
+    return (redn, sourceProofUses axioms synonyms)
 
 -- | See Note [Rewriting]
 -- `rewriteForErrors` is a variant of 'rewrite' that rewrites
@@ -391,13 +397,22 @@ rewriteTyConAppArgsNom loc tc args
 -- | Reduce family axioms at nominal role with the solver reduction-depth limit.
 -- See Note [Solving retained function equalities] in GHC.Tc.Solver.Equality.
 rewriteFamilyAxioms :: CtLoc -> TcType -> TcS Reduction
-rewriteFamilyAxioms loc ty
-  = do { (redn, rewriters) <- runRewrite loc Given NomEq $
+rewriteFamilyAxioms loc ty = runFamilyAxioms loc (rewrite_one ty)
+
+-- | Also return the checked branches selected by axiom-only reduction.
+rewriteFamilyAxiomsWithSourceProofs :: CtLoc -> TcType -> TcS (Reduction, [(Name, [SourceProofRule])])
+rewriteFamilyAxiomsWithSourceProofs loc ty =
+  runFamilyAxioms loc (collectSourceProofs (rewrite_one ty))
+
+-- | Disable inert equalities, plugins and local definitions for this rewrite.
+runFamilyAxioms :: CtLoc -> RewriteM a -> TcS a
+runFamilyAxioms loc rewrite_action
+  = do { (result, rewriters) <- runRewrite loc Given NomEq $
            withRewriteEnv (\env -> env { re_fam_axioms_only = True
                                       , re_zap_coercions = False
-                                      , re_source_lets = emptyVarEnv }) (rewrite_one ty)
+                                      , re_source_lets = emptyVarEnv }) rewrite_action
        ; massert (isEmptyCoHoleSet rewriters)
-       ; return redn }
+       ; return result }
 
 {- *********************************************************************
 *                                                                      *

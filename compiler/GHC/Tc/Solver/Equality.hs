@@ -769,19 +769,22 @@ can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
                             , ces_rwL = True
                             , ces_rwR = True
                             }
-           ; let solve = do
-                   { proof <- tryRetainedFamilyEquality new_ev xi1 xi2
-                   ; case proof of
-                       Just co -> do
-                         { let holes = foldr (flip addRewriter) emptyCoHoleSet
-                                      (univCoDepsHoles (mkUnivCoDeps [co]))
-                         ; setEqIfWanted new_ev (CPH (downgradeRole (eqRelRole eq_rel) Nominal co) holes)
-                         ; stopWith new_ev "Solved by retained family congruence" }
-                       Nothing -> can_eq_nc ces' rdr_env envs new_ev eq_rel xi1 xi1 xi2 xi2 }
-           ; case (eq_rel, new_ev) of
-               (NomEq, CtWanted (WantedCt { ctev_dest = HoleDest hole }))
-                 -> record_reduction_uses hole (deps1 ++ deps2) solve
-               _ -> solve }
+           ; proof <- case eq_rel of
+               NomEq -> tryRetainedFamilyEquality new_ev xi1 xi2
+               ReprEq -> return Nothing
+           ; case proof of
+               Just (co, uses) -> do
+                 { let holes = foldr (flip addRewriter) emptyCoHoleSet
+                              (univCoDepsHoles (mkUnivCoDeps [co]))
+                 ; record_source_uses (deps1 ++ deps2 ++ uses)
+                 ; setEqIfWanted new_ev (CPH co holes)
+                 ; stopWith new_ev "Solved by retained family congruence" }
+               Nothing ->
+                 let solve = can_eq_nc ces' rdr_env envs new_ev eq_rel xi1 xi1 xi2 xi2
+                 in case (eq_rel, new_ev) of
+                   (NomEq, CtWanted (WantedCt { ctev_dest = HoleDest hole }))
+                     -> record_reduction_uses hole (deps1 ++ deps2) solve
+                   _ -> solve }
 
     -- See Note [Committing checked source family branches]
     -- in GHC.Tc.Solver.Rewrite.
@@ -789,13 +792,15 @@ can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
       = do { result <- solve
            ; filled <- wrapTcS (TcM.liftZonkM (unpackCoercionHole_maybe hole))
            ; case filled of
-               Just (CPH { cph_co = proof }) | isReflCo proof ->
-                 wrapTcS $ TcM.setCtLocM (ctEvLoc ev) $ do
-                   loc <- TcM.getSrcSpanM
-                   mapM_ (uncurry (TcM.recordSourceProofUse loc)) uses
+               Just (CPH { cph_co = proof }) | isReflCo proof -> record_source_uses uses
                _ -> pure ()
            ; pure result }
     record_reduction_uses _ _ solve = solve
+
+    record_source_uses [] = pure ()
+    record_source_uses uses = wrapTcS $ TcM.setCtLocM (ctEvLoc ev) $ do
+      loc <- TcM.getSrcSpanM
+      mapM_ (uncurry (TcM.recordSourceProofUse loc)) uses
 
     rewrite_if_unrewritten :: Bool -> TcType
                            -> TcS ((Reduction, [(Name, [SourceProofRule])]), CoHoleSet)
@@ -3191,13 +3196,18 @@ A Given can also fix an argument to a promoted constructor. Lift that
 Given through the family, then reduce the family axioms. Use constructor
 targets with no runtime indices so this step cannot chase a recursive
 index equation. The result must already agree with the other side.
-No new equality enters the inerts. Do not use this step inside a
-retained function equality comparison. See Note [Native runtime binder
-scopes] in GHC.Tc.Solver.Monad.
+An ordinary family can reach a checked family through its result.
+Keep the selected branch dependencies when this proof solves the Wanted.
+See Note [Committing checked source family branches] in GHC.Tc.Solver.Rewrite.
+
+This step solves nominal Wanteds only. No new equality enters the inerts.
+Do not use this step inside a retained function equality comparison.
+See Note [Native runtime binder scopes] in GHC.Tc.Solver.Monad.
 -}
 
 -- | Try a scoped nominal proof for an ordinary closed-family Wanted.
-tryRetainedFamilyEquality :: CtEvidence -> Type -> Type -> TcS (Maybe Coercion)
+tryRetainedFamilyEquality :: CtEvidence -> Type -> Type
+                          -> TcS (Maybe (Coercion, [(Name, [SourceProofRule])]))
 tryRetainedFamilyEquality ev lhs rhs
   | isWanted ev
   , isJust left || isJust right
@@ -3207,12 +3217,12 @@ tryRetainedFamilyEquality ev lhs rhs
          then return Nothing
          else do { irreds <- inert_irreds <$> getInertCans
                  ; case sameFamily irreds of
-                     Just co -> return (Just co)
+                     Just co -> return (Just (co, []))
                      Nothing -> do
-                       { Reduction co1 lhs' <- specialize irreds lhs left
-                       ; Reduction co2 rhs' <- specialize irreds rhs right
+                       { (Reduction co1 lhs', uses1) <- specialize irreds lhs left
+                       ; (Reduction co2 rhs', uses2) <- specialize irreds rhs right
                        ; return $ if lhs' `tcEqType` rhs'
-                           then Just (co1 `mkTransCo` mkSymCo co2)
+                           then Just (co1 `mkTransCo` mkSymCo co2, uses1 ++ uses2)
                            else Nothing } } }
   | otherwise = return Nothing
   where
@@ -3245,9 +3255,9 @@ tryRetainedFamilyEquality ev lhs rhs
       | let (proofs, targets) = unzip (map (refine irreds) args)
       , any (not . isReflCo) proofs
       , wellKinded (tyConKind tc) targets
-      = do { reduced <- rewriteFamilyAxioms (ctEvLoc ev) (mkTyConApp tc targets)
-           ; pure (mkTyConAppCo Nominal tc proofs `mkTransRedn` reduced) }
-    specialize _ ty _ = pure (mkReflRedn Nominal ty)
+      = do { (reduced, uses) <- rewriteFamilyAxiomsWithSourceProofs (ctEvLoc ev) (mkTyConApp tc targets)
+           ; pure (mkTyConAppCo Nominal tc proofs `mkTransRedn` reduced, uses) }
+    specialize _ ty _ = pure (mkReflRedn Nominal ty, [])
 
     refine irreds a
       | isOpaqueTermIndex a
