@@ -11,7 +11,9 @@ import Data.Maybe (catMaybes, fromMaybe, isJust, mapMaybe)
 import GHC.Builtin.WiredIn.Types (manyDataConTy, unmatchableDataConTy)
 import GHC.Core (CoreBind, CoreExpr)
 import qualified GHC.Core as Core
-import GHC.Core.Coercion.Axiom (CoAxBranch, ClosedTyFam(CTF), Role(Nominal))
+import GHC.Core.Coercion.Axiom
+  ( CoAxBranch, ClosedTyFam(CTF), Role(Nominal)
+  , coAxBranchLHS, coAxBranchRHS, coAxBranchTyVars )
 import qualified GHC.Core.DataCon as DC
 import GHC.Core.FamInstEnv (emptyFamInstEnvs, mkBranchedCoAxiom, mkCoAxBranch)
 import GHC.Core.FVs (exprFreeVars, exprSomeFreeVarsList)
@@ -24,10 +26,12 @@ import GHC.Core.TyCon
   ( FamTyConFlav(ClosedTypeFamilyTyCon), AlgTyConFlav(VanillaAlgTyCon)
   , TyCon, TyConBinder, Injectivity(NotInjective), mkAlgTyCon
   , mkLevPolyDataTyConRhs, mkTyConKind, mkAnonTyConBinder, mkNamedTyConBinders
-  , mkFamilyTyCon, mkTyConKindWithMatchability, tyConDataCons, tyConKind, tyConName )
+  , mkFamilyTyCon, mkTyConKindWithMatchability, isAlgTyCon, isPromotedDataCon
+  , tyConDataCons, tyConKind, tyConName )
 import GHC.Core.Type
   ( Kind, isLiftedTypeKind, liftedTypeKind, lookupTyVar, mkTyConApp, mkTyVarTy
-  , mkTyVarTys, splitForAllTyVars, splitFunTys, splitTyConApp_maybe, substTyUnchecked, typeKind )
+  , mkTyVarTys, splitForAllTyVars, splitFunTys, splitTyConApp_maybe, substTyUnchecked
+  , tyCoVarsOfTypes, typeKind )
 import GHC.Core.Unify (tcMatchTys)
 import GHC.Core.Utils (exprType)
 import GHC.Driver.Config (initSimpleOpts)
@@ -36,6 +40,7 @@ import GHC.Tc.Gen.SourceTable (hasSourceMethodRule, visibleSourceMethodRules)
 import GHC.Tc.TyCl.Build (buildDataCon, newImplicitBinder, newTyConRepName)
 import GHC.Tc.Utils.Instantiate (freshenTyVarBndrs)
 import GHC.Tc.Utils.Monad (TcGblEnv(..), TcM, getGblEnv, newSysName)
+import GHC.Tc.Utils.TcType (isTyFamFree)
 import GHC.Types.Avail (availNames)
 import GHC.Types.Id (Id, idDetails, idName, isDataConWorkId_maybe, isDataConWrapId_maybe)
 import GHC.Types.Id.Info (IdDetails(CheckedClosureSourceTableId, VanillaId))
@@ -54,7 +59,7 @@ import GHC.Types.Var
   ( ForAllTyFlag(Specified), TyVar, isCoVar, isId, isTyVar
   , Var, mkTyVar, mkTyVarBinders, setIdDetails, varType )
 import GHC.Types.Var.Env (mkInScopeSet)
-import GHC.Types.Var.Set (elemVarSet, mkVarSet, unionVarSet)
+import GHC.Types.Var.Set (elemVarSet, mkVarSet, subVarSet, unionVarSet)
 
 {- Note [Certifying a checked source closure]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -145,11 +150,15 @@ familyInputs bindings owner rhs = do
     ([callback_sort], [argument], lookup_body) <- function callback
     let context_kind = varType context
         sort_kind = varType sort
+    (context_tycon, []) <- splitTyConApp_maybe context_kind
+    (sort_tycon, []) <- splitTyConApp_maybe sort_kind
+    guard (all isAlgTyCon [context_tycon, sort_tycon])
     guard (all (eqType sort_kind) [varType result, varType callback_sort])
     (term, [body_ctx, TyVarTy body_sort]) <- splitTyConApp_maybe (varType body)
     (ext, [TyVarTy g, TyVarTy a]) <- splitTyConApp_maybe body_ctx
     (target, [TyVarTy capture_ctx, TyVarTy capture_sort]) <- splitTyConApp_maybe (varType capture)
     (index, [index_ctx, TyVarTy index_sort]) <- splitTyConApp_maybe (varType argument)
+    guard (isPromotedDataCon ext && all isAlgTyCon [term, index])
     guard (g == context && a == sort && body_sort == result &&
            target == term && capture_ctx == context && capture_sort == sort &&
            index_ctx `eqType` body_ctx && index_sort == callback_sort)
@@ -510,15 +519,16 @@ allocateFamilies (FamilyInputs owner context sort term ext lookup_tycon var hit 
                      , mkBranch [g,d,a,cv] [ctx_g_a,ctx_d_a,ak,l,z_g] v0
                      , mkBranch [g,d,a,b,cv,field] [ctx_g_a,ctx_d_a,bk,l,sx] weaken ]
         pure $ do
-            _ <- apply_branches
-            _ <- lookup_branches
+            apply_equations <- apply_branches
+            lookup_equations <- lookup_branches
             r <- conAt replace (closureAt ctx_g_a gk) [mkTyVarTy arg]
             let result = termAt gk bk
                 t = apply_apply ctx_g_a gk bk r (mkTyVarTy body)
                 params = mkNamedTyConBinders Specified [g,a,b] ++ map mkAnonTyConBinder [body,arg]
                 arguments = mkTyVarTys [g,a,b,body,arg]
-                root = mkFamily root_name root_axiom params result
-                          [mkBranch [g,a,b,body,arg] arguments t]
+                root_equation = mkBranch [g,a,b,body,arg] arguments t
+                root = mkFamily root_name root_axiom params result [root_equation]
+            guard (all validBranch (root_equation : apply_equations ++ lookup_equations))
             pure (root, [root,closure,apply,lookup_fam])
       _ -> pure Nothing
   where
@@ -546,6 +556,16 @@ mkFamily name axname binders result branches =
                     binders 0 result Nothing (ClosedTypeFamilyTyCon (CTF (Just axiom))) Nothing NotInjective
         axiom = mkBranchedCoAxiom Nominal axname family branches
     in family
+
+-- Check the restrictions that ordinary family syntax imposes on
+-- patterns, including the indices exposed by a promoted constructor.
+validBranch :: CoAxBranch -> Bool
+validBranch branch =
+    all isTyFamFree lhs &&
+    tyCoVarsOfTypes (coAxBranchRHS branch : lhs ++ map varType tvs) `subVarSet` mkVarSet tvs
+  where
+    lhs = coAxBranchLHS branch
+    tvs = coAxBranchTyVars branch
 
 mkBranch :: [TyVar] -> [Type] -> Type -> CoAxBranch
 mkBranch vars lhs rhs =
