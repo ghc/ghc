@@ -3220,23 +3220,29 @@ tc_app_ty_external mode rn_ty exp_kind
                          , all (\arg -> known_constructor arg || isOpenTypeOperand arg) args
                          , any known_constructor args, any open_indexed_operand args
                          , Just telescope <- indexedOpenTypeFunction fun
-                         -> do { (result, result_kind) <- tcIndexedOpenTypeCall mode fun telescope args
-                               ; checkExpKind mode rn_ty result result_kind exp_kind }
+                         -> do { observed <- tcIndexedOpenTypeCall mode fun telescope args
+                               ; case observed of
+                                   Just (result, result_kind) ->
+                                     checkExpKind mode rn_ty result result_kind exp_kind
+                                   Nothing -> executable_call fun args }
                          -- See Note [Function values and executable type calls].
                          | not (null args)
                          , ordinary_call || (isQual rdr && ready_partial_call && length args == 1)
-                         -> do { selected <- if ordinary_call then checkedClassMethod fun args else pure Nothing
-                               ; case selected of
-                                   Just check -> check
-                                   Nothing -> do
-                                     hint <- closedCallResultHint ordinary_call exp_kind
-                                     (result_kind, plan) <- tcPlanOrdinaryCall mode ordinary_call hint fun args
-                                     checkClosedCallExpectedKind rn_ty exp_kind result_kind
-                                     run <- prepareClosedCallResult result_kind plan
-                                     result <- run
-                                     checkExpKind mode rn_ty result result_kind exp_kind }
+                         -> executable_call fun args
                        _ -> unsupported name }
            _ -> unsupported name
+
+    executable_call fun args = do
+      selected <- if ordinary_call then checkedClassMethod fun args else pure Nothing
+      case selected of
+        Just check -> check
+        Nothing -> do
+          hint <- closedCallResultHint ordinary_call exp_kind
+          (result_kind, plan) <- tcPlanOrdinaryCall mode ordinary_call hint fun args
+          checkClosedCallExpectedKind rn_ty exp_kind result_kind
+          run <- prepareClosedCallResult result_kind plan
+          result <- run
+          checkExpKind mode rn_ty result result_kind exp_kind
     -- Keep closed calls on the executable path. A retained variable and
     -- nested applications that contain it have no closed runtime operand.
     -- See Note [Identity certificates and open unfoldings] in GHC.Tc.Gen.SourceTable.
@@ -3340,7 +3346,8 @@ tc_app_ty_external mode rn_ty exp_kind
       case instantiateOpenMethod worker (typeKind checked_callback) (typeKind checked_receiver) of
         Nothing -> reportOpenTypeFailure name InvalidInput
         Just (method, result_kind) -> do
-          result <- tcObserveOpenTypeCall local False name method result_kind [checked_callback, checked_receiver]
+          observed <- tcObserveOpenTypeCall local False method result_kind [checked_callback, checked_receiver]
+          result <- either (reportOpenTypeFailure name) pure observed
           checkExpKind mode rn_ty result result_kind exp_kind
 
     -- An inner checked call can return a constructor as its source type.
@@ -3490,7 +3497,8 @@ tcOpenTypeCall :: TcTyMode -> Name -> Core.CoreExpr -> Kind -> [(LHsType GhcRn, 
 tcOpenTypeCall mode name instantiated result_kind args = do
   local <- tcOpenTypeContext mode name
   operands <- mapM (checkOperand local) args
-  tcObserveOpenTypeCall local False name instantiated result_kind operands
+  observed <- tcObserveOpenTypeCall local False instantiated result_kind operands
+  either (reportOpenTypeFailure name) pure observed
   where
     checkOperand local (arg, kind) = setSrcSpanA (getLoc arg) $ do
       let check = tc_check_lhs_type mode arg kind
@@ -3520,7 +3528,7 @@ indexedOpenTypeFunction fun = do
 
 -- | Solve the operand kinds before interpreting one indexed observation.
 tcIndexedOpenTypeCall :: TcTyMode -> Id -> ([TyVar], [Kind], Kind) -> [LHsType GhcRn]
-                      -> TcM (Type, Kind)
+                      -> TcM (Maybe (Type, Kind))
 tcIndexedOpenTypeCall mode fun (tvs, domains, result) args = do
     let name = idName fun
     local <- tcOpenTypeContext mode name
@@ -3532,10 +3540,15 @@ tcIndexedOpenTypeCall mode fun (tvs, domains, result) args = do
     checked <- liftZonkM (zonkTcTypes variables)
     kind <- liftZonkM (zonkTcType result_kind)
     checked_operands <- liftZonkM (zonkTcTypes operands)
-    when (anyVarSet isMetaTyVar (tyCoVarsOfTypes checked)) $
-      reportOpenTypeFailure name InvalidInput
-    let applied = foldl Core.App (Core.Var fun) (map Core.Type checked)
-    (, kind) <$> tcObserveOpenTypeCall local True name applied kind checked_operands
+    if anyVarSet isMetaTyVar (tyCoVarsOfTypes checked)
+      then return Nothing
+      else do
+        let applied = foldl Core.App (Core.Var fun) (map Core.Type checked)
+        observed <- tcObserveOpenTypeCall local True applied kind checked_operands
+        case observed of
+          Left InvalidInput -> return Nothing
+          Left reason -> reportOpenTypeFailure name reason
+          Right ty -> return (Just (ty, kind))
 
 {- Note [Known indexed operands in source calls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3545,8 +3558,10 @@ actual checked operand kinds to instantiate the invisible telescope of
 a binary indexed function.
 
 Require a known constructor and a symbolic operand. The existing
-closed path still owns fully closed calls. Do not turn a case blocked on
-a symbolic term into an opaque call. Use the same staging, readback and
+closed path still owns fully closed calls. If this observer cannot represent
+an operand, let the ordinary call planner check the original source
+operands. Report failures after observation here, including a case blocked
+on a symbolic term. Use the same staging, readback and
 definition tracking restrictions as the other open observer paths.
 See Note [Observing indexed constructor cases] in GHC.Core.OpenWhnf.
 -}
@@ -3569,12 +3584,13 @@ tcOpenTypeContext mode name = do
     reject = failWithTc . TcRnOpenTypeEval name Nothing
 
 -- | Observe checked operands and record every definition used for readback.
-tcObserveOpenTypeCall :: Bool -> Bool -> Name -> Core.CoreExpr -> Kind -> [Type] -> TcM Type
-tcObserveOpenTypeCall local indexed name instantiated result_kind operands = do
+tcObserveOpenTypeCall :: Bool -> Bool -> Core.CoreExpr -> Kind -> [Type]
+                      -> TcM (Either OpenTypeFailure Type)
+tcObserveOpenTypeCall local indexed instantiated result_kind operands = do
   env <- getGblEnv
   outcome <- observeOpenType local indexed instantiated result_kind operands
   case outcome of
-    Left reason -> reportOpenTypeFailure name reason
+    Left reason -> return (Left reason)
     Right (result, used, constructors) -> do
       let locals = tcg_local_open_defs env
           lookup_owner n = case lookupNameEnv locals n of
@@ -3583,7 +3599,7 @@ tcObserveOpenTypeCall local indexed name instantiated result_kind operands = do
       dependencies <- forM used $ \(n, first) -> (, first) <$> lookup_owner n
       recordUnfoldedSourceUses dependencies
       updTcRef (tcg_evaluated_term_uses env) (\seen -> seen `unionNameSet` constructors `unionNameSet` mkNameSet (map fst used))
-      pure result
+      pure (Right result)
 
 -- | Report an unavailable observation at the source call.
 reportOpenTypeFailure :: Name -> OpenTypeFailure -> TcM a
