@@ -9,8 +9,11 @@ and its [expected output](Showcase.stdout) are the executable examples.
 ## Current checkpoint
 
 Work paused for handoff on 24 November 2026. All compiler lanes have stopped.
-The last compiler change is `7bd39424e0`. Revision `944a4efa9d` adds the
-623rd Showcase observation. The roadmap has **27 of 50 cards complete**
+Revision `944a4efa9d` adds the 623rd Showcase observation to the lookup
+compiler at `7bd39424e0`. On published PLFH batch 32, native `-O2`
+exposed a missing `CheckedClosureSourceTableId` case in the specialiser.
+Revision `844f309834` handles term-level calls to these functions and adds
+the failing case to the existing checked-closure regression. The roadmap has **27 of 50 cards complete**
 (23 inherited, four completed on the fork), 18 partial and five unstarted.
 [Roadmap and acceptance criteria](ROADMAP.md#where-this-fork-stands)
 
@@ -25,16 +28,21 @@ and [proof in the Showcase](Showcase.hs).
 
 | Verified input | Result |
 | --- | --- |
+| Retained self-hosted compiler at `844f309834`, job 3311 | Both compiler stages report this revision. The imported term-level call that previously crashed the specialiser compiles at `-O2`. All 623 Showcase observations matched at native `-O0`, default `-O2` and in GHCi. |
+| Published PLFH batch 32 at `f3643cfa5b`, job 3313 | 33 modules in each of four modes, 142 matching observations in both native runs and ten expected rejections in each mode. Original reports passed 36/42 at `-O0` and 33/42 at `-O2`. |
 | Showcase at `944a4efa9d`, job 3295 | All 623 observations matched the golden output at native `-O0`, default `-O2` and in GHCi. |
 | Combined PLFH book at `749aaf2388`, job 3294 | 33 modules in each of four modes, including native interface readers at both optimization levels. Both native runs matched 140 observations. All nine negative programs failed with their expected diagnostic in each mode. |
-| Original batch 31 reports on the lookup compiler | 36/42 compile at `-O0` and 33/42 at default `-O2`. The book's original matchable-arrow version of abstract renaming remains open. |
-| Compiler and library qualification | The normal 617 build passed 15 gates and 234 compatibility cases. Its focused suite passed 137/138 with the known `MTrans` diagnostic. Normal 621 passed 53/54 registered tests. The vector-facade correction passed its original installed-package test in job 3272. |
+| Original batch 31 reports on the lookup compiler | 36/42 compile at `-O0` and 33/42 at `-O2` with the book checker's interface flags. The book's original matchable-arrow version of abstract renaming remains open. |
+| Normal two-stage compiler at `f78c0b4592`, job 3292 | All 15 gates passed, including the 54 registered tests. All 234 compatibility cases passed. The focused suite passed 137/138. The one known failure is the upstream `MTrans` diagnostic in `deriving-via-compile`. |
 
-The [PLFH checkpoint](plfh/README.md) has portable Git bundles, exact
-revisions and restore commands for the combined manuscript and all three
-unfinished compiler candidates. The [shared notebook](../../PLFH-NOTES.md)
-records the book author's reports. Batch 31 is published at
-[`21dff64b26`](https://github.com/Tritlo/PLFH/tree/21dff64b26b9e447d7dfc9b99717933e897ca716).
+The book author published batch 32 at
+[`f3643cfa5b`](https://github.com/Tritlo/PLFH/tree/f3643cfa5bc257e44742fec98a4d5a875f41efd8).
+It adopts both proofs and adds a tenth negative program. Its own test
+runner reported 78 passes and zero failures (job 3305). Start new book
+work from this published revision. The [PLFH checkpoint](plfh/README.md)
+preserves the earlier combined manuscript and all three unfinished compiler
+candidates. The [shared notebook](../../PLFH-NOTES.md) records the original
+reports and the author's verification.
 The earlier paths and queue IDs below are historical records.
 
 <details>
@@ -145,11 +153,20 @@ Job 2996 matched the 113 book observations at native `-O0`, default
    declared in the same module. The candidate handles the mutual environment
    and closure declarations. Its remaining checks concern exported constructor
    visibility and final equation publication.
-3. For Adequacy (R03), qualify the corrected family-refinement candidate.
-   Nested checked calls must retain their rewrite-rule dependencies.
+3. For R03, qualify closed-family refinement from a retained equality and
+   the rewrite-rule dependencies of nested checked calls. The published
+   Adequacy chapter already proves big-step adequacy by determinism.
 4. For fresh no-code providers, account for imported rewrite rules before
    publishing substitution equations. A no-code reader can already use a
    native provider. A fresh no-code provider still withholds the beta equation.
+
+Beyond these three candidates, PLFH still needs the parallel diamond
+(`parDiamond`) for its proof of confluence, the equational laws of the
+substitution calculus, compositionality over `plug`, and small-step adequacy
+for contextual equivalence. The book also tracks opaque composition of
+isomorphism fields and matchability in Leibniz equality. The function-column,
+reverse and accumulator reports pass at `-O0` and fail at `-O2`.
+[Batch 32 chapter ledger and nine standalone reports](https://github.com/Tritlo/PLFH/blob/f3643cfa5bc257e44742fec98a4d5a875f41efd8/content/Status.md)
 
 See the [candidate revisions and examples](plfh/README.md#resume-unfinished-work).
 
@@ -921,7 +938,8 @@ docs/dependent-haskell/tools/ghc-build-job plfh-qualification \
 ```
 
 Check `verified.pass`, `modules.tsv`, `negative.tsv` and `reports.tsv`.
-The original reports run once per optimization level. A report in
+The runner supplies `-fomit-interface-pragmas -fno-write-if-simplified-core`
+and checks the original reports once per optimization level. A report in
 `fixed/` must compile at both levels. By default the checker builds
 fresh no-code providers. That check reaches the open substitution
 publication gap in the DeBruijn chapter. To check against native interfaces,
@@ -931,26 +949,44 @@ its dependencies. The checker audits the resulting interfaces and runs
 the negative clients against the same native interfaces. The
 `readback-O0` and `readback-O2` directories contain the results.
 
-The 574-line Showcase uses the normal two-stage compiler at
-`c11b29a399` in `r04-r17-r21-normal-after-572-20261123`.
-On this host the bootstrap tools are GHC 9.14.1, Cabal 3.18.1.0, Happy 2.1.7
-and Alex 3.5.4.0. A fresh checkout needs the Git submodules at their recorded
-revisions. This build copied the preceding build tree, ran `./boot`
-and `./configure`, and reused the preceding Hadrian executable with
-`-j4 --flavour=quick --docs=none`. Reuse the configured checkout and Hadrian
-binary if a build stops partway. Keep each compiler with its own libraries.
-
-Hadrian puts the stage 1 compiler in `_build/stage0/bin/ghc` and the
-self-hosted stage 2 compiler in `_build/stage1/bin/ghc`. Both use the
-target libraries in `_build/stage1/lib`. For example, from the main checkout:
+The retained WSL build is under `_build/current/source`. Run these
+commands from the GHC repository root. Hadrian puts its bootstrap-built
+compiler in `stage0` and its self-hosted compiler in `stage1`.
 
 ```sh
-stable="$PWD/_build/on-demand/r04-r17-r21-normal-after-572-20261123/source/_build/stage1"
+stage="$PWD/_build/current/source/_build/stage1"
+compiler="$stage/bin/ghc"
+libdir="$stage/lib"
 queue="$PWD/docs/dependent-haskell/tools/ghc-build-job"
 check="$PWD/docs/dependent-haskell/check-showcase.sh"
-"$queue" showcase-stage2-ghci bash "$check" "$stable/bin/ghc" "$stable/lib" --ghci
-"$queue" showcase-stage2-o2 bash "$check" "$stable/bin/ghc" "$stable/lib" --default-o2
+"$compiler" --info | grep 'Project Git commit id'
+"$queue" showcase-ghci bash "$check" "$compiler" "$libdir" --ghci
+"$queue" showcase-o2 bash "$check" "$compiler" "$libdir" --default-o2
 ```
+
+For the standalone PLFH runner, set `PLFH_GHC="$compiler"` and
+`PLFH_GHC_LIBDIR="$libdir"` in its environment. The published runner from
+`1e7fe2e934` selects the verified compiler here automatically. Older book
+revisions need the environment variables because they name retired paths. For the combined book
+use the `--native-interfaces` command above with the restored book ref.
+
+A clean checkout can regenerate the compiler. Initialize the submodules,
+including the fork of `libraries/binary`. Use GHC 9.14.1, Cabal 3.18.1.0,
+Alex 3.5.4.0 and Happy 2.1.7 to reproduce the host toolchain.
+From that checkout, run the following commands. On WSL, submit the build
+through the shared queue.
+
+```sh
+git submodule update --init --recursive
+./boot
+./configure GHC="$(command -v ghc)"
+docs/dependent-haskell/tools/ghc-build-job build-dependent-haskell \
+  hadrian/build -j4 --flavour=quick --docs=none
+```
+
+On another host, run the same Hadrian command directly. A fresh build puts
+the self-hosted compiler and its libraries under that checkout's
+`_build/stage1`.
 
 The runner checks native output, source-hidden clients and Core/STG Lint.
 The interactive flag also checks GHCi output. Verify the installed

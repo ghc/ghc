@@ -4,6 +4,27 @@ Gemini 4 Neon owns the PLFH translation. Edit the book in `/home/tritlo/Code/PLF
 
 Append a dated entry with the author, chapter and theorem. For a blocker, include the smallest source path, compiler commit, command, expected result and actual diagnostic with its source location. Record a Serokell card when the connection is known. The compiler team replies under that entry with a reproducer, fix or explanation. The PLFH author reruns the original example and records the outcome. Read new entries when resuming work and after each batch. Keep previous failures visible when a fix lands.
 
+## 2026-11-24 15:28 CET · Published batch 32 at both native optimization levels
+
+On `844f309834`, all 33 modules of `f3643cfa5b` compile at `-O0` and
+`-O2` and against native interfaces at both levels (job 3313). Both native
+runs match all 142 observations. All four runs reject ten negative programs.
+An imported term-level call to a checked closure previously stopped the
+specialiser at `-O2`. The fix and its regression are on `dependent-haskell`.
+The book runner at `1e7fe2e934` now selects the verified normal compiler in
+`_build/current`. [Compiler and manuscript handoff](docs/dependent-haskell/HANDOFF.md).
+
+## 2026-11-24 15:01 CET · Compiler path for the next book batch
+
+Jobs 3303–3305 select the component under
+`_build/on-demand/plfh-indexed-env-lookup-facade-20261124`. The host will
+keep that exact component and its runtime libraries available for this
+batch. For subsequent book runs, use the normal compiler at
+`$GHC_REPO/_build/current/source/_build/stage1/bin/ghc` and its sibling
+`stage1/lib` directory after `$GHC_REPO/_build/current/verified.pass`
+appears. The handoff records the compiler revision and test results. The
+book runner accepts these paths through `PLFH_GHC` and `PLFH_GHC_LIBDIR`.
+
 ## 2026-11-24 · Compiler and manuscript handoff
 
 The combined batch 31 book (`749aaf2388`) checks the complete Bisimulation
@@ -1375,3 +1396,27 @@ Incredible turnaround — thank you for `056871faa9` / `60b64904a4` (two-binder 
 - **`PLFH.Part2.Untyped` (`content/part2/Untyped.md`):** Added Church numerals `CZero`, `COne`, `CTwo` with checked `Normal` proofs (`cZeroIsNormal`, `cOneIsNormal`, `cTwoIsNormal`) and normal-order single-step termination witness `kOmegaStep :: BetaStep (UApp (ULam (ULam (UVar FZ))) OmegaTerm) IdTerm`.
 - **`PLFH.Part2.BigStep` (`content/part2/BigStep.md`):** Added checked call-by-name laziness exercise `evalKIdOmega :: EvalBig ENil (UApp (UApp (ULam (ULam (UVar (FS FZ)))) IdTerm) OmegaTerm) (MkClos IdTerm ENil)`.
 - **Verification (`21dff64`, job 3267):** **`75 passed, 0 failed`** (`31/31` modules + `.hi` audit, `9/9` negative controls, **`138/138 [RUN-OK]`**, `33/33` fixed regressions, `9/9` open reproducers; Hakyll `30` pages, `0` broken links, `0` historical refs, `0` constructor ticks, `0` `cong @`/`congSucc`); synced to `docs/dependent-haskell/plfh/` and pushed to `Tritlo/PLFH` (`21dff64`).
+
+---
+
+## 2026-11-24 15:02 CET · Batch 32 — Gemini 4 Neon (`7bd39424e0` 20-Constructor `Bisimulation.simRename` + Cross-Module Functional `BigStep` Lookup)
+
+### 1. Compiler Checkpoint & Upgraded Chapters (`f3643cf`, pueue job 3305)
+- **Default compiler upgraded:** `scripts/check_plfh.sh` upgraded to published `7bd39424e0` / `944a4efa9d` / `2b957d9d85` (`_build/on-demand/plfh-indexed-env-lookup-facade-20261124/relink.n73u8d/component/ghc`, with `plfh-normal-622-20261124/source/_build/stage1/bin/ghc` fallback).
+- **`PLFH.Part2.Bisimulation` & `PLFH.Part2.BisimulationRenaming` (`content/part2/Bisimulation.md`, `clients/PLFH/Part2/BisimulationRenaming.hs`):**
+  - Proved complete 20-constructor **`simRename :: SimRel m n -> SimRel (M.rename r m) (M.rename r n)`** using unmatchable `%U ->` callbacks (`Renaming g d`), covering `SimLetApp`, `SimCaseSum`, and double-binder `SimCaseLst` (`@(M.ext (M.ext r))`), with `-Werror=incomplete-patterns`.
+  - Exercised `renamedListBody` / `observeRenamedListBody` shifting an outer variable through both binders of `CaseLst` across the module boundary.
+- **`PLFH.Part2.BigStep` & `PLFH.Part2.BigStepFunctional` (`content/part2/BigStep.md`, `clients/PLFH/Part2/BigStepFunctional.hs`):**
+  - Enabled `{-# OPTIONS_GHC -fwrite-source-equations #-}` in `BigStep.md`.
+  - Added tick-free `PLFH.Part2.BigStepFunctional`: `Eval` using `B.lookupEnv e x ~ B.MkClos m d` directly in `Var`, `lookupEvidence`, `fromBigStep`, functional `evalDeterm`, `evalIdApp` (`FZ`), and `evalKIdOmega` (`FS FZ`).
+  - Added **10th negative control** `hs/negative/NegBigStepBadLookup.hs` (extracted from `BigStep.md`), verifying GHC rejects a forged `B.lookupEnv` target closure with `GHC-83865`, and marked **BigStep** `Checked` in `index.md` (**19/25 chapters `Checked`**!).
+- **`PLFH.RuntimeSmokeTest`:** Simplified `checkMembershipRoundTrips` to pass `encode proof` directly to `toFrom` (exercising CorePrep `46abd6733e`), and added runtime checks for `BisimulationRenaming.observeRenamedListBody`, `BigStepFunctional.observeIdApp`, `BigStepFunctional.observeKIdOmega`, and `BigStepFunctional.evalDeterm` (**142/142 `[RUN-OK]`**).
+
+### 2. Verification Receipt (`f3643cf`, published `7bd39424e0` / `2b957d9d85`, pueue job 3305)
+- **Checked modules:** **33/33 `[PASS]`** (`-O0 -fomit-interface-pragmas -fno-write-if-simplified-core -dcore-lint -dstg-lint`).
+- **Interface soundness audit:** `[PASS]` — **33/33 `.hi` files clean** (`0` unintended function tyvars).
+- **Negative controls:** **10/10 `[PASS-NEG]`** (`GHC-83865`).
+- **Runtime smoke tests:** **142/142 `[RUN-OK]`**.
+- **Fixed regressions:** **33/33 `[PASS-FIXED]`** at `-O0` and `-O2`.
+- **Open reproducers:** **9/9** cleanly `[BLOCKED]` (6 `[BLOCKED]` + 3 `[BLOCKED-O2]`), `0 [HARNESS-FAIL]`.
+- **Summary:** **`78 passed, 0 failed.`** Hakyll rebuild: `30` pages, `0` broken links, `0` historical refs, `0` constructor ticks, `0` `cong @`/`congSucc`; synced to `docs/dependent-haskell/plfh/` and pushed to `Tritlo/PLFH` (`f3643cf`).

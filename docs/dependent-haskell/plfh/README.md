@@ -7,6 +7,11 @@ refresh them, run the book's `scripts/extract_and_sync.py --sync-ghc` with the
 absolute path of this directory. The proof examples adapt PLFA under CC BY 4.0.
 [Attribution and book sources](https://github.com/Tritlo/PLFH)
 
+The book author adopted both combined proofs in published batch 32.
+Start new chapters from that revision. The instructions below reproduce the
+exact batch 31 handoff and its unfinished branches.
+[Published batch 32](https://github.com/Tritlo/PLFH/tree/f3643cfa5bc257e44742fec98a4d5a875f41efd8)
+
 ## Replay the combined book
 
 Start in a full checkout of the GHC fork's `dependent-haskell` branch. Set
