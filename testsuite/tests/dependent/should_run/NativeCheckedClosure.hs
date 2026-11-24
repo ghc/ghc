@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds #-}
+{-# LANGUAGE AllowAmbiguousTypes, CPP, DataKinds, ExperimentalDependentTypes, GADTs, PolyKinds #-}
 {-# LANGUAGE StandaloneKindSignatures, TypeApplications, TypeOperators #-}
 module NativeCheckedClosure where
 
@@ -42,4 +42,22 @@ loopStep m = case m of
 captured :: Step (P.Call (P.Bind Body) Inserted)
                  (P.Bind (P.Bind (P.At P.New)))
 captured = captureAvoided
+#endif
+
+#ifdef CHECK_INDEXED_RECURSION
+openTail :: forall g a b (next :: P.Slot g a) (stamp :: P.Stamp a) (other :: P.Stamp a).
+            P.findMarked ('P.Marked ('P.Old next) stamp :: P.Marked (P.Push g b))
+              :~: 'P.InTail (P.findMarked ('P.Marked next
+#ifdef WRONG_STAMP
+                                            other
+#else
+                                            stamp
+#endif
+                                            :: P.Marked g))
+openTail = Refl
+#endif
+
+#ifdef RULE_MARKED
+{-# RULES "findMarked/replace" forall (marked :: P.Marked NatScope).
+    P.findMarked marked = P.AtHead (P.Stamp False) #-}
 #endif

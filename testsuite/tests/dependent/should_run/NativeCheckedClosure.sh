@@ -16,13 +16,14 @@ for opt in -O0 -O2; do
     "${ghc[@]}" "$opt" -fwrite-source-equations -fexpose-all-unfoldings -c NativeCheckedClosureProvider.hs
     "${ghc[@]}" --show-iface NativeCheckedClosureProvider.hi >provider.iface
     grep -Fq 'CheckedClosureSourceTable T:replace' provider.iface
+    grep -Fq 'SourceTable T:findMarked' provider.iface
 
     for mode in native no-code; do
         cd "$work/$opt/$mode"
         cp "$provider/NativeCheckedClosureProvider.hi" "$inputs/NativeCheckedClosure.hs" .
         args=()
         if [[ $mode == no-code ]]; then args=(-fno-code -fwrite-interface); fi
-        "${ghc[@]}" "$opt" "${args[@]}" -c NativeCheckedClosure.hs
+        "${ghc[@]}" "$opt" "${args[@]}" -DCHECK_INDEXED_RECURSION -c NativeCheckedClosure.hs
         test ! -f NativeCheckedClosureProvider.o
         if [[ $mode == no-code ]]; then test ! -f NativeCheckedClosure.o; fi
     done
@@ -31,6 +32,21 @@ for opt in -O0 -O2; do
         exit 1
     fi
     grep -Fq '[GHC-83865]' wrong.log
+
+    if "${ghc[@]}" "$opt" -fno-code -fforce-recomp -DCHECK_INDEXED_RECURSION -DWRONG_STAMP \
+         -c NativeCheckedClosure.hs >wrong.log 2>&1; then
+        cat wrong.log
+        exit 1
+    fi
+    grep -Fq 'other' wrong.log
+
+    if "${ghc[@]}" "$opt" -fno-code -fforce-recomp -DCHECK_INDEXED_RECURSION -DRULE_MARKED \
+         -c NativeCheckedClosure.hs >rule.log 2>&1; then
+        cat rule.log
+        exit 1
+    fi
+    grep -Fq '[GHC-83605]' rule.log
+    grep -Fq 'P.findMarked' rule.log
 
     cd "$work/$opt/withheld"
     cp "$inputs/NativeCheckedClosureProvider.hs" .
@@ -47,6 +63,14 @@ for opt in -O0 -O2; do
             -fforce-recomp "-D$variant" -c NativeCheckedClosureProvider.hs
         "${ghc[@]}" --show-iface NativeCheckedClosureProvider.hi >withheld.iface
         if grep -Eq 'CheckedClosureSourceTable T:replace|\$apply:replace' withheld.iface; then
+            exit 1
+        fi
+    done
+    for variant in STRICT_TAIL CHANGED_STAMP HIDE_MARKED; do
+        "${ghc[@]}" "$opt" -fwrite-source-equations -fexpose-all-unfoldings \
+            -fforce-recomp "-D$variant" -c NativeCheckedClosureProvider.hs
+        "${ghc[@]}" --show-iface NativeCheckedClosureProvider.hi >withheld.iface
+        if grep -Fq 'SourceTable T:findMarked' withheld.iface; then
             exit 1
         fi
     done
