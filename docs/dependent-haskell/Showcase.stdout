@@ -553,6 +553,7 @@ apply the same partially applied addition to equal sizes: Refl
 prove the length of a countdown: ([Succ (Succ Zero),Succ Zero,Zero],Refl)
 subtract a runtime natural from zero: (Zero,Refl)
 raise three to the fourth power and prove the successor equation: (True,Refl)
+multiply zero by an unevaluated argument and prove the open equation: (True,Refl)
 check powers and truncated subtraction where they are defined: (Refl,Refl,Refl)
 lift equality under successor and partially applied addition: (Refl,Refl)
 lift equality under binary increment and exponentiation: (Refl,Refl)

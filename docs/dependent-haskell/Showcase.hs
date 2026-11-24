@@ -334,6 +334,10 @@ powSuccessor :: foreach (m :: HaskLib.Nat) -> foreach (n :: HaskLib.Nat)
                 :~: BookNaturals.times m (BookNaturals.pow m n)
 powSuccessor _ _ = Refl
 
+-- | Multiplication by zero ignores its second argument.
+timesZeroLeft :: foreach (n :: HaskLib.Nat) -> BookNaturals.times 0 n :~: 0
+timesZeroLeft _ = Refl
+
 -- | Return the measurement and certify that reversal preserves it.
 measureReverseLength :: forall a. foreach (measure :: [a] -> HaskLib.Size)
                      -> foreach (xs :: [a])
@@ -1988,6 +1992,8 @@ main = do
         (BookNaturals.monus 0 count, zeroMonus count)
     observe "raise three to the fourth power and prove the successor equation"
         (HaskLib.eqSize (BookNaturals.pow count 4) 81, powSuccessor count 3)
+    observe "multiply zero by an unevaluated argument and prove the open equation"
+        (HaskLib.eqSize (BookNaturals.times 0 (error "forced wildcard")) 0, timesZeroLeft count)
     observe "check powers and truncated subtraction where they are defined"
         (BookNaturals.threePowFour, BookNaturals.threeMonusTwo, BookNaturals.twoMonusThree)
     observe "lift equality under successor and partially applied addition"

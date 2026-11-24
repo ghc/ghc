@@ -15,7 +15,7 @@ monus (Succ m) (Succ n) = monus m n
 
 -- | Multiply by recursion on the first operand.
 times :: Nat -> Nat -> Nat
-times Zero     n = Zero
+times Zero     _ = Zero
 times (Succ m) n = plus n (times m n)
 
 -- | Raise the base to the natural exponent.
