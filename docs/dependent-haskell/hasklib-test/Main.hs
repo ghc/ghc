@@ -1,12 +1,12 @@
 module Main where
 
 import Control.Exception (ErrorCall(..), evaluate, try)
-import Client (addUnder, checkAppendSingleton, checkNat, checkReverse, checkZipMap, zipLaw)
+import Client (addUnder, checkAppendSingleton, checkNat, checkReverse, checkZipMap, mapLaw, zipLaw)
 import HaskLib
 
 -- | Use the installed list proofs from an ordinary Haskell function.
 check :: (Bool -> Bool) -> (Bool -> Bool -> Bool) -> [Bool] -> [Bool] -> Bool
-check pre f xs ys = case lengthMap pre xs of
+check pre f xs ys = case mapLaw pre xs of
     Refl -> case lengthAppend xs ys of
         Refl -> case zipLaw xs ys of
             Refl -> case lengthZipWith f xs ys of Refl -> True

@@ -1,7 +1,7 @@
 {-# LANGUAGE GHC2024, ExplicitNamespaces, ExperimentalDependentTypes #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 
-module Client (zipLaw, addUnder, lengthAppendSingleton, checkAppendSingleton, checkReverse, zipMapLaw, checkZipMap, checkNat) where
+module Client (mapLaw, zipLaw, addUnder, lengthAppendSingleton, checkAppendSingleton, checkReverse, zipMapLaw, checkZipMap, checkNat) where
 
 import qualified HaskLib as H
 import HaskLib.Nat (type (+))
@@ -24,6 +24,11 @@ lengthAppendSingleton xs x =
 checkAppendSingleton :: [Bool] -> Bool -> Bool
 checkAppendSingleton xs x = case lengthAppendSingleton xs x of
     H.Refl -> True
+
+-- | Give the imported map law the same polymorphic callback domain.
+mapLaw :: forall a b. foreach (f :: a -> b) -> foreach (xs :: [a])
+       -> H.size (map f xs) H.:~: H.size xs
+mapLaw = H.lengthMap
 
 -- | Give the imported reverse law the same polymorphic signature.
 reverseLaw :: forall a. foreach (xs :: [a]) -> H.size (reverse xs) H.:~: H.size xs

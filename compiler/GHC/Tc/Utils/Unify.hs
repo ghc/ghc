@@ -2019,6 +2019,11 @@ domains agree or normalize to the same type. Check the nominal equality of
 the domains first in the current implication. This lets the ordinary unifier
 assign alpha to a.
 
+Read back the domain assignments before comparing the two telescopes. In
+an alias such as lengthMapLaw = lengthMap, the callback domain contains
+both freshly instantiated parameters. The retained binder and occurrences
+of the callback in the result must see the same instantiated type.
+
 Then check the whole retained function equality for the cast and the runtime
 index scope. This check adds no runtime lambda. Deep subsumption has a separate
 rule for an expected dictionary immediately below a retained binder.
@@ -2036,7 +2041,9 @@ unify_retained_rho unify actual expected
         domain_e = varType b_e
   , not (domain_a `tcEqType` domain_e)
   = do { _ <- unify domain_a domain_e
-       ; unify actual expected }
+       ; actual' <- liftZonkM (zonkTcType actual)
+       ; expected' <- liftZonkM (zonkTcType expected)
+       ; unify actual' expected' }
   | otherwise
   = unify actual expected
 
