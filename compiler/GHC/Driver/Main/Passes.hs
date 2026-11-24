@@ -46,6 +46,7 @@ import GHC.Driver.Main.Hsc
       ioMsgMaybe,
       nativeOptLevel,
       checkNativeDependentModule,
+      hasNativeDependentModuleBody,
       nativeCodeGenFlags,
       hscSimpleIface )
 
@@ -937,7 +938,7 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
           -- user requested. See #22008 for some discussion.
           plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
           simplified_guts <- hscSimplify' plugins desugared_guts
-          let checked_tc = validateSimpleSourceTables desugared_guts simplified_guts tc_result
+          let checked_tc = validateSimpleSourceTables desugared_guts (Just simplified_guts) tc_result
           (cg_guts, _) <-
               liftIO $ hscTidy hsc_env simplified_guts
 
@@ -958,7 +959,9 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
       _ -> do
         checked_tc <- case mb_desugar of
           Just guts | not (null (finalCoreMappers (mg_binds guts))) -> do
-            optimized <- hscSimplify' [] guts
+            let ordinary = null (mg_rules guts) &&
+                           not (hasNativeDependentModuleBody (mg_binds guts) [] (mg_tcs guts))
+            optimized <- if ordinary then Just <$> hscSimplify' [] guts else pure Nothing
             pure (validateSimpleSourceTables guts optimized tc_result)
           _ -> pure tc_result
         (iface, _details) <- liftIO $
@@ -981,7 +984,7 @@ keepValidatedSourceMappers original final
   | otherwise = final { mg_binds = map clearBind (mg_binds final)
                       , mg_tcs = filter (not . invalidFamily) (mg_tcs final) }
   where
-    (owners, families) = invalidSourceMappers original final
+    (owners, families) = invalidSourceMappers original (Just final)
     invalidFamily tc = tyConName tc `elemNameSet` families
     clearOwner = clearInvalidSourceOwner owners families
     clearBind (NonRec v rhs) = NonRec (clearOwner v) rhs
@@ -989,7 +992,7 @@ keepValidatedSourceMappers original final
 
 -- | Withdraw invalid provisional equations before emitting a simple interface.
 -- See Note [Final Core source equations] in GHC.Tc.Gen.SourceTable.
-validateSimpleSourceTables :: ModGuts -> ModGuts -> TcGblEnv -> TcGblEnv
+validateSimpleSourceTables :: ModGuts -> Maybe ModGuts -> TcGblEnv -> TcGblEnv
 validateSimpleSourceTables original final env
   | null (finalCoreMappers (mg_binds original)) = env
   | isEmptyNameSet owners && isEmptyNameSet families = env
@@ -1003,18 +1006,23 @@ validateSimpleSourceTables original final env
     clearOwner thing = thing
 
 -- | Collect rejected owners and families, including equations that refer to them.
-invalidSourceMappers :: ModGuts -> ModGuts -> (NameSet, NameSet)
+invalidSourceMappers :: ModGuts -> Maybe ModGuts -> (NameSet, NameSet)
 invalidSourceMappers original final =
     (mkNameSet (map idName failed),
      close (mkNameSet (map tyConName
             (rejected_list_tables ++ concatMap finalCoreSourceFamilies failed))))
   where
-    failed = filter (not . verifyFinalCoreMapper (mg_binds final))
-                    (finalCoreMappers (mg_binds original))
-    rejected_list_tables = failedFinalListTables (mg_binds final) (mg_tcs final)
+    candidates = finalCoreMappers (mg_binds original)
+    failed = case final of
+      Just guts -> filter (not . verifyFinalCoreMapper (mg_binds guts)) candidates
+      Nothing -> candidates
+    rejected_list_tables = case final of
+      Just guts -> failedFinalListTables (mg_binds guts) (mg_tcs guts)
+      Nothing -> []
+    tycons = maybe (mg_tcs original) mg_tcs final
     invalidFamily invalid tc = tyConName tc `elemNameSet` invalid
     close invalid =
-      case [tyConName tc | tc <- mg_tcs final
+      case [tyConName tc | tc <- tycons
                         , not (invalidFamily invalid tc)
                         , maybe False (any (invalidFamily invalid)) (sourceTableCallees tc)] of
         [] -> invalid

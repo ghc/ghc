@@ -2030,10 +2030,12 @@ sourceCaseTables binds = do
   dflags <- getDynFlags
   rdr_env <- getGlobalRdrEnv
   let generates_code = backendGeneratesCode (backend dflags)
-  no_code_structural <- if generates_code then pure False else do
-    hsc <- getTopEnv
-    added_plugins <- readTcRef (tcg_th_coreplugins env)
-    pure (null added_plugins && null (pluginsWithArgs (hsc_plugins hsc)))
+  no_code_structural <- if generates_code || not (null (tcg_rules env))
+    then pure False
+    else do
+      hsc <- getTopEnv
+      added_plugins <- readTcRef (tcg_th_coreplugins env)
+      pure (null added_plugins && null (pluginsWithArgs (hsc_plugins hsc)))
   let exported = mkNameSet (concatMap availNames (tcg_exports env))
       ruled = sourceRuleOwners (tcg_rules env)
       enum_enabled = not char_tables
@@ -2053,10 +2055,10 @@ sourceCaseTables binds = do
         = publicCaseType env exported imported (dataConTyCon con)
         | otherwise = False
       structural_candidate owner
-        | isNothing (sourceTableOccurrence env owner >>= sourceTableId_maybe)
+        | generates_code || no_code_structural
+        , isNothing (sourceTableOccurrence env owner >>= sourceTableId_maybe)
         , Just signature <- constructorCaseType (varType owner)
-        = ((generates_code || no_code_structural) && isTwoStructuralCase signature) ||
-          (generates_code && isSizeListCase signature)
+        = isTwoStructuralCase signature || isSizeListCase signature
         | otherwise = False
       partial_case_candidate owner =
         (generates_code || no_code_structural) &&
@@ -3107,14 +3109,19 @@ See Note [Nullary indexed source projections].
 The new private family is available to neither user declarations nor the
 helper collector.
 
-A no-code module can also check equations for structural sizes and non-list
-constructor cases. The driver checks the optimized body before it writes
-those equations to the simple interface. It does this only for modules
-without plugins. This preserves the no-code path that skips Core plugin
-passes. The interface contains the checked equations and no additional Core
-program. A module that explicitly requests simplified Core keeps that
-separate driver path. See validateSimpleSourceTables in
-GHC.Driver.Main.Passes.
+A no-code module can check equations for structural sizes, for a size and a
+list, and for independent constructor cases. The driver checks the
+optimized body before it writes the equations to the simple interface.
+Simple interfaces do not include rules. A source rule can rewrite a call
+without changing the rule owner's Core. Skip new no-code candidates in
+modules with source rules. Also skip them in modules with plugins so
+no-code compilation does not start running Core plugin passes.
+
+The driver discards these candidates if the module needs the retained
+program pipeline. That pipeline still requires an object or bytecode
+backend. This check emits equations without a Core program. A module
+that explicitly requests simplified Core keeps its separate driver
+path. See validateSimpleSourceTables in GHC.Driver.Main.Passes.
 
 Before Tidy the driver checks the final optimized definition of the same
 owner with the same structural test. This check covers the actual callback,
