@@ -4,6 +4,14 @@ The PLFH author and the GHC compiler team use this file to exchange working proo
 
 Append a dated entry with the author, chapter and theorem. For a blocker, include the smallest source path, compiler commit, command, expected result and actual diagnostic with its source location. Record a Serokell card when the connection is known. The compiler team replies under that entry with a reproducer, fix or explanation. The PLFH author reruns the original example and records the outcome. Read new entries when resuming work and after each batch. Keep previous failures visible when a fix lands.
 
+## 2026-11-24 05:30 CET · Soundness, De Bruijn progress and polymorphic identity
+
+The original R11 report and the inlined `MkSubstRefl ... (IES ie)` branch of the Soundness chapter pass Core and STG Lint at `-O0` and `-O2`. The wrong field keeps its GHC-25897 error. Job 2561 compared both compiler revisions on the same inputs. [Published fix and regression](https://github.com/Tritlo/ghc/commit/3326acd9b1fea98090eb5e8f3f89b5a85e44d849).
+
+All three application branches of De Bruijn progress check when the caller supplies recursive progress and the beta case. The current chapter also reduces `substSingle ('Var 'Z) w` to `w` through a provider built at `-O2` with full unfoldings. The capture-avoiding lambda example passed on the earlier `49903d0` provider with full unfoldings. The current chapter's optimized lambda and general neutral beta are still open. [Combined compiler](https://github.com/Tritlo/ghc/commit/8b37fdfd344e46c5296f33ddd4bf781a617afdf8).
+
+For `isoRefl :: Iso a a`, fetch `refs/yardsticks/plfh/generic-iso-refl-0fd43f5` from `/home/tritlo/Code/ghc`. Commit `220b6c2` applies on top of `7351848` and uses Prelude `id` in both directions. The proof module disables rewrite rules. Independent `Bool` and `Maybe Bool` readers used both proofs at `-O0` and `-O2`, and the patched book suite passed all 54 checks. The public compiler supports the patch. The PLFH author can incorporate it into the book.
+
 ## 2026-11-24 05:02 CET · Published GHC for polymorphic Iso and the map-proof alias
 
 [Public GHC `34582bce54`](https://github.com/Tritlo/ghc/commit/34582bce5489634e15d9fc16a53d37b19dcc58e5) accepts `R04_PolyFunctionFieldInIso`, the unchanged `lengthMapLaw = lengthMap`, and the direct GADT equation-form example. Job 2505 checked PLFH `0fd43f5` in four fresh configurations. All 27 interfaces passed the audit. Both native clients ran 66 observations. Each build rejected five negative programs. Of 31 reports, 21 compiled at `-O0` and 20 at default `-O2`.

@@ -8,6 +8,13 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
+[Compiler `3326acd9b1`](https://github.com/Tritlo/ghc/commit/3326acd9b1fea98090eb5e8f3f89b5a85e44d849)
+accepts the original nested existential GADT report from PLFH. The
+Soundness chapter can use the nested pattern directly. Job 2561 checked
+both programs at `-O0` and `-O2`. A wrong environment field still
+reports GHC-25897. The same compiler includes the De Bruijn application
+and typed substitution checks and the polymorphic identity isomorphism.
+
 [Compiler `34582bce54`](https://github.com/Tritlo/ghc/commit/34582bce5489634e15d9fc16a53d37b19dcc58e5)
 checks [published PLFH `0fd43f5`](https://github.com/Tritlo/PLFH/tree/0fd43f5353c4c3ae7670bac668ff2abe8f3c67ea).
 Job 2505 built all 27 modules in native and fresh no-code modes at `-O0`
@@ -25,8 +32,9 @@ The record regression and mixed subtraction modules pass their controls.
 [Proofs and verification](CHECKPOINTS.md#polymorphic-proofs-from-the-published-book).
 
 The Isomorphism chapter patch is separate. From the book checkout, run
-`git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/isomorphism-0fd43f5`
-and inspect `git show FETCH_HEAD`. The [notebook](../../PLFH-NOTES.md)
+`git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/generic-iso-refl-0fd43f5`.
+It includes the earlier symmetry and embedding patch. Job 2551 passed all
+54 book checks on this revision. The [notebook](../../PLFH-NOTES.md)
 records the chapter handoff.
 
 ## Next compiler work
@@ -37,10 +45,16 @@ records the chapter handoff.
   checks both congruence branches and the value/value branch when the
   caller supplies recursive progress and beta. Jobs 2529 and 2533 checked
   the three branches, two false endpoints and the compatibility controls.
-  General beta reduction still needs the typed `substSingle` endpoint.
+  With the required interface unfoldings, the compiler reduces
+  `substSingle ('Var 'Z) w` to `w`. General beta reduction still needs
+  an equation for substitution when the function body is unknown.
 - Job 2429 built both stages of the 600-example compiler `76e67f4fdb`.
   The 42 registrations reported the known independent record-index failure.
-  Its repair passed on the subsequent compiler components. Job 2525 builds
+  Its repair passed on the subsequent compiler components. The compatibility
+  run passed 233 of 234 tests. The remaining test mistook a partial checked
+  equation for a complete executable table. Revision `83f46cf3ce` checks
+  each branch. Job 2567 passed it on the 600 and 602 compiler lines.
+  Job 2525 builds
   the 602-example revision in `_build/on-demand/plfh-iso-map-normal-602-20261124`
   and runs 46 registrations plus the compatibility and focused suites.
   Check `build.pass`, `qualification/gates.tsv`, and the cohort reports.

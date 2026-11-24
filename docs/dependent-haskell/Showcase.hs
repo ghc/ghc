@@ -177,6 +177,7 @@ import qualified PreludeZipProof
 import qualified HaskLib
 import qualified BookCalculations as Book
 import qualified BookIsomorphism as BookIso
+import qualified BookIsoRefl
 import qualified BookNaturals
 import qualified CastedConstructorGivens as TreeProof
 import qualified SumOfSizes
@@ -1982,6 +1983,10 @@ main = do
         BookIso.MkIso to from fromTo toFrom ->
             observe "convert a Boolean to a bit and check both inverse laws"
                 (to True, from BookIso.Clear, fromTo True, toFrom BookIso.Clear)
+    case BookIsoRefl.isoRefl :: BookIso.Iso (Maybe Bool) (Maybe Bool) of
+        BookIso.MkIso to from fromTo toFrom ->
+            observe "apply the identity isomorphism at Maybe Bool"
+                (to (Just True), from Nothing, fromTo (Just False), toFrom Nothing)
     let arrow = Book.Arrow Book.Bottom (error "forced the arrow output")
     observe "take the domain of a join of function values"
         (Book.dom (Book.Join arrow Book.Bottom), Book.domJoin arrow Book.Bottom)

@@ -59,6 +59,11 @@ a comparison implementation. External solvers remain later work.
   Inspecting a lambda leaves its body unevaluated.
   [Agda progress](https://plfa.github.io/DeBruijn/#progress),
   [PLFH DeBruijn](https://github.com/Tritlo/PLFH/blob/49903d04bdde2b140a763c16cca23768a9f8dd08/content/part2/DeBruijn.md).
+- **Substitution under a binder.** PLFA extends the substitution when it
+  enters a lambda. A free variable in the replacement must still refer to
+  the outer context. The compiler regression checks the shift on PLFH's
+  typed `substSingle` and rejects the endpoint that would capture the variable.
+  [Agda simultaneous substitution](https://plfa.github.io/DeBruijn/#simultaneous-substitution).
 - **Isomorphism fields.** PLFA packages two functions with proofs of both
   round trips. The fork's GADT has four fields. Its first two fields are
   retained functions between lifted type parameters. The other two refer
@@ -67,6 +72,12 @@ a comparison implementation. External solvers remain later work.
   even when the endpoints have the same type.
   [Agda Isomorphism](https://plfa.github.io/Isomorphism/),
   [PLFH reproducer](https://github.com/Tritlo/PLFH/blob/0fd43f5353c4c3ae7670bac668ff2abe8f3c67ea/reproducers/R04_PolyFunctionFieldInIso.hs).
+- **Reflexivity of isomorphism.** PLFA uses identity in both directions.
+  Each round trip computes to its input. The Haskell chapter uses Prelude
+  `id` and the same pointwise proof. It disables rewrite rules in the
+  proof module so that the compiler can use the checked identity equation.
+  [Agda equivalence laws](https://plfa.github.io/Isomorphism/#isomorphism-is-an-equivalence),
+  [Haskell proof](examples/open-evaluation/BookIsoRefl.hs).
 - **Callback inference.** Agda can infer implicit arguments from the
   signature of a partially applied function. In `lengthMapLaw = lengthMap`,
   GHC already infers the callback's input and output types. The fix reads those
