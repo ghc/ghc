@@ -2614,6 +2614,12 @@ sourceLength :: forall a. [a] -> Nat, the signature binds a, so only Nat
 can add a dependency. Compare the renamed element Name with the binder.
 Only schedule a lifted type binder with no further kind dependencies.
 
+A unary list result can use the same element parameter, as in
+rev :: [a] -> [a]. Use the domain dependency check for that result.
+The row scan recognizes bracket list literals. The typed source checker
+still decides whether they desugar directly to constructors and checks
+each helper call. See Note [Composed source equations] in GHC.Tc.Gen.SourceTable.
+
 For nodes :: forall a k. Tree k a -> Size, record Tree separately from
 the worker's bound parameters. The order of the forall does not control
 the order of the datatype's arguments. Tree can come from an ordinary
@@ -2739,6 +2745,7 @@ localSourceTableBinders binds sigs =
         check args expr = case unLoc (stripParensLHsExpr expr) of
           HsApp _ fun arg -> check (arg : args) fun
           OpApp _ left op right -> check (left : right : args) op
+          ExplicitList _ items -> null args && all (check []) items
           HsAppType _ fun _
             | null carried -> case unLoc (stripParensLHsExpr fun) of
                 HsAppType{} -> check args fun
@@ -2950,6 +2957,8 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
       -- See Note [Source equations returning a structural list] in GHC.Tc.Gen.SourceTable.
       _ | Just [] <- outer_vars outer, Just element <- list_element ty ->
             type_dependencies element
+        | TableInType{} <- use, Just [_] <- outer_vars outer, Just _ <- list_element ty ->
+            domain_dependencies outer ty
       _ -> type_dependencies ty
 
     list_element :: LHsType GhcRn -> Maybe (LHsType GhcRn)
