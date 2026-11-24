@@ -128,7 +128,8 @@ publishCheckedSourceClosures original_binds final_binds final_types = do
         exported = availsToNameSet (tcg_exports env)
         imported name = isWiredInName name || ordinaryImport rdr_env name
         public = publicCaseType env exported imported
-        original = [(v, simpleOptExpr opts rhs) | (v, rhs) <- inspect original_binds]
+        unoptimized = inspect original_binds
+        original = [(v, simpleOptExpr opts rhs) | (v, rhs) <- unoptimized]
         final = inspect final_binds
         inspect binds = [(v, stripTicksE breakpoint rhs) | (v, rhs) <- Core.flattenBinds binds]
         breakpoint Breakpoint{} = True
@@ -177,6 +178,11 @@ publishCheckedSourceClosures original_binds final_binds final_types = do
           guard (idName rename == idName final_rename && idName extend == idName final_extend)
           actual_rename <- lookupOwner final_rename
           actual_extend <- lookupOwner final_extend
+          original_extension <- lookup extend unoptimized
+          final_extension <- lookup actual_extend final
+          let helper v = isValueVar v &&
+                         not (isJust (isDataConWorkId_maybe v <|> isDataConWrapId_maybe v))
+          guard (all (null . exprSomeFreeVarsList helper) [original_extension, final_extension])
           helpers <- dependencies isExternalName rename actual_rename
           guard (actual_extend `elem` helpers)
           pure (actual_rename, (actual_extend, shape), helpers)
@@ -995,6 +1001,11 @@ when the provider exports both. The variable row keeps the rank-n
 callback application below a lazy constructor. A binder row partially
 applies the same checked extension that the client can name. Reduction
 stops at an unknown lookup or term.
+
+Check the extension before SimpleOpt and after optimization. Its only
+free term Ids can be constructor workers or wrappers. The callback is
+bound by the extension. User rules cannot target these constructors,
+so the extension table has an empty helper list and checks its owner.
 
 Use the original unmatchable callback kind. A runtime renaming can
 map two distinct lookups to the same value. This certificate gives no
