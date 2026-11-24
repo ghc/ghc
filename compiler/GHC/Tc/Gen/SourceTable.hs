@@ -2807,11 +2807,12 @@ isTwoListCaseTable table =
     isJust (closedFamilyTyConCoAxiom_maybe table) &&
     maybe False isTwoListCase (constructorCaseType (tyConKind table))
 
--- | Two operands and a result at the same ordinary recursive datatype.
+-- | Two structural sizes, returning a size of that datatype or a Boolean.
 -- See Note [Checked cases on two structural sizes].
 isTwoStructuralCase :: ConstructorCaseType -> Bool
 isTwoStructuralCase (ConstructorCaseType [] root [] [left, right] 0 result) =
-    left `eqType` result && right `eqType` result && isStructuralSize root left
+    left `eqType` right && (left `eqType` result || result `eqType` boolTy) &&
+    isStructuralSize root left
 isTwoStructuralCase _ = False
 
 -- | A structural size bound followed by an ordinary list of the result type.
@@ -3136,9 +3137,17 @@ Note [Checked cases on two structural sizes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A structural size has two constructors. One is nullary. The other has a
 single lazy field at the same datatype. An ordinary function can inspect
-two values at this datatype and return a value of the same type. For
-example, minSize returns zero if the left size is zero. It inspects the
-right size only after the left size matches its successor constructor.
+two values at this datatype and return a size or Bool. For example,
+minSize returns zero if the left size is zero. It inspects the right size
+only after the left size matches its successor constructor. A predicate
+such as eqSize scrutinizes both sizes.
+
+A Boolean leaf can return a direct recursive call. The call must pass the
+same operand checks as recursion under a constructor. For eqSize, the
+leaf for two successors calls eqSize on their two predecessor fields.
+A new, swapped, or unbound operand fails the check for its column.
+The same ordered case tree keeps the second argument's demand. Bool has
+nullary constructors, so this path adds no delayed result fields.
 
 Use the same row checker as for two list operands. Each recursive operand
 must be its original value or a field of its own pattern. At least one
@@ -4492,7 +4501,7 @@ checkedSpecConstrWorker bindings table owner = do
     guard (eqTypes (map varType fields) (map instantiate [mkTyVarTy a, left, right]) &&
            maybe True null (idCbvMarks_maybe worker))
     guard (lazySpecConstrFields (tidyCbvInfoTop emptyNameSet worker rhs))
-    rows <- checkedConstructorRows True (const True) Nothing (const Nothing)
+    rows <- checkedConstructorRows True False (const True) Nothing (const Nothing)
               (checkedSpecializedCall worker other parameters)
               parameters (instantiate result) [pattern, CaseField other] other body
     axiom <- closedFamilyTyConCoAxiom_maybe table
@@ -4605,8 +4614,10 @@ checkedConstructorCaseWith specialized visible helper owner rhs = do
               [_, other] <- pure terms
               checkedSpecializedCall worker other (mkTyVarTys (binderVars telescope))
                                      patterns aliases expr)
-    rows <- checkedConstructorRows (multipleCaseOperands signature) public witness_root
-                                  helper recursive kinds result (map CaseField terms) scrutinee body
+    let tail_recursive_predicate = isTwoStructuralCase signature && result `eqType` boolTy
+    rows <- checkedConstructorRows (multipleCaseOperands signature) tail_recursive_predicate
+                                  public witness_root helper recursive kinds result
+                                  (map CaseField terms) scrutinee body
     forM_ witness_root $ \con -> do
       [ConstructorCaseRow [CaseConstructor actual [] (CaseField witness : payloads)]
                           (CaseField value)] <- pure rows
@@ -4667,11 +4678,11 @@ multipleCaseOperands signature =
     isTwoListCase signature || isTwoStructuralCase signature || isSizeListCase signature
 
 -- | Check the remaining cases from the supplied operand patterns.
-checkedConstructorRows :: Bool -> (TyCon -> Bool) -> Maybe DataCon -> (Id -> Maybe TyCon)
+checkedConstructorRows :: Bool -> Bool -> (TyCon -> Bool) -> Maybe DataCon -> (Id -> Maybe TyCon)
                        -> ([ConstructorCaseTree] -> [(Id, Id)] -> Core.CoreExpr -> Maybe ConstructorCaseTree)
                        -> [Type] -> Type -> [ConstructorCaseTree] -> Id -> Core.CoreExpr
                        -> Maybe [ConstructorCaseRow]
-checkedConstructorRows bind_aliases public witness_root helper recursive parameters result patterns scrutinee =
+checkedConstructorRows bind_aliases tail_self public witness_root helper recursive parameters result patterns scrutinee =
     checkBody patterns [] (Just scrutinee)
   where
     checkCase patterns aliases scrutinee
@@ -4736,10 +4747,12 @@ checkedConstructorRows bind_aliases public witness_root helper recursive paramet
             checkBody patterns ((binder, selected) : aliases) first_case rest
       _ -> do
         guard (isNothing first_case)
-        value <- checkCaseResult public (casePublicKind public parameters) helper
+        let check_self = recursive patterns aliases
+        value <- (guard tail_self *> check_self body) <|>
+                 checkCaseResult public (casePublicKind public parameters) helper
                     (\v -> let selected = resolveCaseAlias aliases v
                            in selected <$ guard (scoped selected))
-                    (recursive patterns aliases) result body
+                    check_self result body
         pure [ConstructorCaseRow patterns value]
       where
         scoped v = any (hasCaseField v) patterns
