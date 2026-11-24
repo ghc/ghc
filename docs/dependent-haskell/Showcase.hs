@@ -179,6 +179,8 @@ import qualified BookCalculations as Book
 import qualified BookIsomorphism as BookIso
 import qualified BookIsoRefl
 import qualified BookIsoComposition
+import qualified BookConnectives
+import qualified BookReverseProof
 import qualified BookNaturals
 import qualified CastedConstructorGivens as TreeProof
 import qualified SumOfSizes
@@ -1992,6 +1994,19 @@ main = do
         BookIso.MkIso to from fromTo toFrom ->
             observe "compose the Boolean-to-bit isomorphism with its inverse"
                 (to True, from False, fromTo False, toFrom True)
+    case BookConnectives.sumComm :: BookIso.Iso (Either Bool Ordering) (Either Ordering Bool) of
+        BookIso.MkIso to from fromTo toFrom ->
+            observe "exchange the alternatives of a sum and check both inverse laws"
+                (to (Left True), from (Left GT), fromTo (Right LT), toFrom (Right False))
+    case BookConnectives.prodComm :: BookIso.Iso (Bool, Ordering) (Ordering, Bool) of
+        BookIso.MkIso to from fromTo toFrom ->
+            let leftPair = (True, GT)
+                rightPair = (LT, False)
+            in observe "exchange the fields of a pair and check both inverse laws"
+                (to leftPair, from rightPair, fromTo leftPair, toFrom rightPair)
+    observe "reverse onto an accumulator and check the append proof"
+        (BookReverseProof.shunt [True, False] [True],
+         BookReverseProof.checkShuntReverse [True, False] [True])
     let arrow = Book.Arrow Book.Bottom (error "forced the arrow output")
     observe "take the domain of a join of function values"
         (Book.dom (Book.Join arrow Book.Bottom), Book.domJoin arrow Book.Bottom)

@@ -85,6 +85,19 @@ a comparison implementation. External solvers remain later work.
   steps. The proof module disables rewrite rules for the checked composition.
   [PLFA transitivity](https://plfa.github.io/Isomorphism/#isomorphism-is-an-equivalence),
   [Haskell proof](examples/open-evaluation/BookIsoComposition.hs).
+- **Reversal with an accumulator.** PLFA proves a stronger equation for
+  every accumulator before specializing it to the empty list. In the
+  cons case, the induction hypothesis moves the head onto the accumulator.
+  Associativity of append then gives the required grouping. The fork
+  checks the same proof over ordinary lists and Prelude `(++)`.
+  [PLFA faster reverse](https://plfa.github.io/Lists/#faster-reverse),
+  [Haskell proof](examples/open-evaluation/BookReverseProof.hs).
+- **Commutativity of sums and products.** PLFA gives an isomorphism for
+  each law. In PLFH, swapping a pair exchanges its fields. Swapping a
+  sum exchanges its constructors and preserves the payload. Pattern
+  matching on the original constructor proves that a second swap returns
+  the input. [PLFA Connectives](https://plfa.github.io/Connectives/),
+  [Haskell proofs](examples/open-evaluation/BookConnectives.hs).
 - **Callback inference.** Agda can infer implicit arguments from the
   signature of a partially applied function. In `lengthMapLaw = lengthMap`,
   GHC already infers the callback's input and output types. The fix reads those

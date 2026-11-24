@@ -1,10 +1,10 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, LambdaCase, TypeOperators #-}
 {-# OPTIONS_GHC -fno-enable-rewrite-rules #-}
 
--- | Length laws for the installed Prelude functions on ordinary lists.
+-- | Laws for the installed Prelude functions on ordinary lists.
 module HaskLib.List
     ( Nat(..), Size, size, plus, minSize, takeSize
-    , lengthMap, lengthAppend, lengthZip, lengthZipWith, lengthZipMap, lengthMapZip, lengthReverse, lengthTakeSize
+    , appendAssoc, lengthMap, lengthAppend, lengthZip, lengthZipWith, lengthZipMap, lengthMapZip, lengthReverse, lengthTakeSize
     ) where
 
 import Data.Type.Equality ((:~:)(Refl), trans)
@@ -14,6 +14,13 @@ import HaskLib.Nat (Nat(..), congSucc, plus, plusSucc, plusZero)
 import Prelude ((++), map, reverse, zip)
 import PreludeMapLengthSize (Size, minSize, size)
 import PreludeZipRuntime (lengthZip, lengthZipMap, lengthZipWith)
+
+-- | Appending three lists gives the same result with either grouping.
+appendAssoc :: foreach (xs :: [a]) -> foreach (ys :: [a]) -> foreach (zs :: [a])
+            -> ((xs ++ ys) ++ zs) :~: (xs ++ (ys ++ zs))
+appendAssoc [] _ _ = Refl
+appendAssoc (_ : xs) ys zs = case appendAssoc xs ys zs of
+    Refl -> Refl
 
 -- | Mapping a function preserves the number of list cells.
 -- See Note [Map fusion and length witnesses].
