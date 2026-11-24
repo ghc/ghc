@@ -180,6 +180,8 @@ import qualified BookIsomorphism as BookIso
 import qualified BookIsoRefl
 import qualified BookIsoComposition
 import qualified BookConnectives
+import qualified BookCongruence
+import qualified BookFoldProof
 import qualified BookReverseProof
 import qualified BookNaturals
 import qualified CastedConstructorGivens as TreeProof
@@ -1982,6 +1984,10 @@ main = do
         (BookNaturals.monus 0 count, zeroMonus count)
     observe "raise three to the fourth power and prove the successor equation"
         (HaskLib.eqSize (BookNaturals.pow count 4) 81, powSuccessor count 3)
+    observe "lift equality under successor and partially applied addition"
+        (BookCongruence.plusAssoc count 2 3, BookCongruence.addUnder count 2)
+    observe "sum two lists with the right-fold append proof"
+        (HaskLib.eqSize (BookFoldProof.checkedSum [1, 2] [3, 4]) 10)
     case BookIso.sample of
         BookIso.MkIso to from fromTo toFrom ->
             observe "convert a Boolean to a bit and check both inverse laws"

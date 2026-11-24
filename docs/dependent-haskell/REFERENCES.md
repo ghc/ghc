@@ -92,6 +92,23 @@ a comparison implementation. External solvers remain later work.
   checks the same proof over ordinary lists and Prelude `(++)`.
   [PLFA faster reverse](https://plfa.github.io/Lists/#faster-reverse),
   [Haskell proof](examples/open-evaluation/BookReverseProof.hs).
+- **A required congruence callback.** PLFA applies `cong suc` to the
+  induction hypothesis for addition. The Haskell proof writes
+  `congVis Succ proof`. Proposal 281 supplies the mapping from a written
+  argument to a type. Proposal 242 supplies matchability polymorphism.
+  The fork also accepts the checked partial application `congVis (plus m)`
+  and infers the endpoints from the subsequent equality witness.
+  [PLFA Induction](https://plfa.github.io/Induction/),
+  [GHC proposal 281](https://ghc-proposals.readthedocs.io/en/latest/proposals/0281-visible-forall.html#t2t-mapping),
+  [GHC proposal 242](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#matchability-polymorphism),
+  [Haskell proof](examples/open-evaluation/BookCongruence.hs).
+- **Sum over append.** PLFA's `foldr-monoid-++` shows how to fold two
+  appended lists separately and combine their results. PLFH specializes
+  the law to addition and zero. The cons case lifts the induction
+  hypothesis under `plus x`, then uses associativity in reverse.
+  The proof module disables rewrite rules to use the checked append equations.
+  [PLFA Lists](https://plfa.github.io/Lists/),
+  [Haskell proof](examples/open-evaluation/BookFoldProof.hs).
 - **Commutativity of sums and products.** PLFA gives an isomorphism for
   each law. In PLFH, swapping a pair exchanges its fields. Swapping a
   sum exchanges its constructors and preserves the payload. Pattern
