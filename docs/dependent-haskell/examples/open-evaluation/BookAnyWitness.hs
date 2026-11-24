@@ -1,20 +1,22 @@
 {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, Modifiers #-}
 {-# LANGUAGE NoListTuplePuns, PolyKinds, StandaloneKindSignatures, TypeOperators #-}
 -- The proof module reads packHead's Core unfolding, including in GHCi.
-{-# OPTIONS_GHC -fno-omit-interface-pragmas -fobject-code #-}
--- | The head case of the Lists chapter's existential predicate witness.
+{-# OPTIONS_GHC -fwrite-source-equations -fno-omit-interface-pragmas -fobject-code #-}
+-- | The Lists chapter's existential predicate witness for a Boolean list.
 -- Adapted from PLFH under CC BY 4.0. See REFERENCES.md.
-module BookAnyWitness (Any(..), AnyWitness(..), Evidence(..), Flag(..), packHead) where
+module BookAnyWitness (Any(..), AnyWitness(..), Evidence(..), Flag(..), packHead, witnessToAny) where
 
 import Data.Kind (Type)
 import Data.Type.Equality ((:~:)(Refl))
 import GHC.Types (List, Matchability)
 
--- | Evidence that the predicate holds for the first list element.
+-- | Evidence of the list position where the predicate holds.
 type Any :: forall {m :: Matchability}. (Bool %m -> Type) -> List Bool -> Type
 data Any p xs where
   Here :: forall {m :: Matchability} (p :: Bool %m -> Type) x xs.
           p x -> Any p (x : xs)
+  There :: forall {m :: Matchability} (p :: Bool %m -> Type) xs x.
+           Any p xs -> Any p (x : xs)
 
 -- | An existential member and the proof of the predicate at that member.
 type AnyWitness :: forall {m :: Matchability}. (Bool %m -> Type) -> List Bool -> Type
@@ -33,3 +35,10 @@ data Evidence (b :: Bool) = EvidenceBit Bool
 {-# INLINE packHead #-}
 packHead :: Flag b -> Evidence b -> AnyWitness Evidence (b : [])
 packHead AtTrue proof = AnyWitness (Here Refl) proof
+
+-- | Recover predicate evidence at its original list position.
+witnessToAny :: forall {m :: Matchability} {p :: Bool %m -> Type} {xs}.
+                AnyWitness p xs -> Any p xs
+witnessToAny (AnyWitness (Here Refl) proof) = Here proof
+witnessToAny (AnyWitness (There member) proof) =
+  There (witnessToAny (AnyWitness member proof))

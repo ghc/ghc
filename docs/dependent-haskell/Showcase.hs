@@ -185,6 +185,7 @@ import qualified BookFoldProof
 import qualified BookLambdaUnfold
 import qualified BookBetaReduction
 import qualified BookDeBruijn
+import qualified BookAnyWitness
 import qualified BookAnyWitnessProof
 import qualified BookReverseProof
 import qualified BookNaturals
@@ -2016,6 +2017,12 @@ main = do
         (BookBetaReduction.replacementOrder BookDeBruijn.Zero (BookDeBruijn.Suc BookDeBruijn.Zero))
     observe "preserve an open predicate proof in a promoted existential witness"
         (BookAnyWitnessProof.packHeadPreservesProof @(BookAnyWitnessProof.EvidenceBit False))
+    let firstMember :: BookAnyWitness.Any ((:~:) True) '[True]
+        firstMember = BookAnyWitness.Here Refl
+        evidence :: BookAnyWitness.Evidence True
+        evidence = BookAnyWitness.EvidenceBit False
+    observe "keep the second occurrence when decoding a list witness"
+        (BookAnyWitnessProof.decodeThere @True @True @'[True] firstMember evidence)
     observe "sum two lists with the right-fold append proof"
         (HaskLib.eqSize (BookFoldProof.checkedSum [1, 2] [3, 4]) 10)
     case BookIso.sample of
