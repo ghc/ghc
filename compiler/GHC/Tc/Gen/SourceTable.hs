@@ -1935,8 +1935,8 @@ through SourceTableId when installing or using a table. Follow this closure
 to guard rewrite rules in downstream modules, including type-only uses.
 Speculative collection must not record a use or keep a rejected owner alive.
 
-Note [The second argument of a source equation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Carried arguments of a source equation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The equations for plus can inspect their first argument and carry a
 second argument unchanged:
 
@@ -1944,10 +1944,11 @@ second argument unchanged:
   plus (S n) m = S (plus n m)
 
 As in Agda's definition of addition, only the first argument decreases.
-Compare the second operand of a recursive call with the row's second
-pattern Id. For the first operand, look up the Id among the fields of
-the matched constructor. When both arguments have type Nat, a call
-such as plus m m would otherwise pass the type check without decreasing.
+A row can carry any number of ordinary variable operands. Compare the
+whole list with the recursive call's operands in the original order.
+For the first operand, look up the Id among the fields of the matched
+constructor. When both arguments have type Nat, a call such as plus m m
+would otherwise pass the type check without decreasing.
 
 For an infix call such as n + m, tcExpand places the checked prefix
 application under an ExpandedThingTc. The ExprCtxt identifies the
@@ -1955,11 +1956,11 @@ original OpApp. Check the expanded function and operands with the same
 rules as a written (+) n m. See Note [Desugar OpApp in the typechecker]
 in GHC.Tc.Gen.Head.
 
-Represent the second variable by a fresh nominal binder in each axiom
-branch. The equation can return this variable or put it in a constructor.
-With Strict, desugaring adds a bang to the second variable pattern after
-typechecking. Such a function must force its second argument even to
-return an outer successor. Skip binary equations in that case.
+Represent each carried variable by a fresh nominal binder in each axiom
+branch. The equation can return it or put it in a constructor. With
+Strict, desugaring adds bangs to these variable patterns. Skip equations
+with carried arguments in that case. The local renamer uses the same
+variable pattern restriction before the solved clauses are available.
 -}
 
 -- | Derive closed families after solving the group's top-level constraints.
@@ -2006,16 +2007,6 @@ sourceTableTyCons local binds = do
         guard (eqTypes args (map tyVarKind (tyConTyVars fam)))
         guard (result `eqType` tyConResKind fam)
         pure (fam, args, result)
-
-    ordinaryArrows ty = case splitFunTy_maybe ty of
-      Just (FTF_T_T, ma, mult, arg, rest) -> do
-        guard (ma `eqType` unmatchableDataConTy && isManyTy mult)
-        _ <- ordinaryDataType arg
-        (args, result) <- ordinaryArrows rest
-        pure (arg : args, result)
-      _ -> do
-        _ <- ordinaryDataType ty
-        pure ([], ty)
 
     certify strict checked (fun, body_tv, evidence, rows) = do
       clean <- allM emptyEvidence evidence
@@ -5436,6 +5427,17 @@ constructor column to identify this rule policy. An earlier nominal table
 can have the same kind and carry its second argument unchanged.
 -}
 
+-- | Collect the domains and result of an ordinary monomorphic function.
+ordinaryArrows :: Type -> Maybe ([Type], Type)
+ordinaryArrows ty
+  | Just (arg, rest) <- caseArrow ty = do
+      _ <- ordinaryDataType arg
+      (args, result) <- ordinaryArrows rest
+      pure (arg : args, result)
+  | otherwise = do
+      _ <- ordinaryDataType ty
+      pure ([], ty)
+
 -- | Check that the rows cover the domain of the solved function type.
 checkedDomains :: Bool -> Maybe TyVar -> Type -> [SourceRow] -> Maybe (SourceInput, [Type], TyCon)
 checkedDomains strict body_tv ty rows = do
@@ -5454,14 +5456,9 @@ checkedDomains strict body_tv ty rows = do
       Just (tv, sk) -> do
         guard (arg_ty `eqType` mkListTy (mkTyVarTy tv))
         pure (listTyCon, PolyList sk)
-    (carried, final_ty) <- case splitFunTy_maybe res_ty of
-      Nothing -> pure ([], res_ty)
-      Just (FTF_T_T, second_ma, second_mult, second_ty, final_ty)
-        | ClosedInput{} <- input
-        , not strict, second_ma `eqType` unmatchableDataConTy, isManyTy second_mult -> do
-            _ <- ordinaryDataType second_ty
-            pure ([second_ty], final_ty)
-      _ -> Nothing
+    (carried, final_ty) <- ordinaryArrows res_ty
+    -- See Note [Carried arguments of a source equation].
+    guard (null carried || (isNothing element && not strict))
     (result, []) <- ordinaryDataType final_ty
     let expected = tyConDataCons domain
         actual   = [con | SourceRow _ con _ _ _ _ <- rows]
@@ -5503,10 +5500,7 @@ sourceRow self (L loc (Match { m_pats = L _ (pat : rest), m_grhss = rhss }))
         InfixCon _ p1 p2 -> Just [p1,p2]
         _                -> Nothing
       binders <- traverse fieldBinder fields
-      carried <- case rest of
-        [] -> Just []
-        [p] | VarPat _ (L _ v) <- unParen p -> Just [v]
-        _ -> Nothing
+      carried <- traverse carriedBinder rest
       output <- sourceRhs self carried rhs
       pure (evs, SourceRow (locA loc) input params binders carried output)
   where
@@ -5518,6 +5512,10 @@ sourceRow self (L loc (Match { m_pats = L _ (pat : rest), m_grhss = rhss }))
       VarPat _ (L _ v) -> Just (Just v)
       WildPat _        -> Just Nothing
       _                -> Nothing
+
+    carriedBinder p = case unParen p of
+      VarPat _ (L _ v) -> Just v
+      _ -> Nothing
 sourceRow _ _ = Nothing
 
 -- | Recognise constructors, helper calls, and decreasing self calls.
@@ -5607,7 +5605,7 @@ sourceBranch lookup_call input carried_types result (SourceRow loc con pat_args 
         guard (tyVarKind tv `eqType` expected)
         pure (const (mkTyVarTy tv))
       Recur _ v -> do
-        -- See Note [The second argument of a source equation].
+        -- See Note [Carried arguments of a source equation].
         tv <- lookup (Just v) fields_scope
         guard (tyVarKind tv `eqType` domain && mkTyConTy result `eqType` expected)
         let operands = mkTyVarTys (tv : map snd carried_scope)
@@ -5628,7 +5626,8 @@ sourceBranch lookup_call input carried_types result (SourceRow loc con pat_args 
 makeFamily :: Name -> SourceInput -> [Type] -> TyCon -> [TyCon -> CoAxBranch] -> TcM TyCon
 makeFamily fun input carried_types result branches = do
     (quantified, domain, _) <- freshInput input
-    args <- zipWithM argVar ["x", "y"] (domain : carried_types)
+    args <- zipWithM argVar ("x" : "y" : map (("arg" ++) . show) [3 :: Int ..])
+                    (domain : carried_types)
     let binders = mkNamedTyConBinders (Invisible SpecifiedSpec) quantified ++
                   mkAnonTyConBinders args
     makeSourceFamily fun binders (mkTyConTy result) branches

@@ -2655,13 +2655,18 @@ localSourceTableBinders binds sigs =
     matches_second _ = False
 
     carried_binders :: Bool -> [LPat GhcPs] -> Maybe [RdrName]
-    carried_binders False [] = Just []
-    carried_binders _ [p] | VarPat _ (L _ v) <- unparen p = Just [v]
+    -- See Note [Carried arguments of a source equation] in GHC.Tc.Gen.SourceTable.
+    carried_binders False ps = traverse carried_binder ps
     carried_binders True [p]
+      | Just v <- carried_binder p = Just [v]
       | WildPat{} <- unparen p = Just []
       | Just fields <- constructor_fields (unparen p)
       , all plain_field fields = Just (collectPatsBinders CollNoDictBinders fields)
-    carried_binders _ _ = Nothing
+    carried_binders True _ = Nothing
+
+    carried_binder p
+      | VarPat _ (L _ v) <- unparen p = Just v
+      | otherwise = Nothing
 
     constructor_fields :: Pat GhcPs -> Maybe [LPat GhcPs]
     constructor_fields ConPat{pat_args = PrefixCon _ fields} = Just fields
@@ -2819,7 +2824,7 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
       HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) carried result
         | Just [] <- outer_vars outer -> do
             deps <- domain_dependencies outer carried
-            res <- type_dependencies result
+            res <- result_dependencies outer result
             pure (deps ++ res)
       _ -> type_dependencies ty
 
