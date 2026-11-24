@@ -5426,6 +5426,7 @@ data RetainedQuantificationError
   | RetainedMatrixDuplicate
   | RetainedMatrixFallback
   | RetainedMatrixPattern
+  | RetainedLaterConstructorPattern
   | RetainedMissingConstructorPair Name Name
   | RetainedCasePatterns
   | RetainedCaseQuotation
