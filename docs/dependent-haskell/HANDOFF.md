@@ -8,24 +8,24 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
-[Compiler `6c8ab7f7de`](https://github.com/Tritlo/ghc/commit/6c8ab7f7deb9bbd0ef5e2fa03a5ece733f638492)
-checks generic transitivity of isomorphism. The proof uses Prelude composition
-and the two stored inverse laws. Job 2601 matched all **604 Showcase
-observations** at native `-O0`, default `-O2` and in GHCi.
+[Compiler `da06279b7a`](https://github.com/Tritlo/ghc/commit/da06279b7a4ba86fef478e3f988297ebd3306fd2)
+checks the ordinary list reversal function alongside its inductive proof.
+It also checks that swapping a sum or a product twice returns the input.
+Job 2674 matched all **607 Showcase observations** at native `-O0`,
+default `-O2` and in GHCi. [Proofs and verification](CHECKPOINTS.md#reversal-and-commutativity-in-batch-15).
 
-[Published PLFH `d343521`](https://github.com/Tritlo/PLFH/tree/d343521eb54eb18aca970b302adb3583f98f3111)
-has 37 original reports. On the same snapshot, jobs 2597 and 2603 found
-**23 compile at `-O0` and 21 at default `-O2`**. The two differences are
-the shunt and identity proofs when rewrite rules are enabled. All 27 modules
-passed the interface audit in four configurations. Both native readers ran
-73 observations. Each configuration rejected six negative programs as expected.
-[Verification record](CHECKPOINTS.md#composing-isomorphisms-in-the-published-book).
+[Published PLFH batch 15](https://github.com/Tritlo/PLFH/tree/3c550c8b9879b0f9202b8a9c408df3f61dca222c)
+has 37 original reports. Job 2664 found **25 compile at `-O0` and 23
+at default `-O2`**. The two differences are `R13_RevOpenEq` and
+`R13_ShuntAccumOpenEq`. All 27 modules passed the interface audit in
+four configurations. Both native readers passed 76 runtime checks.
+Each configuration rejected the six negative programs as expected.
 
-The Isomorphism chapter patch applies directly to `d343521`. In the book
-checkout, run `git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/generic-iso-d343521`.
-Job 2600 checked a `Maybe Bool` client through compiled interfaces at both
-optimization levels and recorded 56 passing book checks. The
-[notebook](../../PLFH-NOTES.md) records the chapter handoff.
+The combined book patch `ddd108c6` applies directly to batch 15. It
+contains the changes to Lists, Isomorphism and Connectives. From the book
+checkout, run `git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/three-chapter-laws-3c550c8`.
+Job 2663 checked the three patched chapters together in the full book
+matrix. The [notebook](../../PLFH-NOTES.md) records the handoff.
 
 ## Next compiler work
 
@@ -40,16 +40,14 @@ optimization levels and recorded 56 passing book checks. The
   free replacement under a lambda. Job 2589 checked both proofs at
   `-O0` and `-O2`. General beta reduction still needs
   an equation for substitution when the function body is unknown.
-- Job 2429 built both stages of the 600-example compiler `76e67f4fdb`.
-  The 42 registrations reported the known independent record-index failure.
-  Its repair passed on the subsequent compiler components. The compatibility
-  run passed 233 of 234 tests. The remaining test mistook a partial checked
-  equation for a complete executable table. Revision `83f46cf3ce` checks
-  each branch. Job 2567 passed it on the 600 and 602 compiler lines.
-  Job 2525 builds
-  the 602-example revision in `_build/on-demand/plfh-iso-map-normal-602-20261124`
-  and runs 46 registrations plus the compatibility and focused suites.
-  Check `build.pass`, `qualification/gates.tsv`, and the cohort reports.
+- Job 2525 built both stages of the 602-example compiler `f6aff88d40`.
+  All 46 selected registrations, package checks and Showcase checks passed.
+  Compatibility passed 233 of 234. `NativeBinaryEnum` used the old test
+  expectation corrected in `83f46cf3ce`. The focused suite passed 137
+  of 138 with the known `MTrans` diagnostic. Job 2680 builds the
+  607-example source `a745ffc9b8` with 49 selected registrations.
+  Check `_build/on-demand/plfh-batch15-normal-607-20261124/build.pass`,
+  `qualification/gates.tsv` and `cohorts/gates.tsv` for final results.
 - Three compiler agents use a shared queue with four GHC build slots,
   16 logical CPUs and 64 GB of memory.
   GHC yields to local benchmark jobs. The [roadmap](ROADMAP.md#where-this-fork-stands)

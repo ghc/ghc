@@ -6,6 +6,40 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Reversal and commutativity in batch 15
+
+The Lists proof shows that `shunt xs ys` equals `rev xs ++ ys` by
+induction on the input list. The same module defines the ordinary
+recursive `rev` and proves its accumulator law. Jobs 2632 and 2639
+checked that combination and the maintained regression. A changing rule
+on the imported append function still rejects the proof. The proof
+module disables rewrite rules when it needs the Prelude append equations.
+An installed HaskLib client also needs that setting to open the witness
+from `appendAssoc` at `-O2`. Jobs 2651 and 2654 checked the package,
+the default rejection and the successful reader.
+
+The Connectives chapter packages the forward and reverse swaps of an
+`Either` or a pair with their inverse laws. Job 2646 checked both laws
+and their runtime behavior on lazy payloads. Job 2661 checked the
+registered regression. Extending the early reservation to arbitrary tuple
+functions broke valid projection and reconstruction examples. The
+compiler restricts early reservation to the checked permutation.
+[Compiler and regression](https://github.com/Tritlo/ghc/commit/da06279b7a4ba86fef478e3f988297ebd3306fd2).
+
+The [605th through 607th examples](Showcase.hs) exercise these laws.
+Job 2674 matched all 607 expected lines at native `-O0`, default `-O2`
+and in GHCi. The reversal witness is opened inside its proof module.
+The sums and products use different input types to expose their field
+order. [PLFA provenance](REFERENCES.md#plfh-arithmetic-dependent-patterns-and-callback-inference).
+
+Jobs 2663 and 2664 used [the PLFH checker](tools/check-plfh-revision)
+on the combined chapter patch and on unchanged batch 15. Both built
+27 modules and audited all interfaces in four configurations. Both native
+readers passed 76 runtime checks. Each configuration rejected six negative
+programs. On unchanged batch 15, 25 of 37 original reports compile at
+`-O0` and 23 at default `-O2`. Against the same input, job 2619 recorded
+23 and 22 before the reversal and commutativity fixes.
+
 ## Composing isomorphisms in the published book
 
 The [composition example](examples/open-evaluation/BookIsoComposition.hs)
