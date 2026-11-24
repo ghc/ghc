@@ -107,10 +107,19 @@ for opt in -O0 -O2; do
     "${ghc[@]}" "$opt" -fwrite-source-equations -c NativeCheckedClosureDoubleProvider.hs
     "${ghc[@]}" --show-iface NativeCheckedClosureDoubleProvider.hi >provider.iface
     grep -Fq 'CheckedClosureSourceTable T:replaceBoth' provider.iface
+    grep -Fq 'CheckedClosureSourceTable T:renameExpr [extendName]' provider.iface
+    grep -Fq 'SourceTable T:extendName' provider.iface
 
     cd "$work/$opt/double/reader"
     cp ../provider/NativeCheckedClosureDoubleProvider.hi "$inputs/NativeCheckedClosureDouble.hs" .
     "${ghc[@]}" "$opt" -c NativeCheckedClosureDouble.hs
+    "${ghc[@]}" "$opt" -DABSTRACT_RENAMING -fno-code -c NativeCheckedClosureDouble.hs
+    if "${ghc[@]}" "$opt" -DABSTRACT_RENAMING -DWRONG_RENAMING -fno-code \
+         -c NativeCheckedClosureDouble.hs >wrong.log 2>&1; then
+        cat wrong.log
+        exit 1
+    fi
+    grep -Fq '[GHC-83865]' wrong.log
     if "${ghc[@]}" "$opt" -DWRONG_DOUBLE_CAPTURE -c NativeCheckedClosureDouble.hs >wrong.log 2>&1; then
         cat wrong.log
         exit 1
@@ -125,6 +134,16 @@ for opt in -O0 -O2; do
             exit 1
         fi
         grep -Fq '[GHC-83605]' rule.log
+        # Keep the deliberately conflicting rule visible in the interface.
+        "${ghc[@]}" "$opt" -Wno-inline-rule-shadowing -fforce-recomp -DABSTRACT_RENAMING \
+             -c NativeCheckedClosureDoubleRule.hs
+        if "${ghc[@]}" "$opt" -DHELPER_RULE -DABSTRACT_RENAMING -fno-code \
+             -c NativeCheckedClosureDouble.hs >rule.log 2>&1; then
+            cat rule.log
+            exit 1
+        fi
+        grep -Fq '[GHC-83605]' rule.log
+        grep -Fq 'extendName' rule.log
     fi
 done
 
