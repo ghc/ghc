@@ -39,6 +39,17 @@ for opt in -O0 -O2; do
         reject 83605 "${producer[@]}" -DRULE -fforce-recomp
         "${ghc[@]}" "${producer[@]}" -DRULE -fno-enable-rewrite-rules -fforce-recomp
     fi
+    local_reverse=("${producer[@]}" -DLOCAL_REVERSE -fno-code -fwrite-interface
+                   -fno-enable-rewrite-rules -fforce-recomp)
+    "${ghc[@]}" "${local_reverse[@]}"
+    "${ghc[@]}" --show-iface NativeLocalListAccumulator.hi >local-reverse.iface
+    grep -Fxq '  SourceTable T:rev' local-reverse.iface
+    reject 83865 "${local_reverse[@]}" -DFALSE_REVERSE
+    if [[ "$opt" == -O2 ]]; then
+        reject 68947 "${local_reverse[@]}" -fenable-rewrite-rules
+        grep -Fq 'checked equations are available' negative.log
+        grep -Fq 'rev' negative.log
+    fi
     cd ../reader
     test ! -e NativeLocalListAccumulator.hs
     cat >Main.hs <<'HS'

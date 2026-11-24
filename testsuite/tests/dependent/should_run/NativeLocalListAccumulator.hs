@@ -1,6 +1,11 @@
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
 {-# OPTIONS_GHC -Wno-inline-rule-shadowing #-}
-module NativeLocalListAccumulator (shunt, step) where
+module NativeLocalListAccumulator
+    ( shunt, step
+#ifdef LOCAL_REVERSE
+    , rev, reverseStep
+#endif
+    ) where
 
 import Data.Type.Equality ((:~:)(Refl))
 
@@ -27,3 +32,17 @@ step :: foreach (x :: a) -> foreach (xs :: [a]) -> foreach (ys :: [a])
      -> shunt (x ': xs) ys :~: shunt xs (x ': ys)
 #endif
 step _ _ _ = Refl
+
+#ifdef LOCAL_REVERSE
+rev :: [a] -> [a]
+rev [] = []
+rev (x:xs) = rev xs ++ [x]
+
+reverseStep :: foreach (x :: Bool) -> foreach (xs :: [Bool])
+#ifdef FALSE_REVERSE
+            -> rev (x ': xs) :~: (rev xs ++ '[ 'False])
+#else
+            -> rev (x ': xs) :~: (rev xs ++ '[x])
+#endif
+reverseStep _ _ = Refl
+#endif
