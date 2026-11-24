@@ -9,6 +9,8 @@ cat >"$work/Syntax.hs" <<'HS'
 {-# LANGUAGE DataKinds, GADTs, LambdaCase, RankNTypes #-}
 module Syntax where
 
+import Data.Type.Equality ((:~:) (Refl))
+
 data Sort = Num | Fun Sort Sort
 data Ctx = Empty | Extend Ctx Sort
 
@@ -43,6 +45,15 @@ substTerm _ Lit = Lit
 
 substOne :: Term ('Extend g a) b -> Term g a -> Term g b
 substOne body value = substTerm (\case Here -> value; There x -> Use x) body
+
+data SomeTerm (g :: Ctx) (a :: Sort) where
+    Pack :: (x :~: a) -> Term g x -> SomeTerm g a
+
+packTerm :: Name g a -> Term g a -> SomeTerm g a
+packTerm _ term = Pack Refl term
+
+unpackTerm :: Name g a -> SomeTerm g a -> Term g a
+unpackTerm _ (Pack Refl term) = term
 HS
 
 cat >"$work/Reader.hs" <<'HS'
@@ -77,6 +88,21 @@ underBinder :: forall (g :: Ctx) (x :: Name g 'Num).
 #endif
 underBinder = Refl
 
+packExistential :: forall (x :: Term ('Extend 'Empty 'Num) 'Num)
+                          (y :: Term ('Extend 'Empty 'Num) 'Num).
+                   S.packTerm ('S.Here :: Name ('Extend 'Empty 'Num) 'Num) x
+#ifdef WRONG_EXISTENTIAL
+                   :~: 'S.Pack 'Refl y
+#else
+                   :~: 'S.Pack 'Refl x
+#endif
+packExistential = Refl
+
+unpackExistential :: forall (n :: Name ('Extend 'Empty 'Num) 'Num)
+                            (x :: Term ('Extend 'Empty 'Num) 'Num).
+                     S.unpackTerm n ('S.Pack 'Refl x) :~: x
+unpackExistential = Refl
+
 #ifdef RULE
 {-# RULES "replace/substitution" forall (x :: Term 'Empty 'Num).
     S.substOne (S.Use S.Here) x = S.Lit #-}
@@ -97,7 +123,6 @@ for variant in 0 2 2-retained; do
 retained :: foreach (x :: Term 'Empty 'Num) -> x :~: x
 retained _ = Refl
 HS
-        sed -i '/^module Syntax where$/a import Data.Type.Equality ((:~:) (Refl))' Plain.hs
     fi
     cp Plain.hs Syntax.hs
     provider=(-O"$opt" -fno-omit-interface-pragmas -fexpose-all-unfoldings)
@@ -118,6 +143,7 @@ HS
         fi
     }
     reject GHC-83865 -DWRONG
+    reject GHC-25897 -DWRONG_EXISTENTIAL
     reject GHC-70566 -DRIGID
     grep -Fq 'case on the rigid argument x' wrong.log
     reject GHC-83605 -DRULE -fenable-rewrite-rules
