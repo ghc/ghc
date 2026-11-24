@@ -468,9 +468,11 @@ rnTypedSplice sp@(HsTypedSpliceExpr _ expr)
                 ; traceRn "rnTypedSplice: typed expression splice" empty
                 ; lcl_rdr <- getLocalRdrEnv
                 ; gbl_rdr <- getGlobalRdrEnv
+                  -- See Note [Typed splices and source table dependencies].
                 ; let gbl_names = mkNameSet [ greName gre
                                             | gre <- globalRdrEnvElts gbl_rdr
-                                            , isLocalGRE gre]
+                                            , isLocalGRE gre
+                                            , Nothing <- [sourceTableTermOcc (greOccName gre)]]
                       lcl_names = mkNameSet (localRdrEnvElts lcl_rdr)
                       fvs2      = lcl_names `plusFN` gbl_names
 
@@ -478,6 +480,20 @@ rnTypedSplice sp@(HsTypedSpliceExpr _ expr)
   where
     rn_splice :: RnM (LHsExpr GhcRn, FreeNames)
     rn_splice = rnLExpr expr
+
+{- Note [Typed splices and source table dependencies]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A typed splice can refer to any ordinary local declaration. Do not add a
+private source-table name to this conservative set of free variables.
+The table is a candidate until the typechecker checks the function's
+equations. A use of its private name asks the typechecker to produce
+the equations. Otherwise a splice such as $$(one) could make an
+unrelated runtime function require type-level equations.
+
+Keep the actual free variables of the splice expression in fvs1.
+Keep the user-visible term that owns the table in gbl_names.
+See Note [Ordering local source tables] in GHC.Rename.Module.
+-}
 
 rnUntypedSpliceExpr :: HsUntypedSplice GhcPs -> RnM (HsExpr GhcRn, FreeNames)
 rnUntypedSpliceExpr splice
