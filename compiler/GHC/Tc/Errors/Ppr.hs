@@ -3825,6 +3825,9 @@ pprRetainedQuantificationError reason = case reason of
     text "A visible type argument with runtime indices or retained function binders must be complete."
   RetainedPolymorphicSignature ->
     text "A forall within the scope of a retained binder is not supported yet."
+  RetainedSumContext ->
+    vcat [ text "GHC cannot check a retained dependent sum in this position."
+         , text "A top-level type synonym can name the sum and take its outer indices as parameters." ]
   RetainedUnsupportedContext ->
     text "Retained quantification is supported only at the start of an explicit value signature."
   RetainedFunctionSignature ->
