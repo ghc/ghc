@@ -24,6 +24,28 @@ focus (Join l r) = Join (focus l) (focus r)
 
 known :: focus ('Join ('Arrow 'Empty 'Other) 'Other) :~: 'Join 'Empty 'Other
 known = Refl
+
+swapSum :: Either a b -> Either b a
+swapSum (Left x) = Right x
+swapSum (Right y) = Left y
+
+sumRoundTrip :: foreach (s :: Either a b) -> swapSum (swapSum s) :~: s
+sumRoundTrip (Left _) = Refl
+sumRoundTrip (Right _) = Refl
+
+swapPair :: (a, b) -> (b, a)
+swapPair (x, y) = (y, x)
+
+pairRoundTrip :: foreach (p :: (a, b)) -> swapPair (swapPair p) :~: p
+pairRoundTrip p = case p of
+    (,) _ _ -> Refl
+
+-- Keep the existing open-evaluator route for a local projection.
+first :: (a, b) -> a
+first (x, _) = x
+
+firstLaw :: forall a b. first '(a, b) :~: a
+firstLaw = Refl
 HS
 cat >"$work/Main.hs" <<'HS'
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
