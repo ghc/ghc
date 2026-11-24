@@ -1396,27 +1396,28 @@ tcDataConPatWithIndex index (L con_span con_name) data_con pat_ty_scaled
               ; index_vars <- newEvVars (substTheta proof_subst index_preds)
               ; context_vars <- newEvVars (substTheta tenv theta)
               ; return (kind_vars ++ index_vars ++ context_vars) }
-        ; (body_pats, indexed_fields) <- case (index, given, val_arg_pats) of
-            (Just scrut, [eq], PrefixCon ann fields)
+        ; (body_pats, indexed_fields) <- case (index, val_arg_pats) of
+            (Just scrut, PrefixCon ann fields)
               | not trailing_context, LegacyConOrder _ <- source_order
               , isIdHsWrapper wrap, isNativeIndexedGadtCon data_con
+              , given `equalLength` eq_spec
               , Just prepare <- traverse indexed_field fields
               -> do { (names, pats) <- mapAndUnzipM id prepare
-                    ; return (PrefixCon ann pats, Just (scrut, eq, names)) }
+                    ; return (PrefixCon ann pats, Just (scrut, names)) }
             _ -> return (val_arg_pats, Nothing)
         ; let field_tys
-                | Just (_, _, _ : _) <- indexed_fields
+                | Just (_, _ : _) <- indexed_fields
                 = map (scaleScaled ManyTy) (substScaledTys tenv arg_tys)
                 | otherwise = arg_tys_scaled
-        ; when (case indexed_fields of Just (_, _, _ : _) -> True; _ -> False) $
+        ; when (case indexed_fields of Just (_, _ : _) -> True; _ -> False) $
             tcSubMult (pe_orig penv) ManyTy pat_mult
         -- See Note [Native indexed branch evidence] in GHC.Core.
         ; let check_body = do
                 proof <- case indexed_fields of
-                  Just (scrut, eq, names) -> do
+                  Just (scrut, names) -> do
                     fields <- traverse tcLookupId names
                     actual <- traverse zonk_field fields
-                    case nativeIndexedCon_maybe (varType scrut) data_con (ex_tvs' ++ eq : actual) of
+                    case nativeIndexedCon_maybe (varType scrut) data_con (ex_tvs' ++ given ++ actual) of
                       Just con -> Just <$> newEvVar (mkNomEqPred (TermVarTy scrut) con)
                       Nothing -> return Nothing
                   Nothing -> return Nothing

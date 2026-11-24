@@ -31,6 +31,18 @@ inspectEquations :: foreach (xs :: Vec Bool n) -> Maybe (Shape n xs)
 inspectEquations VNil = Nothing
 inspectEquations (VCons _ _) = Just ConsSeen
 
+data Hold (n :: Nat) where
+    Hold :: Vec Bool m -> Hold n
+
+type Held :: forall (n :: Nat). Hold n -> Type
+data Held x where
+    Held :: Held ('Hold xs)
+
+{-# INLINE inspectHold #-}
+inspectHold :: foreach (x :: Hold n) -> Held x
+inspectHold x = case x of
+    Hold _ -> Held
+
 {-# INLINE inspectKnown #-}
 inspectKnown :: foreach (xs :: Vec Bool ('S n)) -> Shape ('S n) xs
 inspectKnown xs = case xs of
