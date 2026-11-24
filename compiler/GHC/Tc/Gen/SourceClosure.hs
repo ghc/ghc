@@ -16,6 +16,7 @@ import qualified GHC.Core.DataCon as DC
 import GHC.Core.FamInstEnv (emptyFamInstEnvs, mkBranchedCoAxiom, mkCoAxBranch)
 import GHC.Core.FVs (exprFreeVars, exprSomeFreeVarsList)
 import GHC.Core.OpenWhnf (checkedMultiplicityCast)
+import GHC.Core.SimpleOpt (simpleOptExpr)
 import GHC.Core.Subst (extendTvSubst, mkEmptySubst, substExpr)
 import GHC.Core.TyCo.Compare (eqType)
 import GHC.Core.TyCo.Rep (Coercion(..), MCoercion(MRefl), Scaled(..), Type(TyVarTy), scaledThing)
@@ -29,6 +30,8 @@ import GHC.Core.Type
   , mkTyVarTys, splitForAllTyVars, splitFunTys, splitTyConApp_maybe, substTyUnchecked, typeKind )
 import GHC.Core.Unify (tcMatchTys)
 import GHC.Core.Utils (exprType)
+import GHC.Driver.Config (initSimpleOpts)
+import GHC.Driver.DynFlags (HasDynFlags(getDynFlags))
 import GHC.Tc.Gen.SourceTable (hasSourceMethodRule, visibleSourceMethodRules)
 import GHC.Tc.TyCl.Build (buildDataCon, newImplicitBinder, newTyConRepName)
 import GHC.Tc.Utils.Instantiate (freshenTyVarBndrs)
@@ -83,9 +86,10 @@ publishCheckedSourceClosures :: [CoreBind] -> [CoreBind] -> TypeEnv -> TcM ([Id]
 publishCheckedSourceClosures original_binds final_binds final_types = do
     env <- getGblEnv
     visible <- visibleSourceMethodRules env
+    opts <- initSimpleOpts <$> getDynFlags
     let here = Just (tcg_mod env)
         exported = mkNameSet (concatMap availNames (tcg_exports env))
-        original = Core.flattenBinds original_binds
+        original = [(v, simpleOptExpr opts rhs) | (v, rhs) <- Core.flattenBinds original_binds]
         final = Core.flattenBinds final_binds
         lookupLocal name = case lookupTypeEnv final_types name of
           Just (AnId actual) | idName actual == name
