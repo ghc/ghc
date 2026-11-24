@@ -4,6 +4,7 @@ module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourc
                               sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, monomorphicEnumCaseArity, groundFirstHead, sourceLocalBooleanCases,
                               isFinalStructuralSource, isStructuralSourceTable, isNominalStructuralSource,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
+                              sourceEquationDatatypes, publicCaseType, ordinaryImport,
                               sourceBinarySelector, sourceMapSelector, lookupSourceBinaryMethod, lookupSourceContainerMethod, lookupSourceGroundDFun, lookupSourceCheckedMapMethod, publishListFoldMethods, keepCheckedMapWorkers, publishCheckedMapMethods, sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers, isSourceFilterGuard,
                               OptionalSourceUses, optionalSourceUses, registerOptionalSourceUses,
                               checkOptionalSourceUses, checkSourceMethodUses,
@@ -82,7 +83,7 @@ import GHC.Types.Avail (availNames, availsToNameSet)
 import GHC.Types.Basic (Origin(..), LeftOrRight(..), SourceTableOrigin(..), UnfoldingSource(VanillaSrc),
                         isMarkedCbv, pickLR)
 import GHC.Types.Error (errorsFound)
-import GHC.Types.Id.Info (IdDetails(DFunId, SourceTableId, VanillaId), SourceDFun(..), setSourceProofRuleInfo)
+import GHC.Types.Id.Info (IdDetails(CheckedClosureSourceTableId, DFunId, SourceTableId, VanillaId), SourceDFun(..), setSourceProofRuleInfo)
 import GHC.Types.Id (globaliseId, idArity, idCbvMarks_maybe, idCoreRules, idInfo, idName, setIdInfo, idInlineActivation, idInlinePragma, isClassOpId_maybe, isDataConId_maybe, isDataConWorkId_maybe, isJoinId, idUnfolding, realIdUnfolding, mkSysLocalM, mkVanillaGlobal, setIdType, sourceTableId_maybe, sourceLiteralCons_maybe,
                      setIdExported, setSourceMethodIds, sourceMethodAliases, sourceMethodTarget_maybe,
                      sourceMethodDFunClass)
@@ -231,7 +232,17 @@ sourceTableCallees table = do
 -- | Recover all checked callees from closed source equations.
 -- See Note [Composed source equations].
 sourceTableDependencies :: TyCon -> TcM (Maybe [Id])
-sourceTableDependencies root = walk (unitNameSet (tyConName root)) [] [root]
+sourceTableDependencies root = do
+    owner <- sourceTableOwner root
+    case idDetails <$> owner of
+      Just (CheckedClosureSourceTableId _ _ helpers)
+        | not (null helpers) -> do
+            ids <- traverse tcLookupIdMaybe helpers
+            case sequence ids of
+              Just checked -> walk (unitNameSet (tyConName root)) (reverse checked) [root]
+              Nothing -> pure Nothing
+        | otherwise -> pure Nothing
+      _ -> walk (unitNameSet (tyConName root)) [] [root]
   where
     walk _ owners [] = pure (Just (reverse owners))
     walk seen owners (table : rest)
@@ -1824,6 +1835,22 @@ sourceRuleOwnersWith zonk arg rules = unionNameSets <$> sequence
     first_arg (WpSubType w) = first_arg w
     first_arg _ = Nothing
 
+{- Note [Checked closure dependencies]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A checked closure interpreter can inline or combine its source helpers.
+Their Names need not occur in a generated equation. The interface's
+checked-closure source-table details therefore store the helper Names
+alongside the private family. These Names are part of the owner's
+interface fingerprint.
+
+Keep this information in the source-table details. The ordinary term Id
+must not become a source proof at every runtime occurrence. The reader
+for a checked closure table must check the helper Rules before using the
+equations. The selective header feature makes a reader without that
+payload reject a closure interface before decoding it. Other source
+tables keep their existing interface format.
+-}
+
 {- Note [Closed source tables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For a definition such as
@@ -2486,18 +2513,26 @@ checkLocalRetainedWitnessExports env owners = do
         _ -> pure ()
   where
     unexported_case_types exported table =
-      sortBy stableNameCmp $
-        [ name | tc <- nonDetEltsUniqSet (tyConsOfTypes (concatMap equation_types tables))
-               , let parent = maybe tc dataConTyCon (isPromotedDataCon_maybe tc)
-                     name = tyConName parent
-               , isAlgTyCon parent, nameModule_maybe name == Just (tcg_semantic_mod env)
-               , not (publicCaseType env exported (const False) parent) ]
+      sortBy stableNameCmp
+        [ name | tc <- sourceEquationDatatypes tables
+               , let name = tyConName tc
+               , nameModule_maybe name == Just (tcg_semantic_mod env)
+               , not (publicCaseType env exported (const False) tc) ]
       where
         tables = table : fromMaybe [] (sourceTableCallees table)
-        equation_types tc = tyConKind tc :
-          [ ty | axiom <- maybeToList (closedFamilyTyConCoAxiom_maybe tc)
-               , branch <- fromBranches (coAxiomBranches axiom)
-               , ty <- coAxBranchRHS branch : coAxBranchLHS branch ++ map tyVarKind (coAxBranchTyVars branch) ]
+
+-- | Find the datatypes that supply the types and promoted constructors
+-- of a group of emitted equations, including their operand kinds.
+sourceEquationDatatypes :: [TyCon] -> [TyCon]
+sourceEquationDatatypes tables =
+    [ parent | tc <- nonDetEltsUniqSet (tyConsOfTypes (concatMap equation_types tables))
+             , let parent = maybe tc dataConTyCon (isPromotedDataCon_maybe tc)
+             , isAlgTyCon parent ]
+  where
+    equation_types tc = tyConKind tc :
+      [ ty | axiom <- maybeToList (closedFamilyTyConCoAxiom_maybe tc)
+           , branch <- fromBranches (coAxiomBranches axiom)
+           , ty <- coAxBranchRHS branch : coAxBranchLHS branch ++ map tyVarKind (coAxBranchTyVars branch) ]
 
 -- | The early witness path only considers signatures accepted by this rule.
 isMonomorphicRetainedWitness :: Id -> Bool

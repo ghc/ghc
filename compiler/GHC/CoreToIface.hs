@@ -590,6 +590,9 @@ toIfaceIdDetails _ VanillaId                      = IfVanillaId
 toIfaceIdDetails name (SourceTableId owner table origin)
   | name == owner = IfSourceTableId (tyConName table) origin
   | otherwise     = IfVanillaId
+toIfaceIdDetails name (CheckedClosureSourceTableId owner table helpers)
+  | name == owner = IfCheckedClosureSourceTableId (tyConName table) helpers
+  | otherwise     = IfVanillaId
 toIfaceIdDetails _ (InstMethId {})                = IfVanillaId
 toIfaceIdDetails _ (WorkerLikeId dmds)            = IfWorkerLikeId dmds
 toIfaceIdDetails name (DFunId _ (Just source))

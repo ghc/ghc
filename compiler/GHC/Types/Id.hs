@@ -220,6 +220,7 @@ sourceTableId_maybe :: Id -> Maybe TyCon
 sourceTableId_maybe fun
   | Just (owner, table) <- case idDetails fun of
         SourceTableId name tbl _ -> Just (name, tbl)
+        CheckedClosureSourceTableId name tbl _ -> Just (name, tbl)
         RecSelId{sel_fieldLabel = field, sel_sourceTable = Just tbl}
           -> Just (flSelector field, tbl)
         _ -> Nothing

@@ -865,6 +865,7 @@ Library
         GHC.Tc.Gen.OpenTypeEval
         GHC.Tc.Gen.Pat
         GHC.Tc.Gen.Sig
+        GHC.Tc.Gen.SourceClosure
         GHC.Tc.Gen.SourceTable
         GHC.Tc.Gen.Splice
         GHC.Tc.Instance.Class

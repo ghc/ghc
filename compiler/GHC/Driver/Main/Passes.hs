@@ -80,6 +80,7 @@ import GHC.Linker.Types
 import GHC.Linker.Deps
 
 import GHC.Hs
+import qualified GHC.LanguageExtensions as LangExt
 import GHC.Hs.Dump
 import GHC.Hs.Stats         ( ppSourceStats )
 
@@ -176,6 +177,7 @@ import GHC.Types.Var.Env       ( mkEmptyTidyEnv )
 import GHC.Types.Var.Set
 
 import GHC.Utils.Fingerprint ( Fingerprint )
+import GHC.Tc.Gen.SourceClosure (publishCheckedSourceClosures)
 import GHC.Tc.Gen.SourceTable (finalCoreMappers, verifyFinalCoreMapper, failedFinalListTables,
                                finalCoreSourceFamilies, sourceTableCallees, publishListFoldMethods,
                                keepCheckedMapWorkers, publishCheckedMapMethods)
@@ -909,7 +911,7 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
             Just publish -> liftIO $ fmap snd $
               initTc NoTcMPlugins hsc_env hsc_src False (mg_module checked) (tcg_top_loc tc_result) $
                 setGblEnv tc_result publish
-          let details = case publication of
+          let method_details = case publication of
                 Just (ids, families) ->
                   let types = md_types original_details `plusTypeEnv` typeEnvFromEntities ids families [] []
                       update dfun = case lookupTypeEnv types (idName dfun) of
@@ -918,6 +920,23 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
                   in original_details { md_types = types
                                       , md_insts = updateClsInstDFuns update (md_insts original_details) }
                 Nothing -> original_details
+
+          details <- if gopt Opt_WriteSourceEquations dflags &&
+                        xopt LangExt.ExperimentalDependentTypes dflags &&
+                        null plugins && null (pluginsWithArgs (hsc_plugins hsc_env)) &&
+                        null (pluginModNames dflags) && null (tcg_rules tc_result)
+            then do
+              (_, closures) <- liftIO $
+                initTc NoTcMPlugins hsc_env hsc_src False (mg_module checked) (tcg_top_loc tc_result) $
+                  setGblEnv tc_result $
+                    publishCheckedSourceClosures (mg_binds desugared_guts) (cg_binds cg_guts)
+                                                 (md_types method_details)
+              pure $ case closures of
+                Just (ids, families) | not (null ids) ->
+                  method_details { md_types = md_types method_details `plusTypeEnv`
+                                                typeEnvFromEntities ids families [] [] }
+                _ -> method_details
+            else pure method_details
 
           !partial_iface <- liftIO $
                 {-# SCC "GHC.Driver.Main.mkPartialIface" #-}

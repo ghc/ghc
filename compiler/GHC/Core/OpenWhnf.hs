@@ -5,6 +5,7 @@ module GHC.Core.OpenWhnf
   , Suspension
   , CaseContinuation(..)
   , openWhnfM, openWhnfWithLocalM, openWhnfTraceM, CaseStep(..)
+  , checkedMultiplicityCast
   , openFamilyReduction
   , openDataConFieldTypes, openIndexedDataCon, openReadbackM, OpenReadbackFailure(..)
   ) where

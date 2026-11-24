@@ -3114,13 +3114,14 @@ tcIfaceSourceProofRules = traverse $ \((owner, first, mapper), args) ->
 tcIdDetails :: Name -> Type -> IfaceIdDetails -> IfL IdDetails
 tcIdDetails _ _  IfVanillaId           = return VanillaId
 tcIdDetails owner ty (IfSourceTableId table_name origin) = do
-    table <- forkM (text "Source table of" <+> ppr owner) $ do
-      thing <- tcIfaceGlobal table_name
-      case thing of
-        ATyCon tc | let fun = mkGlobalId (SourceTableId owner tc origin) owner ty vanillaIdInfo
-                  , Just _ <- sourceTableId_maybe fun -> return tc
-        _ -> failIfM (text "Invalid source table for" <+> ppr owner <+> ppr table_name)
+    table <- tcIfaceSourceTable owner ty table_name
     return (SourceTableId owner table origin)
+tcIdDetails owner ty (IfCheckedClosureSourceTableId table_name helpers)
+  | null helpers || any ((/= nameModule_maybe owner) . nameModule_maybe) helpers =
+      failIfM (text "Invalid source closure helpers for" <+> ppr owner)
+  | otherwise = do
+      table <- tcIfaceSourceTable owner ty table_name
+      return (CheckedClosureSourceTableId owner table helpers)
 tcIdDetails _ _ (IfSourceProofId _) = pure VanillaId
 tcIdDetails _ _  (IfWorkerLikeId dmds) = return $ WorkerLikeId dmds
 tcIdDetails _ ty IfDFunId              = return (mkDFunIdDetails cls)
@@ -3157,6 +3158,17 @@ tcIdDetails nm ty (IfRecSelId tc _first_con naughty fl table_name)
   where
     tyThingPatSyn (AConLike (PatSynCon ps)) = ps
     tyThingPatSyn _ = panic "tcIdDetails: expecting patsyn"
+
+-- | Recover the exact private family of an interface source owner.
+tcIfaceSourceTable :: Name -> Type -> Name -> IfL TyCon
+tcIfaceSourceTable owner ty table_name =
+  forkM (text "Source table of" <+> ppr owner) $ do
+    thing <- tcIfaceGlobal table_name
+    case thing of
+      ATyCon tc
+        | let fun = mkGlobalId (SourceTableId owner tc NominalSourceTable) owner ty vanillaIdInfo
+        , Just _ <- sourceTableId_maybe fun -> return tc
+      _ -> failIfM (text "Invalid source table for" <+> ppr owner <+> ppr table_name)
 
 tcIdInfo :: Bool -> TopLevelFlag -> Name -> Type -> IfaceIdInfo -> IfL IdInfo
 tcIdInfo ignore_prags toplvl name ty info = do

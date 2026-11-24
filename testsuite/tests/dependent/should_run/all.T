@@ -24,6 +24,10 @@ test('NativeGadtImplicitSource',
 test('NativeOrdinaryGadtSource',
      [req_host_target_ghc, only_ways(['normal'])],
      run_command, ['bash NativeOrdinaryGadtSource.sh "{compiler}" "{libdir}"'])
+test('NativeCheckedClosure',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['NativeCheckedClosureProvider.hs', 'NativeCheckedClosure.hs'])],
+     run_command, ['bash NativeCheckedClosure.sh "{compiler}" "{libdir}"'])
 test('NativeLocalBooleanResult',
      [req_host_target_ghc, only_ways(['normal']), extra_files(['NativeLocalBooleanResult.hs'])],
      run_command, ['bash NativeLocalBooleanResult.sh "{compiler}" "{libdir}"'])

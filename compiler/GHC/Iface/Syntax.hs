@@ -641,6 +641,7 @@ data IfaceIdDetails
   -- Rule heads can name private bindings. Their defining module and
   -- occurrence identify a RULE without requiring an Id declaration.
   | IfSourceProofId [IfaceSourceProofHead] -- Legacy private interface encoding.
+  | IfCheckedClosureSourceTableId IfExtName [IfExtName]
 
 -- | A source proof identifies a rule head by its module and occurrence.
 type IfaceSourceProofRule = (IfaceSourceProofHead, [SourceProofArg IfaceRuleName])
@@ -2110,6 +2111,8 @@ instance Outputable IfaceConAlt where
 ------------------
 instance Outputable IfaceIdDetails where
   ppr IfVanillaId       = Outputable.empty
+  ppr (IfCheckedClosureSourceTableId table helpers) =
+    text "CheckedClosureSourceTable" <+> ppr table <+> ppr helpers
   ppr (IfSourceTableId table origin) = text label <+> ppr table
     where label = case origin of
             NominalSourceTable -> "SourceTable"
@@ -2245,6 +2248,7 @@ freeNamesIfIdDetails (IfRecSelId tc first_con _ fl table) =
   maybe emptyNameSet unitFN table
 freeNamesIfIdDetails IfVanillaId         = emptyNameSet
 freeNamesIfIdDetails (IfSourceTableId table _) = unitFN table
+freeNamesIfIdDetails (IfCheckedClosureSourceTableId table helpers) = mkNameSet (table : helpers)
 freeNamesIfIdDetails (IfSourceProofId _) = emptyNameSet
 freeNamesIfIdDetails (IfWorkerLikeId {}) = emptyNameSet
 freeNamesIfIdDetails IfDFunId            = emptyNameSet
@@ -3324,6 +3328,9 @@ instance Binary IfaceIdDetails where
       putByte bh 6 >> put_ bh methods >> put_ bh literal
     put_ bh (IfSourceProofId deps) =
       requireIfaceEvidenceVersion bh SourceProofRuleEvidence >> putByte bh 9 >> put_ bh deps
+    put_ bh (IfCheckedClosureSourceTableId table helpers) =
+      requireIfaceEvidenceVersion bh CheckedClosureSourceTableEvidence >>
+      putByte bh 11 >> put_ bh table >> put_ bh helpers
     get bh = do
         h <- getByte bh
         case h of
@@ -3343,6 +3350,7 @@ instance Binary IfaceIdDetails where
             8 -> flip IfSourceTableId FinalCoreSourceTable <$> get bh
             9 -> IfSourceProofId <$> get bh
             10 -> IfRecSelId <$> get bh <*> get bh <*> get bh <*> get bh <*> (Just <$> get bh)
+            11 -> IfCheckedClosureSourceTableId <$> get bh <*> get bh
             _ -> panic "Binary IfaceIdDetails: unknown tag"
 
 instance Binary IfaceInfoItem where
@@ -3865,6 +3873,7 @@ instance NFData IfaceIdDetails where
   rnf = \case
     IfVanillaId -> ()
     IfSourceTableId table origin -> rnf table `seq` origin `seq` ()
+    IfCheckedClosureSourceTableId table helpers -> rnf table `seq` rnf helpers
     IfWorkerLikeId dmds -> rnf dmds `seq` ()
     IfSourceProofId deps -> rnf deps
     IfRecSelId parent b c d table ->

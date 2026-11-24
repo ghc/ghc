@@ -91,6 +91,7 @@ restoreSourceTableId types fun
   , Just (AnId owner) <- lookupTypeEnv types (getName fun)
   = let with_details = case idDetails owner of
           details@(SourceTableId name _ _) | name == getName fun -> setIdDetails fun details
+          details@(CheckedClosureSourceTableId name _ _) | name == getName fun -> setIdDetails fun details
           details@(DFunId _ (Just source)) | sdf_owner source == getName fun -> setIdDetails fun details
           _ -> fun
         deps = sourceProofRuleInfo (idInfo owner)
