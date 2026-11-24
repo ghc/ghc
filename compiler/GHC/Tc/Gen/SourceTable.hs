@@ -2660,7 +2660,14 @@ sourceCaseVisibleArity table
           | Just (expected, ConstructorCaseType telescope _ _ _ _ _) <- retainedWitnessType kind -> do
               [branch] <- pure branches
               (con, witness : _) <- caseBranch telescope branch
-              guard (con == expected && coAxBranchRHS branch `eqType` witness)
+              (patterns, _) <- branchPatterns telescope branch
+              [pattern_ty] <- pure patterns
+              (_, args) <- splitTyConApp_maybe pattern_ty
+              let arity = length telescope
+                  parameters = take arity (coAxBranchTyVars branch)
+              guard (con == expected &&
+                     eqTypes (take arity args) (mkTyVarTys parameters) &&
+                     coAxBranchRHS branch `eqType` witness)
               pure 1
           | otherwise -> case constructorCaseType kind <|> monomorphicGuardedListCaseType kind of
               Just (ConstructorCaseType telescope tc _ domains position _)
@@ -2903,7 +2910,7 @@ retainedWitnessType ty = do
     (domain, result) <- caseArrow body
     (tc, args) <- caseDatatype domain
     [con] <- pure (tyConDataCons tc)
-    guard (all (isLiftedTypeKind . varType) (binderVars binders) &&
+    guard (all (\tv -> varType tv `eqType` liftedTypeKind) (binderVars binders) &&
            eqTypes args (mkTyVarTys (binderVars binders)) &&
            (null binders || not (null (dataConFieldLabels con))) &&
            isRetainedCaseRoot domain tc)
@@ -2962,9 +2969,13 @@ The ordinary visibility, constructor coverage, and RULE checks still
 apply. Interface recognition checks the instantiated promoted argument
 kinds again before classifying the table as a constructor case.
 
-A nullary package can supply an exact projection of its witness. Keep
-this rule separate from ordinary constructor cases with no domain type
-parameters. Check that the Core case returns its first field directly.
+A retained record selector quantifies over the same erased parameters as
+its constructor. Pass those parameters to the witness family before its
+receiver. This makes the receiver determine the erased arguments and
+keeps the result of a payload selector indexed by that receiver.
+
+A nullary package can also supply a handwritten witness projection.
+Check that its Core case returns its first field directly.
 Each payload field remains a variable in the checked alternative, even
 when its type depends on the witness. Check that the sole imported
 equation also returns the first variable of this same constructor.

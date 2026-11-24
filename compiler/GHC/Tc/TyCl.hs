@@ -5408,7 +5408,8 @@ tcConDecl _ dd_info rep_tycon tc_bndrs _ tag_map
           (ConDeclH98 { con_name = lname@(L _ name), con_ext = Just sig })
   = addErrCtxt (DataConDefCtxt (NE.singleton lname)) $
     do { case dd_info of
-           DDataType | all (isLiftedTypeKind . varType) (binderVars tc_bndrs) -> pure ()
+           DDataType | all (\tv -> varType tv `eqType` liftedTypeKind) (binderVars tc_bndrs)
+                     -> pure ()
            _ -> failWithTc (TcRnRetainedQuantificationError RetainedPackageDeclaration)
        ; skol_info <- mkSkolemInfo (DataConSkol name)
        ; (tclvl, wanted, (retained, full_ty)) <-

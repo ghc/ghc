@@ -1391,7 +1391,8 @@ tcIfaceDataCons tycon_name tycon if_cons
                     else tc_retained_args dc_name emptyVarSet arg_binders args
                 ; when (not (null arg_binders) && not (null lbl_names)) $
                     do { valid <- evaluateIfaceNativeDomain (ppr dc_name)
-                           (validRetainedRecordFields retained_binders arg_tys)
+                           (all (\tv -> varType tv `eqType` liftedTypeKind) univ_tvs
+                            && validRetainedRecordFields retained_binders arg_tys)
                        ; unless valid $
                            failIfM (text "Invalid retained record fields in interface:" <+> ppr dc_name) }
                 ; let retained_fields = [field | Just field <- retained_binders]
@@ -1482,7 +1483,7 @@ tcIfaceDataCons tycon_name tycon if_cons
           | null fields = True
           | IfDataTyCon False [_] <- if_cons
           , Just _ : rest@(_ : _) <- binders
-          = all isNothing rest && not wrapper && null univs && null ctxt
+          = all isNothing rest && not wrapper && user_names == univ_names && null ctxt
             && null spec && fields `equalLength` args && length fields == length (nub fields)
           | otherwise = False
         valid_result

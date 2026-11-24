@@ -1398,7 +1398,8 @@ mkDataConWithTelescope source_order arg_binders name declared_infix prom_info
       | null fields = True
       | Just _ : rest@(_ : _) <- arg_binders
       = all isNothing rest && fields `equalLength` orig_arg_tys
-        && null univ_tvs && null eq_spec && null theta
+        && all (\tv -> varType tv `eqType` liftedTypeKind) univ_tvs
+        && map binderVar user_tvbs == univ_tvs && null eq_spec && null theta
       | otherwise = False
 
     valid_result
@@ -2253,9 +2254,10 @@ with DepFunTy at each dependent field. Each runtime field remains an ordinary
 lazy constructor payload slot.
 See Note [Retained constructor equality contexts].
 
-A monomorphic retained package can have record fields. The labels must
-align with the arguments. The first field is the only retained binder,
-and every later field must use it as the final argument of its type.
+A retained package can have record fields and ordinary lifted type
+parameters in datatype order. The labels must align with the arguments.
+The first field is the only retained binder. Every later field must use
+it as the final argument of its type.
 Check the payload types after the parent TyCon is available.
 See Note [Source retained constructor declarations] in GHC.Tc.TyCl.
 
