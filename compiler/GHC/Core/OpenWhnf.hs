@@ -39,7 +39,7 @@ import GHC.Core.Type
   , repGetTyVar_maybe, splitFunTy_maybe, splitTyConApp_maybe, substTyWith, tyCoVarsOfType, typeKind )
 import GHC.Core.Utils (exprType, findAlt)
 import GHC.Types.Basic (Boxity(Boxed), IntWithInf, intGtLimit)
-import GHC.Types.Id (isDataConWorkId_maybe)
+import GHC.Types.Id (dataConWrapUnfolding_maybe, isDataConWorkId_maybe)
 import GHC.Types.Literal (Literal(LitChar))
 import GHC.Types.Tickish (GenTickish(Breakpoint))
 import GHC.Types.Var (Var, isCoVar, isId, isTyVar, varType)
@@ -250,6 +250,9 @@ evaluate local_families indexed limit obtain local record unsolved first_type (S
       | Just binding <- lookupVarEnv env v -> do
           lift (lift (local v))
           recur binding
+      | indexed, Just wrapper <- dataConWrapUnfolding_maybe v
+      , exprType wrapper `eqType` varType v ->
+          recur (Suspension emptyVarEnv wrapper)
       | otherwise -> do
           definition <- lift (lift (obtain v first_type))
           case definition of
@@ -492,6 +495,11 @@ environments. A cast whose endpoints still differ blocks observation.
 A neutral scrutinee cannot choose a branch. For example, a substitution
 worker can apply its callback to a known bound variable, but it cannot
 inspect an unknown term. See PLFA v22.08, DeBruijn, Single substitution.
+
+When a worker builds a GADT constructor through its wrapper, use the
+wrapper unfolding reconstructed from the constructor interface. It is
+an implicit binding. Check the resulting worker through the same plan
+as the worker for a promoted operand.
 -}
 
 -- | Recognize lifted, lazy constructor fields with the ordinary representation.
