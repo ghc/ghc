@@ -681,6 +681,11 @@ test('NativeRetainedConstructorContext',
       extra_files(['retained-constructor-context'])],
      run_command, ['bash NativeRetainedConstructorContext.sh "{compiler}" "{libdir}"'])
 
+test('NativeNestedRetainedCase',
+     [req_host_target_ghc, only_ways(['normal']),
+      extra_files(['nested-retained-case'])],
+     run_command, ['bash NativeNestedRetainedCase.sh "{compiler}" "{libdir}"'])
+
 test('NativeRetainedFunctionRules',
      [req_host_target_ghc, only_ways(['normal']),
       extra_files(['../../../../docs/dependent-haskell/examples/qualified-pi/' + f for f in
