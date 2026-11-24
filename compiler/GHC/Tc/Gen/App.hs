@@ -882,8 +882,7 @@ tcOrdinaryAppScoped fields checked_prefix rn_expr rn_head@(rn_fun, fun_lspan) tc
               -- See Note [Quick Look for particular Ids].
               vta_cache <- case do_ql of
                 NoQL | native_app
-                     , let (_, _, head_ty) = tcRetainedInstTelescope fun_sigma
-                     , any is_type_arg rn_args || has_required_prefix head_ty
+                     , any is_type_arg rn_args || hasRequiredTypePrefix fun_sigma
                   -> Just <$> newTcRef Nothing
                 _ -> return Nothing
             ; let instantiate =
@@ -907,11 +906,6 @@ tcOrdinaryAppScoped fields checked_prefix rn_expr rn_head@(rn_fun, fun_lspan) tc
   where
     is_type_arg ETypeArg{} = True
     is_type_arg _ = False
-
-    has_required_prefix ty
-      | Just (_, tvb, _) <- tcSplitForAllTyVarBinder_maybe ty
-      = isVisibleForAllTyFlag (binderFlag tvb)
-      | otherwise = False
 
     -- See Note [Type arguments before an implicit package head].
     source_fun
@@ -3821,6 +3815,8 @@ reference. After ITVDQ checks its argument, keep it in the type-argument
 spine. It is erased, so it does not advance the value argument position.
 For example, in `cong Succ (assoc m n p)`, the argument `Succ` fixes the
 kinds and the recursive proof supplies the retained endpoints.
+Wait until the leading required foralls have all been applied. A
+remaining required argument cannot supply an ordinary term operand.
 
 Cache keys count value arguments. Diagnostic positions also count written type
 arguments. Keep separate counters in tcValArgsWithCache; otherwise a written
@@ -3959,6 +3955,7 @@ tcInstFunWithPrefix look_arg prefix_only prefix vta_cache expected_rho inst_plan
                       | pos == 1
                       , any is_type_arg acc
                       , not (any is_type_arg args)
+                      , not (hasRequiredTypePrefix fun_ty)
                       , hasNoConcreteTyVars tc_fun
                       -> do { attempted <- readTcRef ref
                             ; case attempted of
@@ -6579,6 +6576,15 @@ tcRetainedInstTelescope sigma
   = let (rest_tvs, rest_theta, result) = tcRetainedInstTelescope tau
     in (tvs ++ rest_tvs, theta ++ rest_theta, result)
   | otherwise = ([], [], sigma)
+
+-- | Check for a required erased binder after the leading invisible telescope.
+-- See Note [Native inference after visible type applications].
+hasRequiredTypePrefix :: Type -> Bool
+hasRequiredTypePrefix sigma
+  | (_, _, tau) <- tcRetainedInstTelescope sigma
+  , Just (_, tvb, _) <- tcSplitForAllTyVarBinder_maybe tau
+  = isVisibleForAllTyFlag (binderFlag tvb)
+  | otherwise = False
 
 -- | Arguments inferred once before immutable index instantiation.
 -- The argument position counts source value arguments from one.

@@ -3118,13 +3118,8 @@ tc_app_ty_external mode rn_ty exp_kind
            then case (lookupTypeEnv (tcg_type_env env) name,
                       lookupNameEnv (tcg_local_open_defs env) name, value_args) of
              (Just (AnId fun), _, Just args)
-               | isTypeLevel (mode_tyki mode), isJust (mode_complete_type_arg mode)
-               , Just table <- sourceTableId_maybe fun
-               -> do { let head_ty = mkTyConTy table
-                       ; if args `lengthAtLeast` source_arity table
-                         then sourceTableReferenceUse table
-                         else sourceTableTypeUses head_ty
-                       ; tc_app_ty_with_head mode rn_ty exp_kind head_ty }
+               | Just table <- partial_source_callback fun args
+               -> checked_callback table
              (_, Just (fun, _), Just args)
                | isTypeLevel (mode_tyki mode), ordinary_call
                , Just table <- sourceTableOccurrence env fun >>= sourceTableId_maybe
@@ -3145,7 +3140,18 @@ tc_app_ty_external mode rn_ty exp_kind
              _ -> unsupported name
            else imported_call env rdr name }
 
-    source_arity = length . dropWhile isInvisibleTyConBinder . tyConBinders
+    partial_source_callback fun args
+      | isTypeLevel (mode_tyki mode), isJust (mode_complete_type_arg mode)
+      , Just table <- sourceTableId_maybe fun
+      , Just arity <- sourceCaseVisibleArity table
+      , not (args `lengthAtLeast` arity)
+      = Just table
+      | otherwise = Nothing
+
+    checked_callback table
+      = do { let head_ty = mkTyConTy table
+           ; sourceTableTypeUses head_ty
+           ; tc_app_ty_with_head mode rn_ty exp_kind head_ty }
 
     is_local_open_operand arg = isOpenTypeOperand arg || is_type_constructor_app arg
 
@@ -3164,6 +3170,8 @@ tc_app_ty_external mode rn_ty exp_kind
              -> do { thing <- tcLookupGlobal name
                    ; case thing of
                        AnId fun
+                         | Just table <- partial_source_callback fun args
+                         -> checked_callback table
                          | ordinary_call, null args, isQual rdr
                          , isNativeNamedOpaqueFunctionId fun
                          , Nothing <- sourceTableId_maybe fun
@@ -3405,11 +3413,13 @@ head. Imported type synonyms keep their existing type-level names.
 An erased required argument can be written `f (plus m)` or
 `f (type (plus m))`. The term-to-type mapping keeps the resolved term
 name in the first form. The renamer resolves the second form to the
-local source family. Recover that same family from the checked local
-Id when checking the erased type argument. Check the original argument
-types and record the same family use. This lookup only uses equations
-already visible at the occurrence. It does not schedule new equations or
-use a local unfolding to evaluate code.
+source family. Recover that same certified constructor-case family from
+the resolved Id when checking a partial callback. The Id can come from
+the current type environment or from an interface. Check the original
+argument types and record the family identity. The later use of a
+saturated application still checks the rules for using its equations.
+This lookup uses equations already visible at the occurrence. It does
+not schedule new equations or use an unfolding to evaluate code.
 -}
 
 -- | Add the written constraints to the scope of a promoted method call.
