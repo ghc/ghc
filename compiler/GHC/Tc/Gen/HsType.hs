@@ -20,7 +20,7 @@ module GHC.Tc.Gen.HsType (
 
         tcHsClsInstType,
         tcDefaultDeclClass, tcHsDeriv, tcDerivStrategy,
-        tcHsTypeApp,
+        tcHsTypeApp, tcHsTypeAppWithSource,
         UserTypeCtxt(..),
         bindImplicitTKBndrs_Tv, bindImplicitTKBndrs_Skol,
             bindImplicitTKBndrs_Q_Tv, bindImplicitTKBndrs_Q_Skol,
@@ -1424,8 +1424,13 @@ tcHsClsInstType user_ctxt hs_inst_ty
 ----------------------------------------------
 -- | Type-check a visible type application
 tcHsTypeApp :: LHsWcType GhcRn -> Kind -> TcM Type
+tcHsTypeApp = tcHsTypeAppWithSource Nothing
+
+-- | Type-check the lowered argument. Use the written syntax in its context.
 -- See Note [Recipe for checking a signature] in GHC.Tc.Gen.HsType
-tcHsTypeApp wc_ty kind
+-- See Note [Type lambdas in visible type arguments] in GHC.Rename.HsType.
+tcHsTypeAppWithSource :: Maybe HsAppTypeSource -> LHsWcType GhcRn -> Kind -> TcM Type
+tcHsTypeAppWithSource source wc_ty kind
   | HsWC { hswc_ext = sig_wcs, hswc_body = hs_ty } <- wc_ty
   = do { mode <- mkHoleMode TypeLevel HM_VTA
                  -- HM_VTA: See Note [Wildcards in visible type application]
@@ -1433,7 +1438,7 @@ tcHsTypeApp wc_ty kind
        ; let complete = null sig_wcs && hsTypeHasNoAnonWildcards hs_ty
              mode' = mode { mode_indices = indices
                           , mode_complete_type_arg = Just complete }
-       ; ty <- addTypeCtxt hs_ty                  $
+       ; ty <- addTypeCtxtWithSource source hs_ty $
                solveEqualities "tcHsTypeApp" $
                -- We are looking at a user-written type, very like a
                -- signature so we want to solve its equalities right now
@@ -5859,10 +5864,14 @@ want to default it to 'Type', not to (Any @Type).
 -}
 
 addTypeCtxt :: LHsType GhcRn -> TcM a -> TcM a
+addTypeCtxt = addTypeCtxtWithSource Nothing
+
+-- | Attach a type context, with the source argument when the renamer lifted it.
+addTypeCtxtWithSource :: Maybe HsAppTypeSource -> LHsType GhcRn -> TcM a -> TcM a
         -- Wrap a context around only if we want to show that contexts.
         -- Omit invisible ones and ones user's won't grok
-addTypeCtxt (L _ (HsWildCardTy _)) thing = thing   -- "In the type '_'" just isn't helpful.
-addTypeCtxt ty thing = addErrCtxt (TypeCtxt ty) thing
+addTypeCtxtWithSource _ (L _ (HsWildCardTy _)) thing = thing -- "In the type '_'" just isn't helpful.
+addTypeCtxtWithSource source ty thing = addErrCtxt (TypeCtxt source ty) thing
 
 
 

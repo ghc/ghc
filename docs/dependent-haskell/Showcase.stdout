@@ -288,7 +288,9 @@ zip two vectors at their shared stored length: [('r',True),('s',False)]
 zip two named fields at their stored length: [('x',True)]
 read a supplied field when its sibling is omitted: [True]
 replace a named field at the original stored length: (1,[('x',False)])
+reset both columns at their stored length: (1,[('-',False)])
 replace the stored length and both named payloads: (0,[])
+copy flags after comparing two stored lengths: (Just [('x',False)],Nothing)
 put two columns in a row indexed by the record length: ("rs",[True,False])
 project the length of a known dependent package in a type: Refl
 project from two payload families with the same dependent function: ("xx",7)
@@ -470,6 +472,7 @@ map a partially applied column type synonym: Refl
 compare two column readers before choosing the cell type: Refl
 partially apply a two-argument type lambda: Refl
 map a callback that captures a closed family pattern: (Refl,Refl)
+forward a list of column groups to the named error schema: Refl
 capture a type before and after a local let: Refl
 give every field in a row the same error type: (Right 'x',Right True)
 map row cells with a lambda in a local signature: (Right 'x',Right True)

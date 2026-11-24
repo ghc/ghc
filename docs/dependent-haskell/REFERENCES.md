@@ -8387,6 +8387,14 @@ at the same source revision.
 [Agda 2.8.0 rewriting](https://agda.readthedocs.io/en/v2.8.0/language/rewriting.html),
 and [R16 mapping proof](roadmap/R16-open-term-evaluator.md#a-rule-in-the-module-importing-a-mapping-proof).
 
+GHC matches a rule against a Core application. At a checked value
+position, `Nothing` and `Just x` have distinct constructor Names.
+The field of `Just` plays no part in this comparison. Agda uses the
+same constructor distinction when unification encounters `zero` and
+`suc n` in an indexed pattern.
+[GHC rule matching](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/rewrite_rules.html#semantics)
+and [Agda absurd patterns](https://agda.readthedocs.io/en/v2.8.0/language/function-definitions.html#absurd-patterns).
+
 Agda checks the recorded hashes of imports before reusing a checked
 module. GHC records fingerprints for modules and individual declarations.
 The R16 upgrade uses GHC's declaration fingerprints to recheck a client
@@ -8620,6 +8628,21 @@ compare an installed library change with a compiler change that uses the
 same library before and after.
 [GHC's account of the implicit dependency](../../compiler/GHC/Builtin.hs)
 and [the helper exported by base](../../libraries/base/src/GHC/Essentials.hs).
+
+### Forwarding one type argument to a named family
+
+Agda's definitional eta rule identifies a function with the lambda
+that passes its argument to that function. The R17 experiment checks
+one instance of this rule. The generated type lambda must pass its
+last binder unchanged to the named family. The binder must be absent
+from the earlier arguments. The checker compares those arguments after
+substituting the captures. It can therefore compare the two schemas
+in `forwardRowSchema` while the list of column groups is unknown.
+A non-injective family still gives no way to recover its argument from
+its result.
+[Agda function eta](https://agda.readthedocs.io/en/v2.8.0/language/lambda-abstraction.html#lambda-expressions),
+[proposal #242 on apartness](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#apartness-of-type-families),
+and [the row proof](examples/open-evaluation/TypeLambdaSchema.hs).
 
 ### Specialisation of an indexed zip operand
 

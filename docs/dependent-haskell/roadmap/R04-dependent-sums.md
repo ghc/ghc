@@ -412,22 +412,32 @@ readable. Omitting the witness gives GHC-83605 at the constructor and
 names the required field.
 [Field omission and witness inference](../REFERENCES.md#omitted-fields-in-a-dependent-record).
 
-An ordinary caller can replace one payload at the original witness.
+An ordinary client can also write
+`replicateNative (Named.storedLength p) '-'`. Its result is a vector at
+the same index as the two payloads of `p`. GHC checks the selector's
+source equations through its interface.
+
+An ordinary caller can replace one or more payloads at the original witness.
 The Showcase sets the first flag to `False` and keeps the rest of the
-vector. The update checks the replacement at `storedLength p` for
+vector. The update checks each replacement at `storedLength p` for
 receiver `p`. Job 1968 passed the source-hidden test at `-O0` and `-O2`.
 It checked the unchanged length, the laziness of the fields, and the
 GHC-83865 error for a vector at a separate record's witness.
 The receiver must be a supported retained operand, such as a local
-variable. An update that keeps the witness can replace one payload.
+variable.
 [Record update in Haskell and Agda](../REFERENCES.md#updating-a-payload-at-its-stored-witness).
 
-To change the witness, supply a replacement for every payload. For
+An update can write `storedLength = storedLength p` and keep any omitted
+payloads of `p`. It can also reuse a payload at `storedLength q` in a
+branch with a nominal equality proof between the two projected lengths.
+The update uses the written witness expression and leaves omitted
+payloads lazy. Without this equality, supply a replacement for each
+payload when writing the witness. For
 example, `p { storedLength = Z, namedLetters = VNil, namedFlags = VNil }`
 changes a nonempty record to an empty one. The constructor match demands
 the old record and leaves its fields unevaluated. GHC checks each new
-vector at `Z`. If an update omits a payload, GHC reports GHC-83605 at
-the witness field and names the missing replacement.
+vector at `Z`. If GHC cannot reuse an omitted payload, it reports
+GHC-83605 at the witness field and names the missing replacement.
 
 ## Sums in constructor fields
 

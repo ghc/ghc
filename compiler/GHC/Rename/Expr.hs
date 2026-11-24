@@ -348,7 +348,7 @@ rnExpr (HsHole h)
 rnExpr (HsOverLabel src v)
   = do { (from_label, fvs) <- lookupSyntaxName fromLabelClassOpOcc
        ; return ( mkExpandedExpr (HsOverLabel src v) $
-                  HsAppType noExtField (genLHsVar from_label) hs_ty_arg
+                  HsAppType Nothing (genLHsVar from_label) hs_ty_arg
                 , fvs ) }
   where
     hs_ty_arg = mkEmptyWildCardBndrs $ wrapGenSpan $
@@ -388,8 +388,8 @@ rnExpr (HsAppType _ fun arg)
   = do { type_app <- xoptM LangExt.TypeApplications
        ; unless type_app $ addErr $ typeAppErr TypeLevel $ hswc_body arg
        ; (fun',fvFun) <- rnLExpr fun
-       ; (arg',fvArg) <- rnHsTypeApp arg
-       ; return (HsAppType noExtField fun' arg', fvFun `plusFN` fvArg) }
+       ; (arg', original, fvArg) <- rnHsTypeApp arg
+       ; return (HsAppType original fun' arg', fvFun `plusFN` fvArg) }
 
 rnExpr (HsAppRetained _ fun arg)
   = do { enabled <- xoptM LangExt.ExperimentalDependentTypes

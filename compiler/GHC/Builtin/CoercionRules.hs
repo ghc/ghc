@@ -4,6 +4,7 @@ module GHC.Builtin.CoercionRules
   , boxedPairCompositionRule, matchBoxedPairComposition
   , boxedPairReconstructionRule
   , proveBoxedPairProjection, proveScopedSigmaClosure, proveScopedLambdaClosure
+  , proveScopedLambdaEta
   , proveScopedConstructorCase
   ) where
 
@@ -16,7 +17,7 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.DataCon
   ( DataCon, dataConName, dataConTyCon, dataConUnivTyVars, dataConInstOrigArgTys
   , dataConSourceArity, dataConRepArgBinders, isVanillaDataCon )
-import GHC.Core.TyCo.Rep (Coercion(AxiomCo), Type(TyVarTy), scaledThing)
+import GHC.Core.TyCo.Rep (Coercion(AxiomCo), Type(TyVarTy, TyConApp), scaledThing)
 import GHC.Core.TyCo.Compare
   (eqType, eqTypeX, eqTypes, eqVarBndrs, eqScopedSigmaClosures, eqScopedLambdaClosures)
 import GHC.Core.TyCon
@@ -49,14 +50,16 @@ builtInCoAxiomRules =
       , matchableAppProjectionRule CLeft, matchableAppProjectionRule CRight
       , (scopedSigmaClosureName, scopedSigmaClosureRule)
       , (scopedLambdaClosureName, scopedLambdaClosureRule)
+      , (scopedLambdaEtaName, scopedLambdaEtaRule)
       , (scopedEnumCaseName, scopedEnumCaseRule)
       , (scopedConstructorCaseName, scopedConstructorCaseRule)
       , (scopedCaseResultName, scopedCaseResultRule)
       , (scopedOrderedCaseName, scopedOrderedCaseRule) ]
 
-scopedSigmaClosureRule, scopedLambdaClosureRule :: CoAxiomRule
+scopedSigmaClosureRule, scopedLambdaClosureRule, scopedLambdaEtaRule :: CoAxiomRule
 scopedSigmaClosureRule = scopedClosureRule scopedSigmaClosureName eqScopedSigmaClosures
 scopedLambdaClosureRule = scopedClosureRule scopedLambdaClosureName eqScopedLambdaClosures
+scopedLambdaEtaRule = scopedClosureRule scopedLambdaEtaName eqScopedLambdaEta
 
 -- | The least interface requirement for this checked case equality.
 data ScopedCaseProof = EnumerationCases | IgnoredFieldCases | ScopedResultCases
@@ -96,6 +99,70 @@ proveScopedLambdaClosure lhs rhs
   | eqScopedLambdaClosures lhs rhs
   = Just (AxiomCo scopedLambdaClosureRule [mkNomReflCo lhs, mkNomReflCo rhs])
   | otherwise = Nothing
+
+-- | Prove equality between a generated lambda and the family it forwards to.
+proveScopedLambdaEta :: Type -> Type -> Maybe Coercion
+proveScopedLambdaEta lhs rhs
+  | eqScopedLambdaEta lhs rhs = Just (evidence lhs rhs)
+  | eqScopedLambdaEta rhs lhs = Just (mkSymCo (evidence rhs lhs))
+  | otherwise = Nothing
+  where
+    evidence lambda family = AxiomCo scopedLambdaEtaRule
+      [mkNomReflCo lambda, mkNomReflCo family]
+
+{- Note [Eta for a forwarding type lambda]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For 'Map (\a -> Stamp e a) xs', the generated closure has one equation.
+After supplying its captures, that equation passes the remaining binder
+directly to 'Stamp e'. Compare that prefix with the named family at the
+same unmatchable kind. Inspect the raw RHS spine because application
+splitting preserves saturation for type families.
+
+Use the branch patterns as the substitution domain. Their order can
+differ from the order of the axiom binders. Remove the final binder only
+if it is absent from the prefix, including its kinds. A single variable
+equation covers every application. A case split or a repeated pattern
+would require a separate proof.
+
+The named family's equations are opaque to this check. For example,
+'\a -> Discard e a' forwards to 'Discard e', while '\a -> e' has no
+forwarded argument. The equality gives no inverse inference for 'Discard'.
+Opaque partial families still have the MaybeApart result.
+See Note [Unmatchable applications in immutable unification] in GHC.Core.Unify.
+-}
+
+-- | Check a single visible erased argument passed through to a named family.
+eqScopedLambdaEta :: Type -> Type -> Bool
+eqScopedLambdaEta lhs rhs
+  | Just (lambda, args) <- splitTyConApp_maybe lhs
+  , Just (scope, False) <- closedFamilyScope_maybe lambda
+  , scope == tyConName lambda
+  , isUnsaturatedUserFamily lambda args
+  , lengthIs args (tyConArity lambda - 1)
+  , Just (FTF_T_T, _, _, _, _) <- splitFunTy_maybe (typeKind lhs)
+  , Just (family, expected) <- splitTyConApp_maybe rhs
+  , Nothing <- closedFamilyScope_maybe family
+  , isUnsaturatedUserFamily family expected
+  , Just ax <- closedFamilyTyConCoAxiom_maybe lambda
+  , coAxiomRole ax == Nominal, coAxiomTyCon ax == lambda
+  , Just branch <- coAxiomSingleBranch_maybe ax
+  , null (cab_cvs branch), null (cab_eta_tvs branch)
+  , null (cab_incomps branch), null (cab_overlaps branch)
+  , Just vars <- traverse repGetTyVar_maybe (cab_lhs branch)
+  , let var_set = mkVarSet vars
+  , sizeVarSet var_set == length vars
+  , var_set == mkVarSet (cab_tvs branch)
+  , all (== Nominal) (cab_roles branch)
+  , Just (captures, binder) <- snocView vars
+  , equalLength captures args
+  , TyConApp head_tc applied <- cab_rhs branch
+  , head_tc == family
+  , Just (prefix, TyVarTy final) <- snocView applied
+  , final == binder
+  , not (binder `elemVarSet` tyCoVarsOfTypes prefix)
+  , typeKind lhs `eqType` typeKind rhs
+  = eqTypes (substTysWith captures args prefix) expected
+  | otherwise = False
 
 -- | Produce nominal evidence for equal retained constructor cases.
 proveScopedConstructorCase :: Type -> Type -> Maybe Coercion

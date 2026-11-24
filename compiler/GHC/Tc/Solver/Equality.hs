@@ -13,7 +13,7 @@ import {-# SOURCE #-} GHC.Tc.Solver.Solve( solveSimpleWanteds )
 
 import GHC.Builtin.CoercionRules
   ( proveBoxedPairProjection, proveScopedSigmaClosure, proveScopedLambdaClosure
-  , proveScopedConstructorCase )
+  , proveScopedLambdaEta, proveScopedConstructorCase )
 import GHC.Builtin.WiredIn.Types ( heqClass )
 import GHC.Tc.Gen.SourceTable ( sourceTableFamilyAppUse, sourceTableOwner )
 import GHC.Tc.Errors.Types ( RetainedQuantificationError(..), TcRnMessage(..) )
@@ -887,6 +887,7 @@ can_eq_nc _ _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
 A wanted can compare Map f xs and Map g xs with xs still unknown.
 Map is non-injective. Decomposing the wanted would assume an equality
 of its arguments. Check the lexical closures of f and g independently.
+The same check can compare a forwarding lambda with its named family.
 Build nominal congruence only when every argument already has a proof.
 Use the same family head on both sides, whether the family is open or
 closed. Ordinary matching and apartness still select its equations.
@@ -895,6 +896,7 @@ This visits the arguments of nested family applications once. Use
 reflexivity for an argument whose types already agree. Leave a wholly
 reflexive wanted to the ordinary solver.
 See Note [Scoped retained sum codomains] in GHC.Core.TyCo.Compare.
+See Note [Eta for a forwarding type lambda] in GHC.Builtin.CoercionRules.
 -}
 
 -- | Prove a generated closure equality, including under a type family.
@@ -903,6 +905,7 @@ proveLambdaCongruence = prove False
   where
     prove allow_refl lhs rhs
       | Just co <- proveScopedLambdaClosure lhs rhs = Just co
+      | Just co <- proveScopedLambdaEta lhs rhs = Just co
       | Just (tc, as) <- splitTyConApp_maybe lhs
       , Just (tc', bs) <- splitTyConApp_maybe rhs
       , tc == tc'

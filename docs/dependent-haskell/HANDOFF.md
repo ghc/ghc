@@ -8,20 +8,18 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
-Both stages built from `db2586fdc2`. All 585 Showcase observations
+Both stages built from `d15cbd41fe`. All 588 Showcase observations
 matched at native `-O0`, default `-O2` and in GHCi. An ordinary client
-can change a record's stored length and supply both dependent vectors.
-[Working example](CHECKPOINTS.md#change-the-length-of-a-dependent-record).
+can compare two records' stored lengths, keep the letters from one
+record and copy the matching flags from the other.
+[Source and results](CHECKPOINTS.md#copy-one-field-between-records-after-comparing-their-lengths).
 
-Job 1997 passed all 18 selected registrations and four warm upgrade checks.
-The focused suite passed 137 of 138, including `NativeDependentCoreRun`.
-The remaining failure was the existing `MTrans` diagnostic. The package
-and compatibility runners encountered output from the previous compiler.
-Jobs 2011 and 2016 ran them on the same binary with fresh output.
-The package, its three downstream clients and all 234 compatibility cases
-passed. Under `_build/on-demand`, run
-`r04-r05-r17-repaired-qualification-20261123/verify-publication.py`
-to check the original results and both replays.
+Job 2027 passed all 20 selected registrations, four upgrade checks, both
+package checks and 234 compatibility cases. The focused suite passed
+137 of 138. The remaining failure was the existing `MTrans` diagnostic.
+Job 2125 passed the fusion regression from the published branch on the
+same compiler. Run `verify-publication.py` in
+`_build/on-demand/r04-r16-r17-post-585-20261123` to check the receipts.
 
 ## Next compiler work
 
@@ -29,21 +27,27 @@ Read [PLFH-NOTES.md](../../PLFH-NOTES.md) on resuming work and after each
 compiler batch. Reply with the compiler revision and the result of running
 the PLFH author's example.
 
-Job 2027 builds and tests private compiler `d15cbd41fe` in
-`_build/on-demand/r04-r16-r17-post-585-20261123`. Git retains the
-source at `refs/spikes/r04-r16-r17-normal-588`. Check `build.exit`,
-`qualification/gates.tsv`, `cohorts/gates.tsv` and `run-all.exit`
-before publishing. PLFH can keep using the qualified 585 compiler.
+PLFH can continue using the pinned 585 compiler while its author compares
+the yardstick with newer compilers.
 
 The next R17 candidate is `1a02a866e7` at
 `refs/spikes/r17-schema-transformer-590`. Job 2055 checked equality of
 two schema transformers before the caller supplied any rows. Job 2074
 checked the closed cell schema with `NoUndecidableInstances`. Its
 ordinary interface-only client printed `((),Right 42)` at `-O0` and
-`-O2`. Job 2080 waits for job 2027 before building both stages and
-running all 590 Showcase observations, the fusion checks and the
+`-O2`. Job 2080 follows job 2027 to build both stages and run all 590 Showcase observations, the fusion checks and the
 compatibility suite. Its source is in
 `_build/on-demand/r17-schema-transformer-post-588-20261124/source`.
+
+The next proof-inference change is `c21ecc47ff` at
+`refs/spikes/plfh-typed-congruence-591`. Job 2160 compiled the original
+PLFH addition rearrangement at both optimization levels after the checker
+used the kinds fixed by the visible callback argument. The old compiler
+rejected the same source with GHC-83865. The separate `withEquality`
+under `trans` reproducer still fails. Job 2174 checked the new HaskLib
+`cong` from its source distribution, its installed clients and the
+diagnostic for two different retained indices in an expression annotation.
+The components passed these checks. This change awaits a normal build.
 
 | Area | Verified result and next step |
 | --- | --- |
@@ -59,6 +63,11 @@ records the diagnostics and runtime results. Job 1996 verified the
 separate constructor comparison at `7f56212d49`. The four disjoint
 local and imported rules allowed the proof. All four matching rules
 still blocked it. Job 1999 passed the extended maintained regression.
+
+Job 2080 uses the current compiler as its build seed. The former 560
+and 562 build products have been retired. Their Git revisions and test
+receipts remain available. The exact 7.81 GB inventory is in
+`_build/on-demand/retirement-560-562-for-plfh-20261124`.
 
 The GHC queue has two slots. Other benchmark jobs take priority and freeze
 the GHC slice. Jobs 1947 and 1949 were exploratory allocation measurements.

@@ -242,7 +242,7 @@ type instance XLam           (GhcPass _) = EpAnnLam
 type instance XApp           (GhcPass _) = NoExtField
 
 type instance XAppTypeE      GhcPs = EpToken "@"
-type instance XAppTypeE      GhcRn = NoExtField
+type instance XAppTypeE      GhcRn = Maybe HsAppTypeSource
 type instance XAppTypeE      GhcTc = Type
 
 type instance XAppRetained   GhcPs = (EpToken "@", EpToken "{", EpToken "}")
@@ -847,11 +847,18 @@ pprApp app
     go fun args
       = case fun of
           HsApp _         (L _ fun') arg -> go fun' (Left arg : args)
-          HsAppType _     (L _ fun') arg -> go fun' (Right (char '@' <> ppr arg) : args)
+          HsAppType ext   (L _ fun') arg -> go fun' (Right (char '@' <> ppr_type_arg ext arg) : args)
           HsAppRetained ext (L _ fun') arg
             | GhcTc <- ghcPass @p, (DepFunVisible, _) <- ext -> go fun' (Left arg : args)
             | otherwise -> go fun' (Right (char '@' <> braces (pprLExpr arg)) : args)
           _                              -> ppr_app fun args
+
+    ppr_type_arg :: XAppTypeE (GhcPass p) -> LHsWcType (NoGhcTc (GhcPass p)) -> SDoc
+    ppr_type_arg ext arg
+      | GhcRn <- ghcPass @p
+      , Just written <- ext
+      = ifPprDebug (ppr arg) (ppr written)
+      | otherwise = ppr arg
 
     ppr_app fun args
       -- Special case: (f x) should print as (f x)

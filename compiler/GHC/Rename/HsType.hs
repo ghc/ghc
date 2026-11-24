@@ -198,25 +198,40 @@ withWrittenSignatureKinds kinds action = do
 
 -- | Rename a visible type argument with aliases for lexical runtime indices.
 -- See Note [Runtime indices in visible type arguments].
-rnHsTypeApp :: LHsWcType GhcPs -> RnM (LHsWcType GhcRn, FreeNames)
+rnHsTypeApp :: LHsWcType GhcPs
+            -> RnM (LHsWcType GhcRn, Maybe HsAppTypeSource, FreeNames)
 rnHsTypeApp ty@(HsWC { hswc_body = hs_ty })
   = do { experimental <- xoptM LangExt.ExperimentalDependentTypes
        ; if experimental
          then do { free_vars <- filterInScopeM (extractHsTyRdrTyVars hs_ty)
                  ; rnWithRetainedAliases emptyNameSet RetainedPartialTypeArgument free_vars hs_ty $
                      rn_argument }
-         else rnHsWcType HsTypeCtx ty }
+         else ordinary_argument }
   where
+    ordinary_argument = finish False <$> rnHsWcType HsTypeCtx ty
+
     rn_argument
-      | hasParsedRetainedPi hs_ty = rnHsWcType HsTypeCtx ty
+      | hasParsedRetainedPi hs_ty = ordinary_argument
       | otherwise = do
           lifted <- try_lift_argument hs_ty
-          maybe (rnHsWcTypeWithSplice rn_argument_splice HsTypeCtx ty) pure lifted
+          case lifted of
+            Just result -> pure (finish True result)
+            Nothing -> do
+              lifted_splice <- newTcRef False
+              result <- rnHsWcTypeWithSplice
+                (rn_argument_splice (writeTcRef lifted_splice True)) HsTypeCtx ty
+              changed <- readTcRef lifted_splice
+              pure (finish changed result)
 
-    rn_argument_splice = rnSpliceTypeWith [] $ \raw -> do
+    finish lifted (argument, fvs) =
+      (argument, if lifted then Just (HsAppTypeSource ty) else Nothing, fvs)
+
+    rn_argument_splice remember_lift = rnSpliceTypeWith [] $ \raw -> do
       lifted <- if hasParsedRetainedPi raw then pure Nothing else try_lift_argument raw
       case lifted of
-        Just (HsWC { hswc_body = body }, fvs) -> pure (body, fvs)
+        Just (HsWC { hswc_body = body }, fvs) -> do
+          remember_lift
+          pure (body, fvs)
         Nothing -> rnLHsType (SpliceTypeCtx raw) raw
 
     try_lift_argument :: LHsType GhcPs -> RnM (Maybe (LHsWcType GhcRn, FreeNames))
@@ -238,6 +253,11 @@ type variable. Give the local signature lifter an empty explicit
 telescope so it lifts lambdas with the same lexical scope as the argument.
 Discard the temporary signature after lifting. The type checker receives
 the result as an ordinary visible type argument.
+
+Keep the written argument for diagnostics when the lifter emits a helper.
+The argument may contain a splice whose result needs lifting. Record the
+lift in its renaming continuation. The written copy is never renamed or
+type checked.
 
 The local lifter accepts only copyable types. When it emits no helper,
 rename the original argument with rnHsWcType. Ordinary wildcards and the

@@ -91,6 +91,30 @@ if "${ghc[@]}" -c BadSplicedArgument.hs >splice-kind.log 2>&1 ||
     exit 1
 fi
 
+cat >BadSplicedCapture.hs <<'HS'
+{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell, TypeApplications #-}
+module BadSplicedCapture where
+
+import Data.Proxy (Proxy(..))
+import TypeLambda (Fields)
+import TypeLambdaArgument (rowFor)
+bad :: forall err. Proxy err -> Fields '[Either String Int, Either String Bool]
+bad _ = rowFor @($([t| \tag cell -> Either tag cell |]) err) Proxy (Right 42) (Right True)
+HS
+if "${ghc[@]}" -c BadSplicedCapture.hs >splice-capture.log 2>&1; then
+    exit 1
+fi
+sed '/^[[:space:]]*|/,$d' splice-capture.log >splice-capture.body
+if ! grep -Fq 'BadSplicedCapture.hs:9:57: error: [GHC-25897]' splice-capture.body ||
+   ! grep -Eq ".k. is a rigid type variable" splice-capture.body ||
+   ! grep -F 'In the type' splice-capture.body |
+       grep -Fq '($([t| \tag cell -> Either tag cell |]) err)' ||
+   grep -Fq '$signature-lambda:' splice-capture.body; then
+    cat splice-capture.log >&2
+    exit 1
+fi
+
 cat >BadArgument.hs <<'HS'
 {-# LANGUAGE CPP, DataKinds, ExperimentalDependentTypes, NamedWildCards, TypeApplications #-}
 module BadArgument where

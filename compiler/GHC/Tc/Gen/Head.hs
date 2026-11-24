@@ -181,6 +181,7 @@ data HsExprArg (p :: TcPass) where -- See Note [HsExprArg]
 
   ETypeArg :: { ea_loc_span :: HsExprLoc
               , ea_hs_ty    :: LHsWcType GhcRn  -- The type arg
+              , ea_ty_source :: Maybe HsAppTypeSource
               , ea_ty_arg   :: !(XCheckedType p) }  -- Kind-checked type arg
            -> HsExprArg p
 
@@ -228,10 +229,11 @@ mkEValArg :: HsExprLoc -> LHsExpr GhcRn -> HsExprArg 'TcpRn
 mkEValArg src_loc e = EValArg { ea_arg = e, ea_loc_span = src_loc
                               , ea_arg_ty = noExtField }
 
-mkETypeArg :: HsExprLoc -> LHsWcType GhcRn -> HsExprArg 'TcpRn
-mkETypeArg src_loc hs_ty =
+mkETypeArg :: HsExprLoc -> Maybe HsAppTypeSource -> LHsWcType GhcRn -> HsExprArg 'TcpRn
+mkETypeArg src_loc original hs_ty =
   ETypeArg { ea_loc_span = src_loc
            , ea_hs_ty = hs_ty
+           , ea_ty_source = original
            , ea_ty_arg = noExtField }
 
 addArgWrap :: HsWrapper -> [HsExprArg p] -> [HsExprArg p]
@@ -321,7 +323,7 @@ splitHsApps e = go e []
   where
     go (HsPar _ (L l fun))        args = go fun (EWrap (EPar l)   : args)
     go (HsPragE _ p (L l fun))    args = go fun (EPrag      l p   : args)
-    go (HsAppType _ (L l fun) ty) args = go fun (mkETypeArg l ty  : args)
+    go (HsAppType source (L l fun) ty) args = go fun (mkETypeArg l source ty : args)
     go (HsAppRetained _ (L l fun) arg) args
       = go fun (ERetainedArg DepFunInvisible l noExtField arg noExtField noExtField : args)
     go (HsApp _ (L l fun) arg)    args = go fun (mkEValArg  l arg : args)
