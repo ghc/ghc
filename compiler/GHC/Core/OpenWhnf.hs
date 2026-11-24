@@ -6,42 +6,43 @@ module GHC.Core.OpenWhnf
   , CaseContinuation(..)
   , openWhnfM, openWhnfWithLocalM, openWhnfTraceM, CaseStep(..)
   , openFamilyReduction
-  , openDataConFieldTypes, openReadbackM, OpenReadbackFailure(..)
+  , openDataConFieldTypes, openIndexedDataCon, openReadbackM, OpenReadbackFailure(..)
   ) where
 
 import GHC.Prelude
 
-import Control.Monad (foldM)
+import Control.Monad (foldM, guard)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT, runExceptT, throwE, withExceptT)
 import Control.Monad.Trans.State.Strict (StateT, evalStateT, get, mapStateT, put)
 import GHC.Builtin.WiredIn.Types
   (charDataCon, mkPromotedPairTy, pairTyCon, tupleDataCon, unboxedUnitDataCon, unboxedUnitTy, unmatchableDataConTy)
-import GHC.Core.Coercion (coercionLKind, coercionRKind)
+import GHC.Core.Coercion (Coercion, coercionLKind, coercionRKind, coercionType, mkNomReflCo)
 import GHC.Core.FamInstEnv (emptyFamInstEnvs, reduceTyFamApp_maybe)
 import GHC.Core.Coercion.Axiom (Role(Nominal))
 import GHC.Core.Reduction (Reduction(..), isReflRedn, mkFunRedn, mkReflRedn)
 import GHC.Core.DataCon
   ( DataCon, dataConWorkId, dataConTyCon, dataConFullSig, dataConRepArity
+  , dataConRepArgTys, dataConExTyCoVars, eqSpecPair
   , dataConRepArgBinders, dataConStupidTheta, dataConImplBangs
   , dataConWrapId_maybe, dataConUserTyVars, dataConUnivTyVars, promoteDataCon
   , isBanged, isTypeDataCon )
 import GHC.Core (Alt(..), AltCon(..), Bind(..), CoreAlt, CoreExpr, Expr(..), collectArgs, isTyCoArg)
 import GHC.Core.FVs (exprFreeVars)
 import GHC.Core.Opt.Arity (etaExpand)
-import GHC.Core.Subst (extendTvSubst, mkEmptySubst, substExpr)
+import GHC.Core.Subst (Subst, extendCvSubst, extendTvSubst, mkEmptySubst, substExpr, substTy)
 import GHC.Core.TyCo.Compare (eqType)
 import GHC.Core.TyCon (closedFamilyTyConCoAxiom_maybe, isBoxedDataTyCon)
 import GHC.Core.TyCo.Rep (scaledThing)
 import GHC.Core.Type
-  ( FunTyFlag(FTF_T_T), Kind, Type, isLiftedTypeKind, isManyTy, mkAppTy, mkTyConApp
+  ( FunTyFlag(FTF_T_T), Kind, Type, isLiftedTypeKind, isManyTy, mkAppTy, mkTyConApp, mkTyVarTy
   , repGetTyVar_maybe, splitFunTy_maybe, splitTyConApp_maybe, substTyWith, tyCoVarsOfType, typeKind )
 import GHC.Core.Utils (exprType, findAlt)
 import GHC.Types.Basic (Boxity(Boxed), IntWithInf, intGtLimit)
 import GHC.Types.Id (isDataConWorkId_maybe)
 import GHC.Types.Literal (Literal(LitChar))
 import GHC.Types.Tickish (GenTickish(Breakpoint))
-import GHC.Types.Var (Var, isId, isTyVar, varType)
+import GHC.Types.Var (Var, isCoVar, isId, isTyVar, varType)
 import GHC.Types.Var.Env (VarEnv, emptyVarEnv, extendVarEnv, extendVarEnvList, lookupVarEnv,
                           mkInScopeSet)
 import GHC.Types.Var.Set (VarSet, emptyVarSet, elemVarSet, unionVarSet)
@@ -69,6 +70,7 @@ data Whnf
   | BoxedPair Suspension Suspension
   | BoxedData DataCon [Type] [Suspension]
   | Neutral Neutral
+  | IndexedData DataCon [Type] [Type] [Coercion] [Suspension]
 
 -- | A weak head result cannot be returned as a checked source type.
 data OpenReadbackFailure
@@ -116,19 +118,19 @@ openWhnfTraceM limit obtain = openWhnfTraceWithLocalM limit (\v _ -> obtain v) (
 openWhnfTraceWithLocalM :: Monad m => IntWithInf -> (Var -> Maybe Type -> m (Maybe CoreExpr)) -> (Var -> m ())
                        -> (CaseStep -> m ()) -> VarSet -> CoreExpr -> m (Either EvalFailure Whnf)
 openWhnfTraceWithLocalM limit obtain local record unsolved expr =
-  runExceptT $ evalStateT (evaluate False limit obtain local record unsolved Nothing (Suspension emptyVarEnv expr)) 1
+  runExceptT $ evalStateT (evaluate False False limit obtain local record unsolved Nothing (Suspension emptyVarEnv expr)) 1
 
 -- | Reflect a finite ordinary constructor value or a supplied rigid symbol.
 -- The first observation and every demanded field share one reduction budget.
-openReadbackM :: Monad m => Bool -> IntWithInf -> (Var -> Maybe Type -> m (Maybe CoreExpr))
+openReadbackM :: Monad m => Bool -> Bool -> IntWithInf -> (Var -> Maybe Type -> m (Maybe CoreExpr))
               -> (Var -> m ()) -> (Var -> Maybe Type) -> (DataCon -> m Bool)
               -> Kind -> CoreExpr
               -> m (Either OpenReadbackFailure (Type, [DataCon]))
-openReadbackM local_families limit obtain local origin visible expected expr =
+openReadbackM local_families indexed limit obtain local origin visible expected expr =
   runExceptT $ evalStateT (readback [] expected (Suspension emptyVarEnv expr)) 1
   where
     observe = mapStateT (withExceptT ReadbackEvaluation)
-            . evaluate local_families limit obtain local (const (pure ())) emptyVarSet Nothing
+            . evaluate local_families indexed limit obtain local (const (pure ())) emptyVarSet Nothing
     readback used kind suspension = do
       whnf <- observe suspension
       case whnf of
@@ -149,15 +151,21 @@ openReadbackM local_families limit obtain local origin visible expected expr =
           | mkTyConApp (dataConTyCon con) arguments `eqType` kind
           , dataConUserTyVars con == dataConUnivTyVars con
           , Just field_kinds <- openDataConFieldTypes con arguments
-          , length fields == length field_kinds -> do
-              in_scope <- lift (lift (visible con))
-              if not in_scope then lift (throwE (ReadbackHidden con)) else do
-                (rev_tys, used') <- foldM readField ([], con : used) (zip field_kinds fields)
-                let result = mkTyConApp (promoteDataCon con) (arguments ++ reverse rev_tys)
-                if typeKind result `eqType` kind
-                  then pure (result, used')
-                  else lift (throwE (ReadbackOpaque whnf))
+          -> readData used kind whnf con arguments field_kinds fields
+        IndexedData con arguments _ _ fields
+          | Just (_, _, field_kinds) <- openIndexedDataCon con kind arguments
+          -> readData used kind whnf con arguments field_kinds fields
         _ -> lift (throwE (ReadbackOpaque whnf))
+    readData used kind whnf con arguments field_kinds fields
+      | length fields == length field_kinds = do
+          in_scope <- lift (lift (visible con))
+          if not in_scope then lift (throwE (ReadbackHidden con)) else do
+            (rev_tys, used') <- foldM readField ([], con : used) (zip field_kinds fields)
+            let result = mkTyConApp (promoteDataCon con) (arguments ++ reverse rev_tys)
+            if typeKind result `eqType` kind
+              then pure (result, used')
+              else lift (throwE (ReadbackOpaque whnf))
+      | otherwise = lift (throwE (ReadbackOpaque whnf))
     -- See Note [Readback of a rigid callback application].
     readApplication used neutral = case neutral of
       Rigid v
@@ -223,10 +231,10 @@ open instances or assume that representationally equal types have the
 same promoted constructor. Other observations leave casts unsupported.
 -}
 
-evaluate :: Monad m => Bool -> IntWithInf -> (Var -> Maybe Type -> m (Maybe CoreExpr)) -> (Var -> m ())
+evaluate :: Monad m => Bool -> Bool -> IntWithInf -> (Var -> Maybe Type -> m (Maybe CoreExpr)) -> (Var -> m ())
          -> (CaseStep -> m ()) -> VarSet -> Maybe Type -> Suspension
          -> StateT Int (ExceptT EvalFailure m) Whnf
-evaluate local_families limit obtain local record unsolved first_type (Suspension env expr) = do
+evaluate local_families indexed limit obtain local record unsolved first_type (Suspension env expr) = do
   steps <- get
   if intGtLimit steps limit then lift (throwE Exhausted) else put (steps + 1)
   case expr of
@@ -235,6 +243,9 @@ evaluate local_families limit obtain local record unsolved first_type (Suspensio
           if missing > 0
           then recur (Suspension env (etaExpand missing expr))
           else pure (BoxedData con arguments (map (Suspension env) fields))
+    _ | indexed
+      , Just (con, arguments, locals, proofs, fields) <- indexedConstructorApplication expr ->
+          pure (IndexedData con arguments locals proofs (map (Suspension env) fields))
     Var v
       | Just binding <- lookupVarEnv env v -> do
           lift (lift (local v))
@@ -250,6 +261,8 @@ evaluate local_families limit obtain local record unsolved first_type (Suspensio
               | v `elemVarSet` unsolved -> pure (Neutral (Unsolved v))
               | otherwise -> pure (Neutral (Rigid v))
     Cast body co
+      | indexed, coercionLKind co `eqType` coercionRKind co ->
+          recurHead first_type (Suspension env body)
       | local_families
       , let lhs = openFamilyReduction (coercionLKind co)
             rhs = openFamilyReduction (coercionRKind co)
@@ -322,6 +335,16 @@ evaluate local_families limit obtain local record unsolved first_type (Suspensio
           selectData SelectBoxedPair pairCon [first, second] binder suspended alts
         BoxedData con _ fields ->
           selectData (SelectBoxedData con) con fields binder suspended alts
+        IndexedData con _ local_tys proofs fields
+          | Just (Alt key binders body) <- findAlt (DataAlt con) alts ->
+              case key of
+                DEFAULT | null binders ->
+                  recur (Suspension (extendVarEnv env binder suspended) body)
+                DataAlt chosen | chosen == con
+                  , Just (subst, bindings) <- indexedAltBindings body binders local_tys proofs fields ->
+                    recur (Suspension (extendVarEnvList env ((binder, suspended) : bindings))
+                                      (substExpr subst body))
+                _ -> lift (throwE UnsupportedCore)
         Literal lit
           | Just (Alt key [] body) <- findAlt (LitAlt lit) alts -> do
               lift (lift (record (SelectLiteral lit key)))
@@ -335,7 +358,7 @@ evaluate local_families limit obtain local record unsolved first_type (Suspensio
         _ -> lift (throwE UnsupportedCore)
     _ -> lift (throwE UnsupportedCore)
   where
-    recurHead = evaluate local_families limit obtain local record unsolved
+    recurHead = evaluate local_families indexed limit obtain local record unsolved
     recur = recurHead Nothing
     pairCon = tupleDataCon Boxed 2
     pairWorker = dataConWorkId pairCon
@@ -355,6 +378,26 @@ evaluate local_families limit obtain local record unsolved first_type (Suspensio
     matches field (Suspension _ body) =
       liftedBinder field && varType field `eqType` exprType body
 
+-- | Instantiate only the checked existential and proof arguments of a selected branch.
+-- See Note [Observing indexed constructor cases].
+indexedAltBindings :: CoreExpr -> [Var] -> [Type] -> [Coercion] -> [Suspension]
+                   -> Maybe (Subst, [(Var, Suspension)])
+indexedAltBindings body binders local_tys proofs fields = do
+    let (tvs, after_types) = splitAt (length local_tys) binders
+        (cvs, ids) = splitAt (length proofs) after_types
+        free = foldl' unionVarSet (exprFreeVars body)
+                 (map (exprFreeVars . Type) local_tys ++ map (exprFreeVars . Coercion) proofs)
+        bind = mkEmptySubst (mkInScopeSet free)
+        types = foldl' (\s (v, t) -> extendTvSubst s v t) bind (zip tvs local_tys)
+        subst = foldl' (\s (v, c) -> extendCvSubst s v c) types (zip cvs proofs)
+    guard (length tvs == length local_tys && all isTyVar tvs)
+    guard (and (zipWith (\tv ty -> substTy types (varType tv) `eqType` typeKind ty) tvs local_tys))
+    guard (length cvs == length proofs && all isCoVar cvs)
+    guard (and (zipWith (\cv co -> substTy types (varType cv) `eqType` coercionType co) cvs proofs))
+    guard (length ids == length fields && all liftedBinder ids)
+    guard (and (zipWith (\v (Suspension _ e) -> substTy subst (varType v) `eqType` exprType e) ids fields))
+    pure (subst, zip ids fields)
+
 -- | Read a fully applied ordinary constructor worker and its suspended fields.
 constructorApplication :: CoreExpr -> Maybe (DataCon, [Type], [CoreExpr], Int)
 constructorApplication expr
@@ -372,6 +415,84 @@ constructorApplication expr
   where
     typeArgument (Type ty) = Just ty
     typeArgument _ = Nothing
+
+-- | Recover a saturated indexed worker and retain its actual equality proofs.
+indexedConstructorApplication :: CoreExpr
+                              -> Maybe (DataCon, [Type], [Type], [Coercion], [CoreExpr])
+indexedConstructorApplication expr = do
+    (Var worker, args) <- pure (collectArgs expr)
+    con <- isDataConWorkId_maybe worker
+    let (type_args, rest) = span isTypeArg args
+        (proof_args, fields) = span isTyCoArg rest
+        variables = dataConUnivTyVars con ++ dataConExTyCoVars con
+    tys <- traverse (\case Type ty -> Just ty; _ -> Nothing) type_args
+    proofs <- traverse (\case Coercion co -> Just co; _ -> Nothing) proof_args
+    guard (length tys == length variables)
+    let (universals, local_tys) = splitAt (length (dataConUnivTyVars con)) tys
+        kind = mkTyConApp (dataConTyCon con) universals
+    source_args <- traverse (`lookup` zip variables tys) (dataConUserTyVars con)
+    (checked, evidence, field_kinds) <- openIndexedDataCon con kind source_args
+    guard (and (zipWith eqType checked tys))
+    guard (length evidence == length proofs &&
+           and (zipWith eqType (map coercionType evidence) (map coercionType proofs)))
+    guard (length field_kinds == length fields && all (not . isTyCoArg) fields &&
+           and (zipWith eqType field_kinds (map exprType fields)))
+    pure (con, source_args, local_tys, proofs, fields)
+  where
+    isTypeArg Type{} = True
+    isTypeArg _ = False
+
+-- | Instantiate a promoted ordinary GADT constructor at its checked kind.
+-- See Note [Observing indexed constructor cases].
+openIndexedDataCon :: DataCon -> Kind -> [Type] -> Maybe ([Type], [Coercion], [Type])
+openIndexedDataCon con kind source_args = do
+    (tc, universals) <- splitTyConApp_maybe kind
+    (univ, exs, specs@(_:_), [], fields, result) <- pure (dataConFullSig con)
+    let user_vars = dataConUserTyVars con
+        variables = univ ++ exs
+    guard (tc == dataConTyCon con && isBoxedDataTyCon tc && not (isTypeDataCon con) &&
+           null (dataConRepArgBinders con) && null (dataConStupidTheta con) &&
+           all (not . isBanged) (dataConImplBangs con))
+    guard (length univ == length universals && all isTyVar exs &&
+           length user_vars == length source_args)
+    local_tys <- traverse (`lookup` zip user_vars source_args) exs
+    let tys = universals ++ local_tys
+        instantiate = substTyWith variables tys
+        field_kinds = map (instantiate . scaledThing) fields
+        rep_kinds = map (instantiate . scaledThing) (dataConRepArgTys con)
+    guard (instantiate result `eqType` kind && isLiftedTypeKind (typeKind kind) &&
+           all isLiftedTypeKind (map typeKind field_kinds))
+    guard (and (zipWith (\v ty -> instantiate (varType v) `eqType` typeKind ty)
+                       variables tys))
+    guard (and (zipWith (\v ty -> instantiate (mkTyVarTy v) `eqType` ty)
+                       user_vars source_args))
+    proofs <- traverse (\spec ->
+        let (tv, rhs) = eqSpecPair spec
+            left = instantiate (mkTyVarTy tv)
+        in mkNomReflCo left <$ guard (left `eqType` instantiate rhs)) specs
+    let expected = map coercionType proofs ++ field_kinds
+    guard (length expected == dataConRepArity con && length expected == length rep_kinds &&
+           and (zipWith eqType expected rep_kinds))
+    pure (tys, proofs, field_kinds)
+
+{- Note [Observing indexed constructor cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A promoted constructor can determine the branch of an imported GADT
+match. The operand decoder uses the constructor's checked result kind
+and source type arguments to instantiate its worker. Accept a proof
+argument only where the instantiated nominal EqSpec endpoints agree.
+Check the complete worker representation against those proof and field
+types. Leave a constructor with a strict field or other evidence out of
+this observer.
+
+When a case chooses that worker, check the alternative's binder kinds.
+Substitute the worker's actual existential arguments and proofs into the
+chosen body together. Save the value fields with their original
+environments. A cast whose endpoints still differ blocks observation.
+A neutral scrutinee cannot choose a branch. For example, a substitution
+worker can apply its callback to a known bound variable, but it cannot
+inspect an unknown term. See PLFA v22.08, DeBruijn, Single substitution.
+-}
 
 -- | Recognize lifted, lazy constructor fields with the ordinary representation.
 -- Both the source operand decoder and the Core observer use this check.
