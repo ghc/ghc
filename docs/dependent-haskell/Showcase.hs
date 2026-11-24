@@ -2287,7 +2287,7 @@ oneCellHead extent =
         count = 1 + extent
     in case sameNat count (S Z) of
          Just proof ->
-             HaskLib.withEquality proof (Just (safeHead (replicateNative count 'x')))
+             HaskLib.rewrite proof (Just (safeHead (replicateNative count 'x')))
          Nothing -> Nothing
 
 -- | Return equality with the empty constructor after inspecting the vector.

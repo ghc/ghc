@@ -8706,3 +8706,13 @@ family call. Job 2074 checked a two-equation example with
 [Agda termination checking](https://agda.readthedocs.io/en/v2.8.0/language/termination-checking.html),
 [the compiler check](../../compiler/GHC/Tc/Validity.hs) and
 [the cell schema](examples/open-evaluation/CellValidation.hs).
+
+### Rewriting with propositional equality
+
+Agda's `rewrite` clause checks its right-hand side after matching the
+given equality proof on `refl`. HaskLib uses the same name for an
+expression-level operation. `rewrite proof body` passes GHC's nominal
+equality to the body using `Data.Type.Equality.gcastWith`. The body can
+return another proof or an ordinary value.
+[Agda rewrite](https://agda.readthedocs.io/en/v2.8.0/language/with-abstraction.html#rewrite)
+and [HaskLib](hasklib/HaskLib.hs).

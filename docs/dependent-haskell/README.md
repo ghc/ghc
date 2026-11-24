@@ -118,14 +118,14 @@ The append-singleton client uses `plusSucc` to move the successor
 outside `plus`. Then `congSucc` applies that successor to both sides
 of `plusZero`. [Append-singleton proof](hasklib-test/Client.hs).
 
-`withEquality proof body` brings the equality into scope for `body`.
+`rewrite proof body` brings the equality into scope for `body`.
 The body can return an ordinary value.
 In the Showcase, `sameNat count (S Z)` returns a witness when the
 runtime count is one. Inside that branch, the vector has the length
 that `safeHead` requires. The checker infers the zero-length tail from that equality.
 
 ```haskell
-Just proof -> withEquality proof (Just (safeHead (replicateNative count 'x')))
+Just proof -> rewrite proof (Just (safeHead (replicateNative count 'x')))
 ```
 
 The branch returns `Just 'x'`. [Value-returning example](Showcase.hs).
