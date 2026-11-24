@@ -553,6 +553,7 @@ apply the same partially applied addition to equal sizes: Refl
 prove the length of a countdown: ([Succ (Succ Zero),Succ Zero,Zero],Refl)
 subtract a runtime natural from zero: (Zero,Refl)
 raise three to the fourth power and prove the successor equation: (True,Refl)
+convert a Boolean to a bit and check both inverse laws: (Set,False,Refl,Refl)
 take the domain of a join of function values: (Join Bottom Bottom,Refl)
 compare a runtime size with itself: (True,Refl)
 transport evidence for three leaves across related trees: True

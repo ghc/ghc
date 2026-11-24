@@ -39,52 +39,12 @@ diff -u O0/client/observed O1/client/observed
 cat O1/client/observed
 
 # A polymorphic retained package keeps both call heads in its proof fields.
-cat > PolyIso.hs <<'HS'
-{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeOperators #-}
-module PolyIso (Iso(..), Bit(..), sample) where
-
-import Data.Type.Equality ((:~:)(Refl))
-
-data Iso a b where
-    MkIso :: foreach (to :: a -> b) -> foreach (from :: b -> a)
-          -> (foreach (x :: a) -> from (to x) :~: x)
-          -> (foreach (y :: b) -> to (from y) :~: y)
-          -> Iso a b
-
-pack :: foreach (to :: a -> b) -> foreach (from :: b -> a)
-     -> (foreach (x :: a) -> from (to x) :~: x)
-     -> (foreach (y :: b) -> to (from y) :~: y)
-     -> Iso a b
-pack to from left right = MkIso to from left right
-
-data Bit = Clear | Set deriving Show
-
-encode :: Bool -> Bit
-encode False = Clear
-encode True = Set
-
-decode :: Bit -> Bool
-decode Clear = False
-decode Set = True
-
-decodeEncode :: foreach (x :: Bool) -> decode (encode x) :~: x
-decodeEncode False = Refl
-decodeEncode True = Refl
-
-encodeDecode :: foreach (x :: Bit) -> encode (decode x) :~: x
-encodeDecode Clear = Refl
-encodeDecode Set = Refl
-
-sample :: Iso Bool Bit
-sample = pack encode decode decodeEncode encodeDecode
-HS
-
 cat > ReadIso.hs <<'HS'
 {-# LANGUAGE CPP, ExperimentalDependentTypes, GADTs #-}
 module Main where
 
 import Data.Type.Equality ((:~:)(Refl))
-import PolyIso
+import BookIsomorphism
 
 symmetric :: Iso a b -> Iso b a
 symmetric (MkIso to from left right) = MkIso from to right left
@@ -104,12 +64,12 @@ for level in 0 2; do
     mkdir -p "iso-O$level/"{provider,client}
     (
         cd "iso-O$level/provider"
-        cp "$tmp/PolyIso.hs" .
-        "${g[@]}" "-O$level" "${flags[@]}" -c PolyIso.hs
-        cp PolyIso.hi "$tmp/ReadIso.hs" ../client/
+        cp "$area/BookIsomorphism.hs" .
+        "${g[@]}" "-O$level" "${flags[@]}" -c BookIsomorphism.hs
+        cp BookIsomorphism.hi "$tmp/ReadIso.hs" ../client/
         cd ../client
         "${g[@]}" "-O$level" -c ReadIso.hs
-        "${g[@]}" ReadIso.o ../provider/PolyIso.o -o observe
+        "${g[@]}" ReadIso.o ../provider/BookIsomorphism.o -o observe
         [[ $(./observe) == '(False,Set,True)' ]]
         if "${g[@]}" "-O$level" -fforce-recomp -DWRONG_FIELD -c ReadIso.hs >wrong.log 2>&1 ||
            ! grep -Fq 'error: [GHC-83865]' wrong.log; then

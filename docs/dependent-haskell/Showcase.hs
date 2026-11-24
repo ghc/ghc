@@ -176,6 +176,7 @@ import qualified PreludeFoldrProof
 import qualified PreludeZipProof
 import qualified HaskLib
 import qualified BookCalculations as Book
+import qualified BookIsomorphism as BookIso
 import qualified BookNaturals
 import qualified CastedConstructorGivens as TreeProof
 import qualified SumOfSizes
@@ -1977,6 +1978,10 @@ main = do
         (BookNaturals.monus 0 count, zeroMonus count)
     observe "raise three to the fourth power and prove the successor equation"
         (HaskLib.eqSize (BookNaturals.pow count 4) 81, powSuccessor count 3)
+    case BookIso.sample of
+        BookIso.MkIso to from fromTo toFrom ->
+            observe "convert a Boolean to a bit and check both inverse laws"
+                (to True, from BookIso.Clear, fromTo True, toFrom BookIso.Clear)
     let arrow = Book.Arrow Book.Bottom (error "forced the arrow output")
     observe "take the domain of a join of function values"
         (Book.dom (Book.Join arrow Book.Bottom), Book.domJoin arrow Book.Bottom)
