@@ -4,7 +4,7 @@ module NativeCheckedClosureProvider
     (Sort (..), Scope (..), Slot (..), Expr (At, Bind, Call, Lit, Test),
      extendName, renameExpr, extendExpr, walk, replace)
 #elif defined HIDE_MARKED
-    (Sort (..), Scope (..), Slot (..), Stamp (..), Marked, Found (..), findMarked)
+    (Sort (..), Scope (..), Slot (..), Stamp (..), Marked, Found (..), findMarked, markFound)
 #endif
 where
 
@@ -78,4 +78,14 @@ findMarked (Marked (Old next) stamp) =
     InTail (findMarked (Marked next (Stamp False)))
 #else
     InTail (findMarked (Marked next stamp))
+#endif
+
+markFound :: Found g -> Marked g
+markFound (AtHead stamp) = Marked New stamp
+markFound (InTail next) = case markFound next of
+    Marked member stamp ->
+#ifdef STRICT_ENCODE
+        stamp `seq` Marked (Old member) stamp
+#else
+        Marked (Old member) stamp
 #endif
