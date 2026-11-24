@@ -7,9 +7,11 @@ import Control.Monad (foldM, guard, zipWithM, zipWithM_)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Maybe (MaybeT(..))
 import Control.Monad.Fix (mfix)
+import Data.Foldable (traverse_)
 import Data.List (foldl', nubBy, sortOn)
 import Data.Maybe (catMaybes, fromMaybe, isJust, mapMaybe)
 
+import GHC.Builtin.KnownKeys (patErrorIdKey)
 import GHC.Builtin.WiredIn.Types (manyDataConTy, unmatchableDataConTy)
 import GHC.Core (CoreBind, CoreExpr)
 import qualified GHC.Core as Core
@@ -66,6 +68,7 @@ import GHC.Types.TypeEnv (TypeEnv, lookupTypeEnv)
 import GHC.Types.Var
   ( ForAllTyFlag(Specified), TyVar, VarBndr(Bndr), isCoVar, isId, isLocalId, isTyVar
   , Var, mkTyVar, mkTyVarBinders, setIdDetails, varType )
+import GHC.Types.Unique (hasKey)
 import GHC.Types.Var.Env (mkInScopeSet)
 import GHC.Types.Var.Set (elemVarSet, mkVarSet, subVarSet, unionVarSet)
 
@@ -186,9 +189,16 @@ publishCheckedSourceClosures original_binds final_binds final_types = do
           helpers <- dependencies isExternalName rename actual_rename
           guard (actual_extend `elem` helpers)
           pure (actual_rename, (actual_extend, shape), helpers)
-    case (mapMaybe candidate original, mapMaybe indexed_candidate original) of
-      ([], []) -> pure ([], [])
-      (closures, indexed) -> do
+        lookup_candidate (old, original_rhs) = do
+          actual <- lookupOwner old
+          final_rhs <- lookup actual final
+          startup <- indexedLookup original old original_rhs
+          optimized <- indexedLookup final actual final_rhs
+          pure (actual, (startup, optimized), [])
+    case (mapMaybe candidate original, mapMaybe indexed_candidate original,
+          mapMaybe lookup_candidate original) of
+      ([], [], []) -> pure ([], [])
+      (closures, indexed, lookups) -> do
         visible <- visibleSourceMethodRules env
         let safe :: (Id, a, [Id]) -> Bool
             safe (owner, _, helpers) = all (not . hasSourceMethodRule visible) (owner:helpers)
@@ -200,7 +210,8 @@ publishCheckedSourceClosures original_binds final_binds final_types = do
         extensions <- catMaybes <$> traverse (publishRenameExtension public) (nubBy sameExtension renamings)
         let extension_tables = [(idName ext, table) | (ext, [table]) <- extensions]
         checked_renamings <- catMaybes <$> traverse (publishRenaming public extension_tables) (nubBy sameRename renamings)
-        let accepted = checked_closures ++ checked_indexed ++ extensions ++ checked_renamings
+        checked_lookups <- catMaybes <$> traverse (publishIndexedLookup public) (filter safe lookups)
+        let accepted = checked_closures ++ checked_indexed ++ extensions ++ checked_renamings ++ checked_lookups
         pure (map fst accepted, concatMap snd accepted)
   where
     publish public (owner, (_, shape), helpers) = do
@@ -441,22 +452,24 @@ publishIndexed public (owner, (is_encoder, original, final), helpers) = runMaybe
       pure (name, axiom)
 
     same_equation header (old, old_case) (new, new_case) = do
-      same_row (applyRow old header) (applyRow new header)
+      sameIndexedRow (applyRow old header) (applyRow new header)
       case (old_case, new_case) of
         (Nothing, Nothing) -> pure ()
         (Just (left, lhs), Just (right, rhs)) -> do
           guard (tyConKind left `eqType` tyConKind right)
-          same_row lhs rhs
+          sameIndexedRow lhs rhs
         _ -> fail "different indexed result cases"
 
-    same_row left right = do
-      let old_lhs = coAxBranchLHS left
-          new_lhs = coAxBranchLHS right
-      subst <- MaybeT (pure (tcMatchTys old_lhs new_lhs))
-      renamed <- MaybeT $ pure $ traverse (\v -> lookupTyVar subst v >>= getTyVar_maybe) (coAxBranchTyVars left)
-      guard (length renamed == length (coAxBranchTyVars right) &&
-             mkVarSet renamed == mkVarSet (coAxBranchTyVars right) &&
-             substTyUnchecked subst (coAxBranchRHS left) `eqType` coAxBranchRHS right)
+-- | Compare two generated rows with a bijection between their binders.
+sameIndexedRow :: CoAxBranch -> CoAxBranch -> MaybeT TcM ()
+sameIndexedRow left right = do
+    let old_lhs = coAxBranchLHS left
+        new_lhs = coAxBranchLHS right
+    subst <- MaybeT (pure (tcMatchTys old_lhs new_lhs))
+    renamed <- MaybeT $ pure $ traverse (\v -> lookupTyVar subst v >>= getTyVar_maybe) (coAxBranchTyVars left)
+    guard (length renamed == length (coAxBranchTyVars right) &&
+           mkVarSet renamed == mkVarSet (coAxBranchTyVars right) &&
+           substTyUnchecked subst (coAxBranchRHS left) `eqType` coAxBranchRHS right)
 
 data IndexedEquation = IndexedEquation [TyVar] [Type] (TyCon -> Type)
 
@@ -542,6 +555,131 @@ checkedPromoted con kind source fields = do
     expected <- vanilla <|> (\(_, _, tys) -> tys) <$> openIndexedDataCon con kind source
     guard (eqTypes (map typeKind fields) expected && typeKind value `eqType` kind)
     pure value
+
+{- Note [Checked lookup over two indexed operands]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An environment lookup first matches the environment, then the position.
+Both matches refine the scope index. Check the nominal equalities before
+using either set of fields. A recursive call consumes one direct field
+from each input, with both kinds at the same specialized index.
+
+A missing environment branch is permissible only when no constructor
+of the position can inhabit the corresponding scope. Desugaring emits
+a pattern failure there. The simplifier can name this failure, so check
+the body behind that local name. Publish only if the original and final
+Core give the same equations.
+-}
+
+data IndexedLookup = IndexedLookup Id [TyVar] [Type] Type [(IndexedPattern, IndexedRow)]
+
+-- | Read the two nested matches of a structurally decreasing lookup.
+indexedLookup :: [(Id, CoreExpr)] -> Id -> CoreExpr -> Maybe IndexedLookup
+indexedLookup bindings owner rhs = do
+    (parameters@[scope], [left, right], Core.Case (Core.Var input) _ result alts) <- function rhs
+    guard (input == left)
+    let left_kind = varType left
+        right_kind = varType right
+    ([(scope_match, declared_scope)], tau) <- pure (splitForAllTyVars (varType owner))
+    let instantiate = substTyWith [declared_scope] [mkTyVarTy scope]
+    (matches, [Scaled left_mult left_type, Scaled right_mult right_type], result_type) <- pure (splitFunTys tau)
+    guard (varType scope `eqType` varType declared_scope &&
+           all (`eqType` unmatchableDataConTy) (scope_match : matches) &&
+           all isManyTy [left_mult, right_mult] &&
+           eqTypes (map instantiate [left_type, right_type, result_type]) [left_kind, right_kind, result])
+    (left_tc, [left_scope]) <- splitTyConApp_maybe left_kind
+    (right_tc, [right_scope]) <- splitTyConApp_maybe right_kind
+    guard (eqTypes [left_scope, right_scope] (map mkTyVarTy [scope, scope]))
+    [(con, binders, rest)] <- pure [(dc, bs, e) | Core.Alt (Core.DataAlt dc) bs e <- alts,
+                                               not (patternFailure e)]
+    guard (all (validOuterAlt con) alts)
+    traverse_ (noPosition left_kind right_kind right_tc)
+              (filter (/= con) (tyConDataCons left_tc))
+    (outer, outer_proofs) <- indexedAlt left con binders
+    [(first, first_bs, first_rhs), (next, next_bs, next_rhs)] <- caseOn right rest
+    guard (not (null outer_proofs) && [first, next] == tyConDataCons right_tc)
+    rows <- traverse (\(dc, bs, e) -> do
+        (pat, proofs) <- indexedAlt right dc bs
+        guard (not (null proofs))
+        pure (outer, IndexedRow pat (outer_proofs ++ proofs) e))
+        [(first, first_bs, first_rhs), (next, next_bs, next_rhs)]
+    pure (IndexedLookup owner parameters [left_kind, right_kind] result rows)
+  where
+    validOuterAlt con (Core.Alt alt _ e) = alt == Core.DataAlt con || patternFailure e
+
+    patternFailure (Core.Case scrut _ _ []) = failure scrut
+    patternFailure _ = False
+
+    failure (Core.Var v)
+      | not (isExternalName (idName v))
+      , Just rhs <- lookup v bindings
+      = directFailure rhs
+    failure expr = directFailure expr
+
+    directFailure expr | (Core.Var v, _) <- Core.collectArgs expr = v `hasKey` patErrorIdKey
+    directFailure _ = False
+
+    noPosition left_kind right_kind right_tc con = do
+      subst <- tcUnifyTys alwaysBindTv [left_kind] [DC.dataConOrigResTy con]
+      (tc, args) <- splitTyConApp_maybe (substTyUnchecked subst right_kind)
+      guard (tc == right_tc && all (DC.dataConCannotMatch args) (tyConDataCons right_tc))
+
+-- | Publish the nominal rows after checking the field projection and recursion.
+publishIndexedLookup :: (TyCon -> Bool) -> (Id, (IndexedLookup, IndexedLookup), [Id])
+                     -> TcM (Maybe (Id, [TyCon]))
+publishIndexedLookup public (owner, (original, final), _) = runMaybeT $ do
+    let IndexedLookup _ parameters domains result _ = original
+        (flags, _) = splitForAllForAllTyBinders (varType owner)
+    guard (length flags == length parameters)
+    name <- lift (newImplicitBinder (idName owner) mkSourceTableOcc)
+    axiom <- lift (newImplicitBinder name mkInstTyCoOcc)
+    operands <- lift (traverse (freshVar "operand") domains)
+    let binders = zipWith (\(_, Bndr _ flag) -> mkNamedTyConBinder flag) flags parameters ++
+                  map mkAnonTyConBinder operands
+        make = mkFamily name axiom binders result
+        header = make []
+    startup <- lookupRows header original
+    optimized <- lookupRows header final
+    zipWithM_ sameIndexedRow (map (`applyRow` header) startup) (map (`applyRow` header) optimized)
+    let table = make (map (`applyRow` table) startup)
+    guard (all public (sourceEquationDatatypes [table]))
+    pure (setIdDetails owner (SourceTableId (idName owner) table NominalSourceTable), [table])
+
+-- | Specialize the nominal scope equalities and read both exact rows.
+lookupRows :: TyCon -> IndexedLookup -> MaybeT TcM [IndexedEquation]
+lookupRows header (IndexedLookup owner parameters domains result rows) =
+    zipWithM row [False, True] rows
+  where
+    row recursive (outer, IndexedRow inner proofs body) = do
+      let equalities = map CoVarCo proofs
+      subst <- MaybeT $ pure $ tcUnifyTys alwaysBindTv
+          (map coercionLKind equalities) (map coercionRKind equalities)
+      let specialize = substTyUnchecked subst
+      (left, left_fields) <- indexedPatternTypes specialize outer
+      (right, right_fields) <- indexedPatternTypes specialize inner
+      let lhs = map (specialize . mkTyVarTy) parameters ++ [left, right]
+          vars = tyCoVarsOfTypesWellScoped lhs
+          field values (Core.Cast expr co)
+            | caseCoercion proofs co
+            , specialize (coercionLKind co) `eqType` specialize (coercionRKind co) = field values expr
+          field values (Core.Var v) = lookup v values
+          field _ _ = Nothing
+          readResult False = const <$> field left_fields body
+          readResult True = do
+            (Core.Var fn, args) <- pure (Core.collectArgs body)
+            guard (fn == owner)
+            let (prefix, suffix) = splitAt (length parameters) args
+            tys <- traverse (fmap specialize . indexedTypeArg) prefix
+            [x, y] <- pure suffix
+            l <- field left_fields x
+            r <- field right_fields y
+            guard (length tys == length parameters &&
+                   eqTypes (map typeKind [l, r]) (map (substTyWith parameters tys) domains))
+            pure (\family -> mkTyConApp family (tys ++ [l, r]))
+      rhs <- MaybeT (pure (readResult recursive))
+      let branch = IndexedEquation vars lhs rhs
+      guard (all isTyVar vars && typeKind (rhs header) `eqType` specialize result &&
+             validBranch (applyRow branch header))
+      pure branch
 
 -- | Read constructors, bound fields and a structurally smaller self call.
 indexedResult :: [(Id, CoreExpr)] -> Id -> Maybe Id -> [TyVar] -> Type -> TyCon -> (Type -> Type)

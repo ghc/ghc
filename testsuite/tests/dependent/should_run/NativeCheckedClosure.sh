@@ -168,3 +168,40 @@ if "${ghc[@]}" --interactive -ignore-dot-ghci -fforce-recomp -fwrite-source-equa
     cat wrong.log >&2
     exit 1
 fi
+
+# Check the shared index on a symbolic pair of operands through a native interface.
+for opt in -O0 -O2; do
+    mkdir -p "$work/$opt/lookup"/{provider,reader}
+    cd "$work/$opt/lookup/provider"
+    cp "$inputs/NativeCheckedLookupProvider.hs" .
+    "${ghc[@]}" "$opt" -fwrite-source-equations -fomit-interface-pragmas \
+        -c NativeCheckedLookupProvider.hs
+    "${ghc[@]}" --show-iface NativeCheckedLookupProvider.hi >provider.iface
+    grep -Fq 'SourceTable T:lookupEnv' provider.iface
+    grep -Fq 'T:lookupEnv field2 field3' provider.iface
+
+    cd ../reader
+    cp ../provider/NativeCheckedLookupProvider.hi "$inputs/NativeCheckedLookup.hs" .
+    "${ghc[@]}" "$opt" -fno-code -fwrite-interface -c NativeCheckedLookup.hs
+    test ! -e NativeCheckedLookup.o
+    "${ghc[@]}" "$opt" -fforce-recomp -c NativeCheckedLookup.hs
+    "${ghc[@]}" "$opt" NativeCheckedLookup.o ../provider/NativeCheckedLookupProvider.o -o run
+    test "$(./run)" = '(True,True,True)'
+
+    if "${ghc[@]}" "$opt" -fforce-recomp -DWRONG_INDEX -c NativeCheckedLookup.hs >wrong.log 2>&1 ||
+       ! grep -Fq '[GHC-25897]' wrong.log; then
+        cat wrong.log
+        exit 1
+    fi
+    if "${ghc[@]}" "$opt" -fforce-recomp -DACTIVE_RULE -fenable-rewrite-rules \
+         -c NativeCheckedLookup.hs >rule.log 2>&1 || ! grep -Fq '[GHC-83605]' rule.log; then
+        cat rule.log
+        exit 1
+    fi
+
+    cd ../provider
+    "${ghc[@]}" "$opt" -fforce-recomp -fwrite-source-equations -DWRONG_BODY \
+        -c NativeCheckedLookupProvider.hs
+    "${ghc[@]}" --show-iface NativeCheckedLookupProvider.hi >provider.iface
+    if grep -Fq 'SourceTable T:lookupEnv' provider.iface; then exit 1; fi
+done
