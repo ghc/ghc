@@ -27,12 +27,12 @@ GHC behavior on the fork.
 
 PLFH's **DeBruijn** chapter checks progress for all seven constructors
 of its closed, intrinsically typed terms. The beta step uses the book's
-ordinary substitution function in its result type. A separate **More**
-chapter patch checks all 19 constructors of the extended language.
+ordinary substitution function in its result type. The published **More**
+chapter checks all 19 constructors of the extended language.
 Its list case replaces two distinct variables under two binders. Both
 proofs exercise R03 and R16. The two cards remain partial.
 [DeBruijn proof](examples/open-evaluation/BookBetaReduction.hs),
-[More handoff](HANDOFF.md#current-checkpoint),
+[More proof](https://github.com/Tritlo/PLFH/blob/81f8c63afdb722766d5ea6a1163f7d20345105d9/clients/PLFH/Part2/MoreProgress.hs),
 [R16](roadmap/R16-open-term-evaluator.md#typed-substitution-under-a-binder).
 
 | Area | Open cards with a tested implementation in the fork |

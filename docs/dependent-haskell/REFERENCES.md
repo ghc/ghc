@@ -87,6 +87,14 @@ a comparison implementation. External solvers remain later work.
   The result supplies one step. A recursive term can keep unfolding.
   [PLFA DeBruijn, Progress](https://plfa.github.io/DeBruijn/#progress),
   [Haskell proof](examples/open-evaluation/BookBetaReduction.hs).
+- **Multiplication with an ignored argument.** PLFA defines the zero
+  row independently of the second natural. Haskell's wildcard pattern
+  accepts an unevaluated argument. The fork keeps a fresh variable for
+  that argument in the checked equation. The source clause cannot
+  refer to it. This gives `times 0 n :~: 0` for an unknown `n`.
+  [PLFA Naturals](https://plfa.github.io/Naturals/#multiplication),
+  [Haskell 2010 Report, pattern matching](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-620003.17),
+  [native regression](../../testsuite/tests/dependent/should_run/NativeStructuralCarriedArgs.sh).
 - **Two bound variables.** PLFA's `case×` example extends the environment
   twice under a pattern that binds both components of a pair. PLFH's list
   case binds the head and tail in the same way. The newest variable has

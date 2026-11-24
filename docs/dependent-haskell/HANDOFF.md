@@ -20,20 +20,24 @@ object code in the interactive run.
 [replacement-order proof](examples/open-evaluation/BookBetaReduction.hs),
 [R16 requirements](roadmap/R16-open-term-evaluator.md#typed-substitution-under-a-binder).
 
-Private book patch `2a77c6f976`, based on batch 25, proves progress for
-all 19 constructors of the extended language. Job 3072 checked all 29
-patched modules from native providers at both optimization levels. Both
-runs matched 123 observations and rejected eight negative programs.
-From a book checkout, fetch
-`refs/yardsticks/plfh/more-progress-6904243` from `/home/tritlo/Code/ghc`.
-Default GHCi cannot yet publish the equations for this chapter.
+[Published PLFH batch 27](https://github.com/Tritlo/PLFH/tree/81f8c63afdb722766d5ea6a1163f7d20345105d9)
+includes the complete progress proof for the 19 constructors of
+**More**. It states all 27 reduction rules. In particular, matching
+`Cons v vs` fixes both indices in the list-case result. On
+`056871faa9`, job 3101 checked all 29 book modules at native `-O0`
+and default `-O2`. Each module also compiled against its dependencies'
+native interfaces at both levels. All four runs rejected eight negative
+programs. The native runs matched 123 observations. The corrected
+double-substitution report passed at both optimization levels. In total, 34 of the 41 original
+reports passed at `-O0` and 31 at default `-O2`.
 
-On [published PLFH batch 26](https://github.com/Tritlo/PLFH/tree/0adc1118387d8228ba54bf332a395bfb70ba9c4b),
-job 3074 checked all 28 modules at native `-O0` and default `-O2`.
-Each module also compiled against the native interfaces of its dependencies
-at both levels. All four runs rejected the seven negative programs. The
-native runs matched 114 observations. Of the 41 original reports, 33
-compiled at `-O0` and 30 at default `-O2`.
+Compiler `744122325d` also accepts the book's original wildcard
+multiplication report. The zero row ignores the other argument. Job
+3109 raised the totals to 35/41 and 32/41 respectively. All other
+reports, negative controls and runtime output matched job 3101. Job
+3119 matched 618 Showcase observations at native `-O0`, default `-O2`
+and in GHCi. The new observation evaluates `times 0 (error "forced wildcard")`
+and checks the open equality `times 0 n :~: 0`.
 [Book verification instructions](#build-and-verify).
 
 [HaskLib.Nat.plusComm](hasklib/HaskLib/Nat.hs) proves that addition
@@ -45,11 +49,11 @@ Job 2996 matched the 113 book observations at native `-O0`, default
 
 ## Next compiler work
 
-- The published standalone double-substitution report now reaches
-  GHC-83865 at `BetaDouble`. Its replacements occur only in the result
-  of a non-injective family. Job 3084 checked a variant that supplies
-  `Proxy v` and `Proxy vs` at both native optimization levels. The
-  actual chapter's step fixes the indices in the scrutinee `Cons v vs`.
+- In default GHCi, the extended language's bytecode provider withholds
+  the substitution equations. With `-fno-break-points`, bytecode alone
+  matched all 123 observations in the batch 26 chapter handoff (job
+  3112). Check the unused bindings that GHCi introduces for debugger
+  variables, while preserving the executable's breakpoints.
 - For **Lists**, the ordinary converter now preserves the exact proof
   and position for known memberships in a source-hidden native interface.
   The general `There` equation still needs a certificate for recursive
@@ -59,7 +63,9 @@ Job 2996 matched the 113 book observations at native `-O0`, default
   GHC-70565 at the beta endpoint at both optimization levels. Publication
   requires an account of imported rewrite rules for no-code interfaces.
 - Job 2983 built both stages of the 615 checkpoint at `2c9b9b286e`.
-  Its qualification is in progress. The previous
+  All 15 qualification gates and 234/234 compatibility tests passed.
+  The focused suite passed 137/138 with the known `MTrans` diagnostic.
+  Job 3106 is building the 617 checkpoint from the 615 donor. The previous
   build at `781a6c6a8f` passed all 15 gates, including 52 selected tests
   and all three modes of the 612-line Showcase. Job 2837 also passed
   234/234 compatibility cases and 136/138 focused tests. The two failures
