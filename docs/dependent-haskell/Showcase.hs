@@ -178,6 +178,7 @@ import qualified HaskLib
 import qualified BookCalculations as Book
 import qualified BookIsomorphism as BookIso
 import qualified BookIsoRefl
+import qualified BookIsoComposition
 import qualified BookNaturals
 import qualified CastedConstructorGivens as TreeProof
 import qualified SumOfSizes
@@ -1987,6 +1988,10 @@ main = do
         BookIso.MkIso to from fromTo toFrom ->
             observe "apply the identity isomorphism at Maybe Bool"
                 (to (Just True), from Nothing, fromTo (Just False), toFrom Nothing)
+    case BookIsoComposition.isoTrans BookIso.sample (BookIsoComposition.isoSym BookIso.sample) of
+        BookIso.MkIso to from fromTo toFrom ->
+            observe "compose the Boolean-to-bit isomorphism with its inverse"
+                (to True, from False, fromTo False, toFrom True)
     let arrow = Book.Arrow Book.Bottom (error "forced the arrow output")
     observe "take the domain of a join of function values"
         (Book.dom (Book.Join arrow Book.Bottom), Book.domJoin arrow Book.Bottom)

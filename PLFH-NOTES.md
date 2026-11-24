@@ -4,6 +4,12 @@ The PLFH author and the GHC compiler team use this file to exchange working proo
 
 Append a dated entry with the author, chapter and theorem. For a blocker, include the smallest source path, compiler commit, command, expected result and actual diagnostic with its source location. Record a Serokell card when the connection is known. The compiler team replies under that entry with a reproducer, fix or explanation. The PLFH author reruns the original example and records the outcome. Read new entries when resuming work and after each batch. Keep previous failures visible when a fix lands.
 
+## 2026-11-24 05:45 CET · Batch 14 handoff for isomorphism transitivity
+
+GHC checks `isoTrans :: Iso a b -> Iso b c -> Iso a c` with Prelude composition in both function fields. One inverse proof is `trans (cong @g (kh (f x))) (gf x)`. Job 2600 checked the Isomorphism chapter and its clients at `-O0` and `-O2`. The chapter disables rewrite rules for these proofs. Its full harness reported 56 passes, zero failures and 73 runtime checks. Fetch `refs/yardsticks/plfh/generic-iso-d343521` from `/home/tritlo/Code/ghc`. The chapter commit `f1a30b85e6` applies directly to published batch 14 (`d343521`). The original `R04_ComposedIsoFields` uses two opaque local aliases, so it still fails. [Compiler revision](https://github.com/Tritlo/ghc/commit/6c8ab7f7deb9bbd0ef5e2fa03a5ece733f638492).
+
+Job 2597 checked the unchanged book at `d343521` on the preceding compiler. All 27 modules passed the interface audit in four configurations. The two native readers passed 73 runtime checks each. Six negative clients failed as expected in each configuration. Across all 37 original reports, 23 compile at `-O0` and 21 at default `-O2`. Identity and the shunt proof account for the two differences. On the same book, the optimized De Bruijn interface now supports substitution under a lambda without capturing a free variable. Job 2606 checked the proof from interfaces at both reader optimization levels. [Substitution fix](https://github.com/Tritlo/ghc/commit/549657008d0ceaba590890324e56ba796b34a560).
+
 ## 2026-11-24 05:30 CET · Soundness, De Bruijn progress and polymorphic identity
 
 The original R11 report and the inlined `MkSubstRefl ... (IES ie)` branch of the Soundness chapter pass Core and STG Lint at `-O0` and `-O2`. The wrong field keeps its GHC-25897 error. Job 2561 compared both compiler revisions on the same inputs. [Published fix and regression](https://github.com/Tritlo/ghc/commit/3326acd9b1fea98090eb5e8f3f89b5a85e44d849).

@@ -6,6 +6,30 @@ compiler and the current queue, use the [program roadmap](ROADMAP.md#where-this-
 The [implementation log](PLAN.md) gives the specifications for the numbered
 increments.
 
+## Composing isomorphisms in the published book
+
+The [composition example](examples/open-evaluation/BookIsoComposition.hs)
+stores `h . f` in the forward field and `g . k` in the inverse field.
+In the proof, `kh (f x)` cancels one inverse pair. Applying `cong @g`
+preserves the surrounding function and `trans` composes the result with
+`gf x`. Job 2601 evaluated the composed Boolean-to-bit isomorphism and
+its inverse in the 604-observation Showcase at native `-O0`, default
+`-O2` and in GHCi. Job 2594 also checked a re-exported composition
+function, a false proof, a strict worker, an ignored bottom callback
+and an active rewrite rule.
+
+Job 2603 checked the unchanged [batch 14 book](https://github.com/Tritlo/PLFH/tree/d343521eb54eb18aca970b302adb3583f98f3111)
+on the composition compiler. Job 2597 ran the same inputs on the
+preceding compiler. The four book builds and all 74 original report
+outcomes agreed. At `-O0`, 23 of 37 reports compiled. At default `-O2`,
+21 compiled. The six negative programs failed with their expected
+diagnostics in each build. Both native readers ran 73 observations.
+The 27 interfaces passed the audit in all four builds. The unchanged
+`R04_ComposedIsoFields` uses opaque local aliases for the compositions and
+still fails. The book patch uses Prelude `(.)` directly in the two fields.
+Job 2600 passed all 56 checks on the patched book.
+[PLFA provenance](REFERENCES.md#plfh-arithmetic-dependent-patterns-and-callback-inference).
+
 ## Nested Soundness patterns and identity isomorphisms
 
 The [R11 fix](https://github.com/Tritlo/ghc/commit/3326acd9b1fea98090eb5e8f3f89b5a85e44d849)

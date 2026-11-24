@@ -8,32 +8,24 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
-[Compiler `3326acd9b1`](https://github.com/Tritlo/ghc/commit/3326acd9b1fea98090eb5e8f3f89b5a85e44d849)
-accepts the original nested existential GADT report from PLFH. The
-Soundness chapter can use the nested pattern directly. Job 2561 checked
-both programs at `-O0` and `-O2`. A wrong environment field still
-reports GHC-25897. The same compiler includes the De Bruijn application
-and typed substitution checks and the polymorphic identity isomorphism.
-Job 2573 built all 27 published PLFH modules in native and fresh no-code
-modes at `-O0` and default `-O2`. Both native readers passed 66 runtime
-checks. All five negative programs gave the expected diagnostic in each
-build. Of the same 31 original reports, **22 compile at `-O0` and 21 at
-default `-O2`**. R11 accounts for the improvement at both levels.
-The [verification record](CHECKPOINTS.md#nested-soundness-patterns-and-identity-isomorphisms)
-gives the example and the interface requirements for substitution.
+[Compiler `6c8ab7f7de`](https://github.com/Tritlo/ghc/commit/6c8ab7f7deb9bbd0ef5e2fa03a5ece733f638492)
+checks generic transitivity of isomorphism. The proof uses Prelude composition
+and the two stored inverse laws. Job 2601 matched all **604 Showcase
+observations** at native `-O0`, default `-O2` and in GHCi.
 
-The [Showcase](Showcase.hs) now uses Prelude `id` as both directions of
-`Iso a a`. Its proof module disables rewrite rules. Job 2574 matched
-all 603 observations at native `-O0`, default `-O2` and in GHCi.
-The difference between the book's two reproducer counts comes from the
-append rule in `R13_ShuntAccumOpenEq`.
-[Book revision](https://github.com/Tritlo/PLFH/tree/0fd43f5353c4c3ae7670bac668ff2abe8f3c67ea).
+[Published PLFH `d343521`](https://github.com/Tritlo/PLFH/tree/d343521eb54eb18aca970b302adb3583f98f3111)
+has 37 original reports. On the same snapshot, jobs 2597 and 2603 found
+**23 compile at `-O0` and 21 at default `-O2`**. The two differences are
+the shunt and identity proofs when rewrite rules are enabled. All 27 modules
+passed the interface audit in four configurations. Both native readers ran
+73 observations. Each configuration rejected six negative programs as expected.
+[Verification record](CHECKPOINTS.md#composing-isomorphisms-in-the-published-book).
 
-The Isomorphism chapter patch is separate. From the book checkout, run
-`git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/generic-iso-refl-0fd43f5`.
-It includes the earlier symmetry and embedding patch. Job 2551 passed all
-54 book checks on this revision. The [notebook](../../PLFH-NOTES.md)
-records the chapter handoff.
+The Isomorphism chapter patch applies directly to `d343521`. In the book
+checkout, run `git fetch /home/tritlo/Code/ghc refs/yardsticks/plfh/generic-iso-d343521`.
+Job 2600 checked a `Maybe Bool` client through compiled interfaces at both
+optimization levels and recorded 56 passing book checks. The
+[notebook](../../PLFH-NOTES.md) records the chapter handoff.
 
 ## Next compiler work
 

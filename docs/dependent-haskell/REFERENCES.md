@@ -78,6 +78,13 @@ a comparison implementation. External solvers remain later work.
   proof module so that the compiler can use the checked identity equation.
   [Agda equivalence laws](https://plfa.github.io/Isomorphism/#isomorphism-is-an-equivalence),
   [Haskell proof](examples/open-evaluation/BookIsoRefl.hs).
+- **Transitivity of isomorphism.** PLFA composes the two functions in one
+  order and their inverses in the opposite order. It uses congruence to
+  cancel the inner round trip under the remaining function. PLFH uses
+  Prelude `(.)`, HaskLib `cong` and `Data.Type.Equality.trans` for these
+  steps. The proof module disables rewrite rules for the checked composition.
+  [PLFA transitivity](https://plfa.github.io/Isomorphism/#isomorphism-is-an-equivalence),
+  [Haskell proof](examples/open-evaluation/BookIsoComposition.hs).
 - **Callback inference.** Agda can infer implicit arguments from the
   signature of a partially applied function. In `lengthMapLaw = lengthMap`,
   GHC already infers the callback's input and output types. The fix reads those
