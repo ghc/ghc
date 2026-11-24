@@ -33,15 +33,19 @@ records the chapter handoff.
 
 - Complete De Bruijn progress on the book's intrinsically typed terms.
   Its value classifier checks in case and equation form. The application
-  case introduces an existential argument index. Its step evidence and
-  the typed `substSingle` endpoints of beta reduction still need work.
+  case introduces an existential argument index. Revision `5a7d9d7de8`
+  checks both congruence branches and the value/value branch when the
+  caller supplies recursive progress and beta. Jobs 2529 and 2533 checked
+  the three branches, two false endpoints and the compatibility controls.
+  General beta reduction still needs the typed `substSingle` endpoint.
 - Job 2429 built both stages of the 600-example compiler `76e67f4fdb`.
   The 42 registrations reported the known independent record-index failure.
   Its repair passed on the subsequent compiler components. Job 2525 builds
   the 602-example revision in `_build/on-demand/plfh-iso-map-normal-602-20261124`
   and runs 46 registrations plus the compatibility and focused suites.
   Check `build.pass`, `qualification/gates.tsv`, and the cohort reports.
-- Three compiler agents and three GHC slots share 16 cores and 64 GB.
+- Three compiler agents use a shared queue with four GHC build slots,
+  16 logical CPUs and 64 GB of memory.
   GHC yields to local benchmark jobs. The [roadmap](ROADMAP.md#where-this-fork-stands)
   counts 27 of 50 cards complete.
 
@@ -195,7 +199,7 @@ The November 24 cleanup retired 826 completed test executables and freed
 7,733,612,544 bytes. Inputs, objects and results stayed in place. The file
 inventory is in `_build/on-demand/retirement-completed-test-executables-20261124`.
 
-The GHC queue has three slots. Local benchmark jobs take priority and freeze
+The GHC queue has four slots. Local benchmark jobs take priority and freeze
 the GHC slice. The remote Colab benchmark uses the
 `colab-inkling-graded-*` label in the `build` group and runs alongside GHC.
 Jobs 1947 and 1949 were exploratory allocation measurements.
@@ -270,7 +274,7 @@ inferred capture kind in a type lambda. A reader built from 572
 consumed the resulting row from a stripped interface at both
 optimization levels.
 
-The three GHC build slots share a 16-core, 64,000,000,000-byte slice and
+The four GHC build slots share a 16-core, 64,000,000,000-byte slice and
 yield to the benchmark queues. Use the
 [queue recovery procedure](CHECKPOINTS.md#restore-the-shared-wsl-build-queue)
 after a distribution restart.
@@ -801,7 +805,7 @@ defaults and an opt-in migration warning.
 3. Restore the [shared WSL build queue](CHECKPOINTS.md#restore-the-shared-wsl-build-queue)
    before submitting work. Use three subagents for the current assignments. The coordinator
    reviews and integrates their results. Check the live assignments and
-   queue before resuming a roadmap card. The group has three slots. All GHC jobs share
+   queue before resuming a roadmap card. The group has four slots. All GHC jobs share
    16 logical CPUs, 64,000,000,000 bytes of memory and zero swap.
    Higher-priority jobs pause the queue and freeze the GHC slice.
 
