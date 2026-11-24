@@ -4796,13 +4796,16 @@ Record that use and its dependencies with tcLookupSourceTableId. This
 checks the same rewrite rules as a saturated source call.
 
 A source family takes the erased arguments of its term owner. A retained
-callback can supply a checked prefix of the value arguments. Leave one
-value binder unsaturated. Substituting the index for the callback saturates
+callback can supply a checked prefix of the value arguments. Keep at least
+one value binder unsaturated. Substituting the index for the callback saturates
 the family wherever the callback was applied to a value. The U arrow prevents using the application
 as evidence for the identity of either input. The ordinary argument check
 keeps the original function occurrence and its selected type arguments.
 A lexical variable still has its own index, even when its right-hand side
 names a certified function. A lambda has no certificate at this admission.
+Use the same checker for a named function operand of a certified source
+call. For example, the callback of foldrL plus Zero xs keeps its exact
+source family and curried arrow kind.
 
 The simplifier can substitute another lexical callback and preserve a strict
 case on an opaque call. It cannot substitute a source family into that case
@@ -5110,7 +5113,14 @@ tcRetainedArgWith reify domain arg
 
     apply_ordinary env fun arg = case splitFunTy_maybe (exprType fun) of
       Just (_, _, _, arg_ty, _) -> do
-        (core_arg, arg') <- resolve env arg_ty arg
+        (core_arg, arg') <- case Core.collectArgs fun of
+          (Core.Var owner, _)
+            | Just _ <- sourceTableId_maybe owner
+            , Just _ <- nativeIndexFunctionTypeTys_maybe arg_ty
+            , Just (name, _) <- retainedSourceHead arg
+            , isExternalName name
+            -> (,arg) <$> tcRetainedFunctionArg arg_ty arg
+          _ -> resolve env arg_ty arg
         let app = Core.App fun core_arg
         -- See Note [Retained argument cast diagnostics].
         case core_arg of

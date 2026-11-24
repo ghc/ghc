@@ -162,7 +162,7 @@ import Data.Maybe (fromMaybe, isJust, isNothing)
 import Data.Word
 
 import Control.DeepSeq
-import Control.Monad ( foldM, guard )
+import Control.Monad ( foldM, guard, zipWithM )
 
 infixl 4 `mkApps`, `mkTyApps`, `mkVarApps`, `App`, `mkCoApps`
 -- Left associative, so that we can say (f `mkTyApps` xs `mkVarApps` ys)
@@ -2718,11 +2718,17 @@ computedIndexExpr = nativeIndexExprWith False extra
       , let (_, domains, result) = splitFunTys body
       , values `equalLength` domains, values `equalLength` binders
       , result `sameNativeIndexDomain` TyCoSubst.substTy family_subst (tyConResKind family)
-      = do { indices <- traverse (fmap snd . computedIndexExpr) values
+      = do { indices <- zipWithM operand domains values
            ; if and (zipWith3 (has_domain family_subst) domains binders indices)
              then Just (expr, mkTyConApp family (tys ++ indices))
              else Nothing }
       | otherwise = Nothing
+
+    operand (Scaled _ domain) value
+      | Just _ <- nativeIndexFunctionTypeTys_maybe domain
+      , Just index <- nativeIndexFunctionArgIndex value
+      = Just index
+      | otherwise = snd <$> computedIndexExpr value
 
     has_domain subst (Scaled mult domain) binder index =
       isManyTy mult && sameNativeIndexDomain domain (TyCoSubst.substTy subst (tyVarKind binder))
@@ -2868,7 +2874,7 @@ nativeIndexFunctionArgIndex arg
   = Just (TermVarTy fun)
   | otherwise = Nothing
 
--- | Reify a checked source function with one value argument remaining.
+-- | Reify a checked source function at its remaining ordinary arrow type.
 -- See Note [Named retained callbacks] in GHC.Tc.Gen.App.
 nativeSourceFunctionArgIndex :: CoreExpr -> Maybe Type
 nativeSourceFunctionArgIndex arg
@@ -2880,7 +2886,7 @@ nativeSourceFunctionArgIndex arg
   , let (type_args, values) = span isTypeArg args
   , Just (tys, body, family_subst, binders) <- sourceIndexHead fun family type_args
   , let (used, remaining) = splitAt (length values) binders
-  , [_] <- remaining
+  , not (null remaining)
   , Just (indices, arrow) <- foldM (apply family_subst) ([], body) (zip used values)
   , Just _ <- nativeIndexFunctionTypeTys_maybe arrow
   , let index = mkTyConApp family (tys ++ reverse indices)
