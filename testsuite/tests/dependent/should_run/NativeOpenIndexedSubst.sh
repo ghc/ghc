@@ -54,6 +54,9 @@ packTerm _ term = Pack Refl term
 
 unpackTerm :: Name g a -> SomeTerm g a -> Term g a
 unpackTerm _ (Pack Refl term) = term
+
+unpackOne :: SomeTerm g a -> Term g a
+unpackOne (Pack Refl term) = term
 HS
 
 cat >"$work/Reader.hs" <<'HS'
@@ -61,7 +64,7 @@ cat >"$work/Reader.hs" <<'HS'
 module Reader where
 
 import Data.Type.Equality ((:~:) (Refl))
-import Syntax (Sort (..), Ctx (..), Name, Term)
+import Syntax (Sort (..), Ctx (..), Name, Term, SomeTerm)
 import qualified Syntax as S
 
 leaf :: forall (g :: Ctx) (a :: Sort) (x :: Term g a).
@@ -102,6 +105,16 @@ unpackExistential :: forall (n :: Name ('Extend 'Empty 'Num) 'Num)
                             (x :: Term ('Extend 'Empty 'Num) 'Num).
                      S.unpackTerm n ('S.Pack 'Refl x) :~: x
 unpackExistential = Refl
+
+unpackUnary :: forall (x :: Term ('Extend 'Empty 'Num) 'Num)
+                      (y :: Term ('Extend 'Empty 'Num) 'Num).
+               S.unpackOne ('S.Pack 'Refl x :: SomeTerm ('Extend 'Empty 'Num) 'Num)
+#ifdef WRONG_UNARY
+                 :~: y
+#else
+                 :~: x
+#endif
+unpackUnary = Refl
 
 #ifdef RULE
 {-# RULES "replace/substitution" forall (x :: Term 'Empty 'Num).
@@ -144,6 +157,7 @@ HS
     }
     reject GHC-83865 -DWRONG
     reject GHC-25897 -DWRONG_EXISTENTIAL
+    reject GHC-25897 -DWRONG_UNARY
     reject GHC-70566 -DRIGID
     grep -Fq 'case on the rigid argument x' wrong.log
     reject GHC-83605 -DRULE -fenable-rewrite-rules
