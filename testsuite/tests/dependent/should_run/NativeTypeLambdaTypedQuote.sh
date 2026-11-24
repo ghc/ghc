@@ -93,7 +93,7 @@ for opt in O0 O2; do
     cd ../consumer
     cp "$work/Main.hs" .
     cp "$work/Runtime.hs" .
-    "${g[@]}" "$opt" -c Runtime.hs
+    "${g[@]}" "-$opt" -c Runtime.hs
     "${g[@]}" "-$opt" -c Main.hs
     "${g[@]}" "-$opt" Main.o TypedCallbacks.o -o test
     ./test >result
