@@ -7282,6 +7282,16 @@ substituted a different proof of the same proposition.
 [proposal #242, inference](https://ghc-proposals.readthedocs.io/en/latest/proposals/0242-unsaturated-type-families.html#inference),
 [worker regression](../../testsuite/tests/dependent/should_run/NativeOpenIndexedSubst.sh).
 
+The recursive `There` case of the PLFA membership proof preserves a
+position in the tail. The fork's ordinary `witnessToAny` follows that
+position and carries the supplied predicate evidence. Its checked
+equation works for an unknown tail, including lists with duplicate
+elements. PLFH opts the provider into equation checking. The Haskell
+interface records the equations that the compiler verified.
+[PLFA Lists, Any](https://plfa.github.io/Lists/#any),
+[Haskell decoder](examples/open-evaluation/BookAnyWitness.hs),
+[equality over the decoder](examples/open-evaluation/BookAnyWitnessProof.hs).
+
 PLFA eliminates a reflexive equality proof by matching on its
 constructor. In the fork, a retained match gives a branch equality for
 the actual proof value. A `case` still forces that Haskell value. The

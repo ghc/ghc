@@ -30,9 +30,14 @@ of its closed, intrinsically typed terms. The beta step uses the book's
 ordinary substitution function in its result type. The published **More**
 chapter checks all 19 constructors of the extended language.
 Its list case replaces two distinct variables under two binders. Both
-proofs exercise R03 and R16. The two cards remain partial.
+proofs work in native code and in default GHCi with breakpoints enabled.
+The latest Lists example also preserves the selected occurrence when it
+decodes an existential witness. R03 and R16 remain partial. The next
+Bisimulation report needs an abstract renaming function in a type.
 [DeBruijn proof](examples/open-evaluation/BookBetaReduction.hs),
 [More proof](https://github.com/Tritlo/PLFH/blob/81f8c63afdb722766d5ea6a1163f7d20345105d9/clients/PLFH/Part2/MoreProgress.hs),
+[Lists proof](examples/open-evaluation/BookAnyWitnessProof.hs),
+[Bisimulation report](https://github.com/Tritlo/PLFH/blob/67dc34b68d1dfcf4d379594986281831c20ae7fd/reproducers/R16_AbstractRenamingInType.hs),
 [R16](roadmap/R16-open-term-evaluator.md#typed-substitution-under-a-binder).
 
 | Area | Open cards with a tested implementation in the fork |

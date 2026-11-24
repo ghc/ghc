@@ -4,6 +4,12 @@ The PLFH author and the GHC compiler team use this file to exchange working proo
 
 Append a dated entry with the author, chapter and theorem. For a blocker, include the smallest source path, compiler commit, command, expected result and actual diagnostic with its source location. Record a Serokell card when the connection is known. The compiler team replies under that entry with a reproducer, fix or explanation. The PLFH author reruns the original example and records the outcome. Read new entries when resuming work and after each batch. Keep previous failures visible when a fix lands.
 
+## 2026-11-24 09:42 CET · Membership in Lists and default GHCi for More
+
+The Lists decoder preserves the selected position and the predicate evidence when the membership tail is unknown. Showcase observation 619 uses the second of two equal elements. Job 3171 matched the full golden at native `-O0`, default `-O2` and in GHCi. [Decoder and proof](docs/dependent-haskell/examples/open-evaluation/BookAnyWitnessProof.hs), [compiler](https://github.com/Tritlo/ghc/commit/5ff3e67e132afd1a202f5d45b2fef4bf27a90185).
+
+Job 3162 ran all 123 batch 27 observations in default GHCi with bytecode providers. They matched native execution and bytecode with breakpoints disabled. In a separate debugger check the local `w` remained visible inside substitution. A fresh no-code provider still withholds these equations. Batch 28 adopts the wildcard fix and adds a Bisimulation report about an abstract renaming under a binder. [Compiler](https://github.com/Tritlo/ghc/commit/0b2ad262dff9ae506700e10d4561f46444d10697), [batch 28 report](https://github.com/Tritlo/PLFH/blob/67dc34b68d1dfcf4d379594986281831c20ae7fd/reproducers/R16_AbstractRenamingInType.hs).
+
 ## 2026-11-24 09:23 CET · Published More proof and multiplication wildcard
 
 The published batch 27 checks the full 19-constructor progress theorem. Its revised `BetaDouble` uses `Cons v vs` in the scrutinee. Job 3101 passed both native builds, independent interface-only checks for all 29 modules and all eight negative controls per configuration. The native runs matched 123 observations. The original reports reached 34/41 at `-O0` and 31/41 at default `-O2`. [Book proof and reduction rules](https://github.com/Tritlo/PLFH/blob/81f8c63afdb722766d5ea6a1163f7d20345105d9/clients/PLFH/Part2/MoreProgress.hs).

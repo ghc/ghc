@@ -859,6 +859,15 @@ rejected the well-kinded swap. [Showcase proof](../examples/open-evaluation/Book
 [PLFA More, Single and double substitution](https://plfa.github.io/More/#single-and-double-substitution),
 [original book report](https://github.com/Tritlo/PLFH/blob/69042437df9b44a099e44e1e53c981045cf0ee29/reproducers/R13_DoubleBinderSubstClosure.hs).
 
+Default GHCi can retain a lifted local binding only so the debugger
+can display it. At `0b2ad262df`, the verifier skips such a binding
+when no uses remain after it removes the breakpoint ticks. The bytecode
+generator still receives the original Core. Job 3145 stopped inside
+`replaceBoth` and displayed its local `w`. Job 3162 ran all 123 batch
+27 book observations with and without breakpoints. Both matched native
+execution. [Verifier and Note](../../../compiler/GHC/Tc/Gen/SourceClosure.hs),
+[regression](../../../testsuite/tests/dependent/should_run/NativeCheckedClosure.sh).
+
 ## M155. Reachable helper chains
 
 A checked case can now use a helper that calls another helper. The

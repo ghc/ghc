@@ -8,6 +8,22 @@ and its [expected output](Showcase.stdout) are the executable examples.
 
 ## Current checkpoint
 
+At `0b2ad262df`, default GHCi runs the entire batch 27 book in
+bytecode. All 123 observations match the native run. This includes
+the **More** progress proof with the debugger enabled. A separate
+debugger test stops inside substitution and inspects a local value.
+Job 3162 also passed three registered compiler tests. The next book
+revision, [batch 28](https://github.com/Tritlo/PLFH/tree/67dc34b68d1dfcf4d379594986281831c20ae7fd),
+adopts the multiplication fix and adds a report about abstract renamings.
+
+Showcase revision `6a608b4f38` proves that decoding an existential
+list witness preserves its position even when the next element has the
+same value. The proof works for an arbitrary tail witness and predicate
+proof. Job 3171 matched all 619 observations at native `-O0`, default
+`-O2` and in GHCi on the decoder compiler at `5ff3e67e13`.
+[Ordinary decoder](examples/open-evaluation/BookAnyWitness.hs),
+[proof](examples/open-evaluation/BookAnyWitnessProof.hs).
+
 Compiler `056871faa9` checks the list-case step in PLFH's **More** chapter.
 The case binds the head and the tail. The step's result type calls the
 ordinary `substDouble` function with those two values. Replacing one
@@ -49,15 +65,13 @@ Job 2996 matched the 113 book observations at native `-O0`, default
 
 ## Next compiler work
 
-- In default GHCi, the extended language's bytecode provider withholds
-  the substitution equations. With `-fno-break-points`, bytecode alone
-  matched all 123 observations in the batch 26 chapter handoff (job
-  3112). Check the unused bindings that GHCi introduces for debugger
-  variables, while preserving the executable's breakpoints.
-- For **Lists**, the ordinary converter now preserves the exact proof
-  and position for known memberships in a source-hidden native interface.
-  The general `There` equation still needs a certificate for recursive
-  calls on the unknown membership tail.
+- R16. Check the new batch 28 Bisimulation report. The result of
+  `simRename` mentions the ordinary renamer applied to an abstract
+  function that must work at every object-language type.
+- For **Lists**, review both inverse laws for the pair of ordinary
+  converters. The published decoder accepts an unknown membership tail.
+  For **Confluence**, review how retained case matching refines a
+  recursive field whose context grows under a lambda.
 - A no-code reader can use a separately compiled native provider. A fresh
   no-code provider withholds the substitution equation. Job 2968 reproduced
   GHC-70565 at the beta endpoint at both optimization levels. Publication
