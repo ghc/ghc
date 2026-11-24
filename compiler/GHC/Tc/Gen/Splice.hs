@@ -81,7 +81,6 @@ import GHC.Iface.Load
 
 import GHCi.Message
 import GHCi.RemoteTypes
-import GHCi.TH (forceMetaHandlersArgs)
 import GHC.Runtime.Interpreter
 
 import GHC.Rename.Splice( traceSplice, SpliceInfo(..) )
@@ -1152,7 +1151,7 @@ runQinTcM (TH.Q act) = withRunInIO $ \runInIO -> act (metaHandlersTcM runInIO)
 --
 -- See Note [Exceptions in TH]
 runQinTcM' :: TH.Q a -> TcM a
-runQinTcM' (TH.Q act) = withRunInIO $ \runInIO -> act (forceMetaHandlersArgs $ metaHandlersTcM runInIO)
+runQinTcM' (TH.Q act) = withRunInIO $ \runInIO -> act (TH.forceMetaHandlersArgs $ metaHandlersTcM runInIO)
 
 runRemoteModFinalizers :: ThModFinalizers -> TcM ()
 runRemoteModFinalizers (ThModFinalizers finRefs) = do
