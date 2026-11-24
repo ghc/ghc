@@ -3,10 +3,10 @@ module GHC.Tc.Gen.SourceClosure (publishCheckedSourceClosures) where
 import GHC.Prelude
 
 import Control.Applicative ((<|>))
-import Control.Monad (guard, zipWithM)
+import Control.Monad (foldM, guard, zipWithM)
 import Control.Monad.Fix (mfix)
 import Data.List (foldl', sortOn)
-import Data.Maybe (catMaybes, fromMaybe, isJust, mapMaybe)
+import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
 
 import GHC.Builtin.WiredIn.Types (manyDataConTy, unmatchableDataConTy)
 import GHC.Core (CoreBind, CoreExpr)
@@ -65,12 +65,12 @@ import GHC.Types.Var.Set (elemVarSet, mkVarSet, subVarSet, unionVarSet)
 
 {- Note [Certifying a checked source closure]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A rank-2 substitution callback can capture a term and can cross a
-binder. Represent the supported callbacks as three private TypeData
-constructors: replacement, one-binder shift, and lifting a callback
-under a binder. Two nominal families interpret the closures over
-term and variable constructors. The source owner names a third
-family, which initializes the replacement closure.
+A rank-2 substitution callback can replace a prefix of the source
+context and cross binders. Private TypeData constructors represent
+the first replacement, another replacement over a checked closure,
+one-binder shift, and lifting. Two nominal families interpret the
+closures over term and variable constructors. The source owner names
+a third family that supplies the replacements in binder order.
 
 Check the original and final Core before allocating the families.
 A traversal must scrutinize its input, cover every constructor, and
@@ -90,10 +90,13 @@ private interpreters. Their source types and constructors must be
 visible under the ordinary source equation policy. The generated
 closure datatype belongs to the certificate and is private.
 
-Keep the actual owner and all reachable original and final helper
-Names in IdDetails. Withhold publication if any Name is absent after
-Tidy or if a visible rule can rewrite a checked function. See
-Note [Checked closure dependencies] in GHC.Tc.Gen.SourceTable.
+Keep the actual owner and all reachable external helper Names from
+both Core graphs in IdDetails. A generated internal helper has no
+interface Name and cannot be the target of a downstream rule. Check
+its Core and traverse its dependencies before filtering Names.
+Withhold publication if any external Name is absent after Tidy or
+if a visible rule can rewrite a checked function. See Note [Checked
+closure dependencies] in GHC.Tc.Gen.SourceTable.
 
 GHCi inserts breakpoint ticks at source spans, including in the middle
 of an application. Inspect the Core with only those ticks removed.
@@ -101,8 +104,10 @@ The certificate describes evaluation of the Haskell term. The bytecode
 generator still sees the original ticks and their debugger variables.
 -}
 
-data FamilyInputs = FamilyInputs Id Kind Kind TyCon TyCon TyCon
-                                  DC.DataCon DC.DataCon DC.DataCon [(DC.DataCon, [Bool])]
+data CallbackLift = NamedLift Id | InlinedRename | InlinedSubst Id
+
+data FamilyInputs = FamilyInputs Id Int Kind Kind TyCon TyCon TyCon
+                                  DC.DataCon DC.DataCon DC.DataCon [(DC.DataCon, [Int])]
 
 -- | Publish tables for eligible final Core bindings. The caller checks
 -- the source-equation opt-in and excludes plugins and local user rules.
@@ -131,11 +136,12 @@ publishCheckedSourceClosures original_binds final_binds final_types = do
           VanillaId <- pure (idDetails actual)
           original_shape <- familyInputs original old original_rhs
           final_rhs <- lookup actual final
-          shape@(FamilyInputs _ _ _ term ext index _ _ _ _) <- familyInputs final actual final_rhs
+          shape@(FamilyInputs _ _ _ _ term ext index _ _ _ _) <- familyInputs final actual final_rhs
           guard (sameShapes original_shape shape)
           guard (all ((== here) . nameModule_maybe . tyConName) [term, ext, index])
           let helpers = nameSetElemsStable $ mkNameSet $
-                filter (/= owner) (reachable original old ++ reachable final actual)
+                filter (\name -> name /= owner && isExternalName name)
+                       (reachable original old ++ reachable final actual)
           helper_ids <- traverse lookupLocal helpers
           guard (not (null helper_ids))
           pure (actual, shape, helper_ids)
@@ -156,39 +162,45 @@ publishCheckedSourceClosures original_binds final_binds final_types = do
         pure (new, families)
 
 sameShapes :: FamilyInputs -> FamilyInputs -> Bool
-sameShapes (FamilyInputs _ g a term ext index var hit miss rows)
-           (FamilyInputs _ g' a' term' ext' index' var' hit' miss' rows') =
-    g `eqType` g' && a `eqType` a' && term == term' && ext == ext' && index == index' &&
+sameShapes (FamilyInputs _ arity g a term ext index var hit miss rows)
+           (FamilyInputs _ arity' g' a' term' ext' index' var' hit' miss' rows') =
+    arity == arity' && g `eqType` g' && a `eqType` a' && term == term' && ext == ext' && index == index' &&
     var == var' && hit == hit' && miss == miss' && rows == rows'
 
 familyInputs :: [(Id, CoreExpr)] -> Id -> CoreExpr -> Maybe FamilyInputs
 familyInputs bindings owner rhs = do
-    ([context, sort, result], [body, capture], call) <- function rhs
+    (context : types, body : captures, call) <- function rhs
+    result : rev_sorts <- pure (reverse types)
+    guard (not (null captures) && length captures == length rev_sorts)
     (Core.Var traversal, [callback, Core.Var operand]) <- application call
     guard (operand == body)
     ([callback_sort], [argument], lookup_body) <- function callback
-    let context_kind = varType context
-        sort_kind = varType sort
+    let sorts = reverse rev_sorts
+        context_kind = varType context
+        sort_kind = varType result
     (context_tycon, []) <- splitTyConApp_maybe context_kind
     (sort_tycon, []) <- splitTyConApp_maybe sort_kind
     guard (all isAlgTyCon [context_tycon, sort_tycon])
-    guard (all (eqType sort_kind) [varType result, varType callback_sort])
+    guard (all (eqType sort_kind . varType) (callback_sort : sorts))
     (term, [body_ctx, TyVarTy body_sort]) <- splitTyConApp_maybe (varType body)
-    (ext, [TyVarTy g, TyVarTy a]) <- splitTyConApp_maybe body_ctx
-    (target, [TyVarTy capture_ctx, TyVarTy capture_sort]) <- splitTyConApp_maybe (varType capture)
+    (ext, [_, _]) <- splitTyConApp_maybe body_ctx
     (index, [index_ctx, TyVarTy index_sort]) <- splitTyConApp_maybe (varType argument)
+    let context_ty = mkTyVarTy context
+        extend k a = mkTyConApp ext [k, mkTyVarTy a]
+        at a = mkTyConApp term [context_ty, mkTyVarTy a]
     guard (isPromotedDataCon ext && all isAlgTyCon [term, index])
-    guard (g == context && a == sort && body_sort == result &&
-           target == term && capture_ctx == context && capture_sort == sort &&
+    guard (foldl' extend context_ty sorts `eqType` body_ctx && body_sort == result &&
+           and (zipWith (\capture sort -> varType capture `eqType` at sort) captures sorts) &&
            index_ctx `eqType` body_ctx && index_sort == callback_sort)
-    [(first, first_bs, first_rhs), (second, second_bs, second_rhs)] <- caseOn argument lookup_body
+    case_rows <- caseOn argument lookup_body
+    [(first, _, _), (second, _, _)] <- pure case_rows
     let index_cons = tyConDataCons index
     guard (first /= second && length index_cons == 2 &&
            first `elem` index_cons && second `elem` index_cons &&
            all lazyConstructor index_cons)
     (hit, miss, var) <-
-        outcomes capture (first, first_bs, first_rhs) (second, second_bs, second_rhs) <|>
-        outcomes capture (second, second_bs, second_rhs) (first, first_bs, first_rhs)
+        outcomes first second [] argument (reverse captures) lookup_body <|>
+        outcomes second first [] argument (reverse captures) lookup_body
     guard (DC.dataConTyCon var == term)
     traversal_rhs <- lookup traversal bindings
     ([_, _, _], [sigma, scrutinee], traversal_case) <- function traversal_rhs
@@ -199,24 +211,25 @@ familyInputs bindings owner rhs = do
     (Core.Var use, [Core.Var x]) <- application checked
     guard (use == sigma && x == field)
     recipes <- checkedTraversals bindings traversal sigma var hit miss rows
-    pure (FamilyInputs owner context_kind sort_kind term ext index var hit miss recipes)
+    pure (FamilyInputs owner (length captures) context_kind sort_kind term ext index var hit miss recipes)
 
 -- Check both case traversals before emitting any nominal equations.
--- The recipe records, in field order, whether each recursive call
--- extends the original callback.
+-- The recipe records the number of binder extensions for each field.
 checkedTraversals :: [(Id, CoreExpr)]
                   -> Id -> Id
                   -> DC.DataCon -> DC.DataCon -> DC.DataCon
                   -> [(DC.DataCon, [Var], CoreExpr)]
-                  -> Maybe [(DC.DataCon, [Bool])]
+                  -> Maybe [(DC.DataCon, [Int])]
 checkedTraversals bindings subst sigma var hit miss rows = do
     let constructors = tyConDataCons (DC.dataConTyCon var)
     guard (complete constructors rows)
-    lifted <- traverse (checkedRow subst sigma) [row | row@(con, _, _) <- rows, con /= var]
+    lifted <- traverse (checkedRow bindings var hit miss subst sigma) [row | row@(con, _, _) <- rows, con /= var]
     let (recipes, used_extenders) = unzip lifted
-    extender <- allSame [v | group <- used_extenders, Just v <- group]
+        subst_steps = concatMap concat used_extenders
+    extender <- allSame [v | NamedLift v <- subst_steps]
     extender_rhs <- lookup extender bindings
     rename <- checkedExtension bindings var hit miss extender_rhs
+    guard (all (isSubstLift rename) subst_steps)
     rename_rhs <- lookup rename bindings
     (tvs, [rho, operand], renaming) <- function rename_rhs
     guard (length tvs == 3)
@@ -229,11 +242,13 @@ checkedTraversals bindings subst sigma var hit miss rows = do
     guard (var_head == var)
     (Core.Var callback, [Core.Var argument]) <- application renamed
     guard (callback == rho && argument == original)
-    renamed_rows <- traverse (checkedRow rename rho)
+    renamed_rows <- traverse (checkedRow bindings var hit miss rename rho)
                              [row | row@(con, _, _) <- rename_rows, con /= var]
     let (rename_recipes, rename_extenders) = unzip renamed_rows
     guard (sortOn (nameStableString . DC.dataConName . fst) recipes == sortOn (nameStableString . DC.dataConName . fst) rename_recipes)
-    extend_rename <- allSame [v | group <- rename_extenders, Just v <- group]
+    let rename_steps = concatMap concat rename_extenders
+    guard (all isRenameLift rename_steps)
+    extend_rename <- allSame [v | NamedLift v <- rename_steps]
     extend_rename_rhs <- lookup extend_rename bindings
     checkRenameExtension hit miss extend_rename_rhs
     pure recipes
@@ -243,38 +258,84 @@ checkedTraversals bindings subst sigma var hit miss rows = do
       in length heads == length constructors && all (`elem` heads) constructors &&
          all lazyConstructor constructors
 
+    isSubstLift _ (NamedLift _) = True
+    isSubstLift rename (InlinedSubst v) = rename == v
+    isSubstLift _ InlinedRename = False
+
+    isRenameLift (NamedLift _) = True
+    isRenameLift InlinedRename = True
+    isRenameLift (InlinedSubst _) = False
+
     allSame [] = Nothing
     allSame (v : vs) = v <$ guard (all (== v) vs)
 
 -- Check every recursive call on exactly the original corresponding
 -- field. The result keeps the same head and lazy field order.
-checkedRow :: Id -> Id
+checkedRow :: [(Id, CoreExpr)] -> DC.DataCon -> DC.DataCon -> DC.DataCon -> Id -> Id
            -> (DC.DataCon, [Var], CoreExpr)
-           -> Maybe ((DC.DataCon, [Bool]), [Maybe Id])
-checkedRow traversal callback (con, binders, rhs) = do
+           -> Maybe ((DC.DataCon, [Int]), [[CallbackLift]])
+checkedRow bindings var hit miss traversal callback (con, binders, rhs) = do
     result <- branchBody binders rhs
     (rebuilt, fields) <- constructorCall result
     let originals = filter isValueVar binders
     guard (rebuilt == con && length fields == length originals)
     owners <- zipWithM recursiveField originals fields
-    pure ((con, map isJust owners), owners)
+    pure ((con, map length owners), owners)
   where
     recursiveField original field = do
         (Core.Var owner, [captured, Core.Var subterm]) <- application field
         guard (traversal == owner && original == subterm &&
                isLiftedTypeKind (typeKind (varType original)))
-        case captured of
-            Core.Var other | callback == other -> pure Nothing
-            _ -> Just <$> extendedCallback callback captured
+        lifts captured
 
-extendedCallback :: Id -> CoreExpr -> Maybe Id
-extendedCallback callback captured = do
-    ([index], [], closure) <- function captured
-    (Core.Var extender, args) <- pure (Core.collectArgs closure)
-    [Core.Type _, Core.Type _, Core.Type _, Core.Var original,
-      Core.Type (TyVarTy rest)] <- pure args
-    guard (callback == original && index == rest)
-    pure extender
+    lifts (Core.Var original)
+        | callback == original = Just []
+    lifts captured = named captured <|> inlined captured
+
+    named captured = do
+        ([index], [], closure) <- function captured
+        case Core.collectArgs closure of
+          (Core.Var original, [Core.Type (TyVarTy rest)])
+            | callback == original && index == rest -> pure []
+          (Core.Var extender, [Core.Type _, Core.Type _, Core.Type _, original,
+                               Core.Type (TyVarTy rest)])
+            | index == rest -> (NamedLift extender :) <$> lifts original
+          _ -> Nothing
+
+    -- Simplification can inline one extension around the remaining callback.
+    -- Check its constructors and each operand before stripping the lookup.
+    inlined captured = do
+        ([index], [argument], body) <- function captured
+        rows <- caseOn argument body
+        [(hit_bs, hit_rhs)] <- pure [(bs, e) | (dc, bs, e) <- rows, dc == hit]
+        [(miss_bs, miss_rhs)] <- pure [(bs, e) | (dc, bs, e) <- rows, dc == miss]
+        guard (length rows == 2 && all (not . isValueVar) hit_bs)
+        fresh <- expandTypeHelper bindings <$> branchBody hit_bs hit_rhs
+        forwarded <- branchBody miss_bs miss_rhs
+        (lift_step, see_older) <- inlineStep fresh forwarded
+        [older] <- pure (filter isValueVar miss_bs)
+        let (head_expr, args) = Core.collectArgs see_older
+        arg : preceding <- pure (reverse args)
+        Core.Var input <- branchBody miss_bs arg
+        guard (input == older)
+        (lift_step :) <$> lifts (Core.Lam index (foldl' Core.App head_expr (reverse preceding)))
+
+    inlineStep fresh forwarded = do
+        (fresh_con, fields) <- constructorCall fresh
+        case fields of
+          [] -> do
+            (forward_con, [lookup_older]) <- constructorCall forwarded
+            guard (fresh_con == hit && forward_con == miss)
+            pure (InlinedRename, lookup_older)
+          [v] -> do
+            (fresh_index, []) <- constructorCall v
+            guard (fresh_con == var && fresh_index == hit)
+            (Core.Var rename, [weakening, lookup_older]) <- application forwarded
+            ([_], [], partial) <- weakeningBody weakening >>= function
+            (shift, []) <- constructorCall partial
+            guard (shift == miss)
+            pure (InlinedSubst rename, lookup_older)
+          _ -> Nothing
 
 -- Check the function used when a renaming crosses a binder.
 checkRenameExtension :: DC.DataCon -> DC.DataCon -> CoreExpr -> Maybe ()
@@ -373,21 +434,26 @@ constructorCall rhs = do
     con <- isDataConWorkId_maybe make <|> isDataConWrapId_maybe make
     pure (con, fields)
 
--- Observe only the original branch fields and proof variables.
-outcomes :: Id
-         -> (DC.DataCon, [Var], CoreExpr)
-         -> (DC.DataCon, [Var], CoreExpr)
+-- Check one lookup case per replacement. Only case evidence can
+-- relate the predecessor lookup to the declared outer context.
+outcomes :: DC.DataCon -> DC.DataCon -> [Var] -> Id -> [Id] -> CoreExpr
          -> Maybe (DC.DataCon, DC.DataCon, DC.DataCon)
-outcomes capture (hit, hit_binders, hit_rhs) (miss, miss_binders, miss_rhs) = do
-    guard (all (not . isValueVar) hit_binders)
-    Core.Var selected <- branchBody hit_binders hit_rhs
-    guard (selected == capture)
-    [field] <- pure (filter isValueVar miss_binders)
-    forwarded <- branchBody miss_binders miss_rhs
-    (Core.Var make, [Core.Var x]) <- application forwarded
-    guard (x == field)
-    con <- isDataConWorkId_maybe make <|> isDataConWrapId_maybe make
-    pure (hit, miss, con)
+outcomes hit miss scope argument captures expr = do
+    body <- branchBody scope expr
+    case captures of
+      [] -> do
+        (con, [Core.Var x]) <- constructorCall body
+        guard (x == argument)
+        pure (hit, miss, con)
+      capture : rest -> do
+        rows <- caseOn argument body
+        [(hit_bs, hit_rhs)] <- pure [(bs, e) | (dc, bs, e) <- rows, dc == hit]
+        [(miss_bs, miss_rhs)] <- pure [(bs, e) | (dc, bs, e) <- rows, dc == miss]
+        guard (length rows == 2 && all (not . isValueVar) hit_bs)
+        Core.Var selected <- branchBody (scope ++ hit_bs) hit_rhs
+        guard (selected == capture)
+        [older] <- pure (filter isValueVar miss_bs)
+        outcomes hit miss (scope ++ miss_bs) older rest miss_rhs
 
 function :: CoreExpr -> Maybe ([TyVar], [Id], CoreExpr)
 function expr = do
@@ -426,6 +492,7 @@ caseCoercion scope co = case co of
     GRefl _ _ MRefl -> True
     CoVarCo cv -> cv `elem` scope
     TyConAppCo _ _ cs -> all (caseCoercion scope) cs
+    TransCo a b -> caseCoercion scope a && caseCoercion scope b
     SubCo c -> caseCoercion scope c
     SymCo c -> caseCoercion scope c
     SelCo _ c -> caseCoercion scope c
@@ -435,10 +502,10 @@ isValueVar :: Id -> Bool
 isValueVar v = isId v && not (isCoVar v)
 
 allocateFamilies :: FamilyInputs -> TcM (Maybe (TyCon, [TyCon]))
-allocateFamilies (FamilyInputs owner context sort term ext lookup_tycon var hit miss recipes) = do
+allocateFamilies (FamilyInputs owner arity context sort term ext lookup_tycon var hit miss recipes) = do
     (closure, constructors) <- allocateClosure owner context sort term ext
     case constructors of
-      [replace, shift, lift] -> do
+      [replace, shift, lift, replace_next] -> do
         apply_name <- localName "$apply:"
         lookup_name <- localName "$lookup:"
         apply_axiom <- newImplicitBinder apply_name mkInstTyCoOcc
@@ -463,8 +530,11 @@ allocateFamilies (FamilyInputs owner context sort term ext lookup_tycon var hit 
         tree <- freshVar "t" (termAt gk bk)
         field <- freshVar "x" (lookupAt gk bk)
         carried <- freshVar "w" (termAt dk ak)
-        body <- freshVar "n" (termAt ctx_g_a bk)
-        arg <- freshVar "v" (termAt gk ak)
+        capture_kinds <- traverse (\_ -> freshVar "captureKind" sort) [1..arity]
+        let capture_sorts = mkTyVarTys capture_kinds
+            body_context = foldl' ctxAt gk capture_sorts
+        body <- freshVar "n" (termAt body_context bk)
+        args <- traverse (freshVar "v" . termAt gk) capture_sorts
         x_d <- freshVar "older" (lookupAt dk bk)
         let prepare (ctor, exten) = do
               let (ctor_tvs, tel) = splitForAllTyVars (tyConKind (DC.promoteDataCon ctor))
@@ -494,18 +564,21 @@ allocateFamilies (FamilyInputs owner context sort term ext lookup_tycon var hit 
                 let fields = mkTyVarTys vars
                     lhs = mkTyConApp (DC.promoteDataCon ctor) (mkTyVarTys tvs ++ fields)
                     env = mkTyVarTy env_var
-                    use lv value = do
+                    liftField 0 source = do
+                      guard (source `eqType` src)
+                      pure (dk, env)
+                    liftField depth source = do
+                      (scope, [outer, introduced]) <- splitTyConApp_maybe source
+                      guard (scope == ext)
+                      (target, inner) <- liftField (depth - 1) outer
+                      let extended = ctxAt target introduced
+                      lifted <- conAt lift (closureAt source extended) [inner]
+                      pure (extended, lifted)
+                    use depth value = do
                       (same, [source, k]) <- splitTyConApp_maybe (typeKind value)
                       guard (same == term)
-                      if lv
-                        then do
-                          (scope, [outer, introduced]) <- splitTyConApp_maybe source
-                          guard (scope == ext && outer `eqType` src)
-                          lifted <- conAt lift (closureAt source (ctxAt dk introduced)) [env]
-                          pure (apply_apply source (ctxAt dk introduced) k lifted value)
-                        else do
-                          guard (source `eqType` src)
-                          pure (apply_apply src dk k env value)
+                      (target, closure_value) <- liftField depth source
+                      pure (apply_apply source target k closure_value value)
                 out <- if ctor == var
                          then do [lookup_var] <- pure fields
                                  pure (lookup_apply src dk sort_k env lookup_var)
@@ -528,20 +601,33 @@ allocateFamilies (FamilyInputs owner context sort term ext lookup_tycon var hit 
                 sx <- conAt miss (lookupAt ctx_g_a bk) [x]
                 s_d <- conAt shift (closureAt dk ctx_d_a) []
                 let weaken = apply_apply dk ctx_d_a bk s_d (lookup_apply gk dk bk c x)
+                next <- conAt replace_next (closureAt ctx_g_a dk) [c,w]
                 pure [ mkBranch [d,a,carried] [ctx_d_a,dk,ak,r,z_in] w
                      , mkBranch [d,a,b,carried,x_d] [ctx_d_a,dk,bk,r,s_in] v_d
                      , mkBranch [g,a,b,field] [gk,ctx_g_a,bk,s,x] v_out
                      , mkBranch [g,d,a,cv] [ctx_g_a,ctx_d_a,ak,l,z_g] v0
-                     , mkBranch [g,d,a,b,cv,field] [ctx_g_a,ctx_d_a,bk,l,sx] weaken ]
+                     , mkBranch [g,d,a,b,cv,field] [ctx_g_a,ctx_d_a,bk,l,sx] weaken
+                     , mkBranch [g,d,a,cv,carried] [ctx_g_a,dk,ak,next,z_g] w
+                     , mkBranch [g,d,a,b,cv,carried,field] [ctx_g_a,dk,bk,next,sx]
+                         (lookup_apply gk dk bk c x) ]
         pure $ do
             apply_equations <- apply_branches
             lookup_equations <- lookup_branches
-            r <- conAt replace (closureAt ctx_g_a gk) [mkTyVarTy arg]
+            (first_sort, first_arg) : rest <- pure (zip capture_sorts (mkTyVarTys args))
+            let initial_context = ctxAt gk first_sort
+                addReplacement (src, env) (k, value) = do
+                    let next_context = ctxAt src k
+                    next <- conAt replace_next (closureAt next_context gk) [env,value]
+                    pure (next_context,next)
+            first <- conAt replace (closureAt initial_context gk) [first_arg]
+            (_, replacements) <- foldM addReplacement (initial_context,first) rest
             let result = termAt gk bk
-                t = apply_apply ctx_g_a gk bk r (mkTyVarTy body)
-                params = mkNamedTyConBinders Specified [g,a,b] ++ map mkAnonTyConBinder [body,arg]
-                arguments = mkTyVarTys [g,a,b,body,arg]
-                root_equation = mkBranch [g,a,b,body,arg] arguments t
+                t = apply_apply body_context gk bk replacements (mkTyVarTy body)
+                index_vars = g : capture_kinds ++ [b]
+                value_vars = body : args
+                vars = index_vars ++ value_vars
+                params = mkNamedTyConBinders Specified index_vars ++ map mkAnonTyConBinder value_vars
+                root_equation = mkBranch vars (mkTyVarTys vars) t
                 root = mkFamily root_name root_axiom params result [root_equation]
             guard (all validBranch (root_equation : apply_equations ++ lookup_equations))
             pure (root, [root,closure,apply,lookup_fam])
@@ -595,7 +681,8 @@ allocateClosure owner context_kind sort_kind term ext = do
     replace_name <- newImplicitBinder (idName owner) (mkDataOcc . tag "$replace:")
     shift_name <- newImplicitBinder (idName owner) (mkDataOcc . tag "$shift:")
     lift_name <- newImplicitBinder (idName owner) (mkDataOcc . tag "$lift:")
-    let names = [replace_name, shift_name, lift_name]
+    next_name <- newImplicitBinder (idName owner) (mkDataOcc . tag "$replaceNext:")
+    let names = [replace_name, shift_name, lift_name, next_name]
         tags = mkNameEnv (zip names [1..])
         ordinary = DC.HsSrcBang NoSourceText DC.NoSrcUnpack DC.NoSrcStrict
     source <- freshVar "source" context_kind
@@ -628,6 +715,10 @@ allocateClosure owner context_kind sort_kind term ext = do
         lift <- ctor lift_name [incoming,outgoing,binder] [incoming,outgoing,binder]
                   [DC.mkEqSpec source (extend incoming_ty), DC.mkEqSpec target (extend outgoing_ty)]
                   [applied incoming_ty outgoing_ty] (applied (extend incoming_ty) (extend outgoing_ty))
+        replace_next <- ctor next_name [incoming,binder] [incoming,target,binder]
+                          [DC.mkEqSpec source (extend incoming_ty)]
+                          [applied incoming_ty target_ty, mkTyConApp term [target_ty,binder_ty]]
+                          (applied (extend incoming_ty) target_ty)
         pure (mkAlgTyCon closure_name kind binders 0 liftedTypeKind [Nominal,Nominal] Nothing []
-                (mkLevPolyDataTyConRhs True True [replace,shift,lift]) (VanillaAlgTyCon closure_rep) True)
+                (mkLevPolyDataTyConRhs True True [replace,shift,lift,replace_next]) (VanillaAlgTyCon closure_rep) True)
     pure (closure, tyConDataCons closure)
