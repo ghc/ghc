@@ -3115,9 +3115,10 @@ tc_app_ty_external mode rn_ty exp_kind
       do { env <- getGblEnv
          ; if nameIsLocalOrFrom (tcg_semantic_mod env) name
            then case (lookupNameEnv (tcg_local_open_defs env) name, value_args) of
-             (Just (fun, _), Just [_])
+             (Just (fun, _), Just args)
                | isTypeLevel (mode_tyki mode), ordinary_call
                , Just table <- sourceTableOccurrence env fun >>= sourceTableId_maybe
+               , lengthIs args 1 || equalLength args (tyConVisibleTyVars table)
                -> do { sourceTableReferenceUse table
                      ; tc_app_ty_with_head mode rn_ty exp_kind (mkTyConTy table) }
              (Just (fun, _), Just args)

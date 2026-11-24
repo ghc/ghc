@@ -1,7 +1,7 @@
 -- | Closed type families for checked functions that match one constructor.
 module GHC.Tc.Gen.SourceTable (recordSourceUses, recordUnfoldedSourceUses, sourceTableTyCons, sourceCaseTables, sourceCharacterTables, sourceRetainedWitnessTables, publishRetainedRecordWitness, checkLocalRetainedWitnessExports, isMonomorphicRetainedWitness, finalCoreMappers, verifyFinalCoreMapper, failedFinalListTables, finalCoreSourceFamilies, isFinalCoreIdentity, indexedProjectionSource, isFinalCoreReverseWrapper, sourcePairBuilderField, lookupObservedPairField, lookupPairObserver, lookupPairRecipe, canObservePairSource, sourceRuleOwners, sourceTableOccurrence, tcLookupSourceTableId,
                               sourceTableCallees, sourceTableDependencies, sourceTableTypeUses, sourceTableFamilyUse,
-                              sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, monomorphicEnumCaseArity, groundFirstHead,
+                              sourceTableFamilyAppUse, sourceTableReferenceUse, sourceCaseKindUse, sourceCaseVisibleArity, isSourceConstructorCase, sourceTableOwner, monomorphicEnumCaseArity, groundFirstHead, sourceLocalBooleanCases,
                               isFinalStructuralSource, isStructuralSourceTable, isNominalStructuralSource,
                               visibleSourceMethodRules, hasSourceMethodRule, hasSourceMethodRuleAt,
                               sourceBinarySelector, sourceMapSelector, lookupSourceBinaryMethod, lookupSourceContainerMethod, lookupSourceGroundDFun, lookupSourceCheckedMapMethod, publishListFoldMethods, keepCheckedMapWorkers, publishCheckedMapMethods, sourceRuleOwnersAt, recordSourceMethodUse, recordSourceLiteralUse, sourceLiteralWorkers, isSourceFilterGuard,
@@ -192,7 +192,8 @@ sourceTableOwner table
                isJust (indexedProjectionSource fun))
         guard (tyConName actual == tyConName table ||
                (finalCoreMapperOwner fun && isFilterGuardFor actual table &&
-                maybe False (any ((== tyConName table) . tyConName)) (sourceTableCallees actual)))
+                maybe False (any ((== tyConName table) . tyConName)) (sourceTableCallees actual)) ||
+               (isNominalStructuralSource fun && booleanSelector actual == Just table))
         pure fun
   | otherwise = pure Nothing
 
@@ -2149,13 +2150,12 @@ sourceCaseTables binds = do
           predicate callee =
             checkedBranchPredicate (fromMaybe callee (lookupNameEnv checked_predicates (idName callee)))
       boolean_cases <- forM
-        [ (owner, signature, rows)
+        [ (owner, checked)
         | (owner, body, _, Nothing) <- prepared
         , partial_case_candidate owner
-        , Just (signature, rows) <- [checkedBooleanConstructorCase public predicate owner (prepare body)]
-        ] $ \(owner, signature@(ConstructorCaseType _ _ _ _ _ result), rows) -> do
-          select <- publishBooleanSelector owner result
-          table <- publishConstructorCase owner signature (selectConstructorRows select rows)
+        , Just checked <- [checkedBooleanConstructorCase public predicate owner (prepare body)]
+        ] $ \(owner, checked) -> do
+          (table, select) <- publishBooleanCase owner checked
           pure ((finalOwner owner table, table), select)
       let reverse_workers = mkNameEnv
             [(idName worker, table) | (Just (worker, table), _) <- final,
@@ -2347,6 +2347,63 @@ sourceRetainedWitnessTables definitions = do
         Nothing -> pure Nothing
       else pure Nothing
 
+-- | Certify demanded cases on a computed Boolean and their exact predicates.
+-- See Note [Local Boolean constructor equations].
+sourceLocalBooleanCases :: NameEnv (Id, Core.CoreExpr) -> NameEnv (Id, Core.CoreExpr)
+                        -> TcM ([(Id, TyCon)], [TyCon])
+sourceLocalBooleanCases roots definitions = do
+    env <- getGblEnv
+    rdr_env <- getGlobalRdrEnv
+    dflags <- getDynFlags
+    let available name
+          | nameModule_maybe name == Just (tcg_semantic_mod env) =
+              maybe False isLocalGRE (lookupGRE_Name rdr_env name)
+          | otherwise = ordinaryImport rdr_env name
+        public = visibleCaseType available
+        prepare = simpleOptExpr (initSimpleOpts dflags)
+        fresh owner = isNothing (sourceTableOccurrence env owner >>= sourceTableId_maybe)
+        ordered = sortBy (\a b -> stableNameCmp (idName (fst a)) (idName (fst b))) . nonDetNameEnvElts
+    predicates <- forM
+      [ (owner, signature, rows)
+      | (owner, body) <- ordered definitions
+      , fresh owner, Just sig <- [constructorCaseType (varType owner)]
+      , isTwoStructuralCase sig, typeKindResultBool sig
+      , Just (signature, rows) <- [checkedStructuralCase public owner (prepare body)]
+      ] $ \(owner, signature, rows) -> do
+        table <- publishConstructorCase owner signature rows
+        pure (owner, table)
+    let local = mkNameEnv [(idName owner, table) | (owner, table) <- predicates]
+        predicate callee = lookupNameEnv local (idName callee) <|>
+          (sourceTableOccurrence env callee >>= checkedBranchPredicate)
+    (cases, selectors) <- fmap unzip $ forM
+      [ (owner, checked)
+      | (owner, body) <- ordered roots
+      , fresh owner, isJust (partialConstructorCaseType (varType owner))
+      , Just checked <- [checkedBooleanConstructorCase public predicate owner (prepare body)]
+      ] $ \(owner, checked) -> do
+        (table, selector) <- publishBooleanCase owner checked
+        pure ((owner, table), selector)
+    let used = mkNameSet [tyConName callee | (_, table) <- cases
+                                         , callee <- fromMaybe [] (sourceTableCallees table)]
+    pure (filter ((`elemNameSet` used) . tyConName . snd) predicates ++ cases, selectors)
+  where
+    typeKindResultBool (ConstructorCaseType _ _ _ _ _ result) = result `eqType` boolTy
+
+{- Note [Local Boolean constructor equations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A constructor result can mention an ordinary function before final Core
+is available. For example, a beta-step constructor calls substitution on
+its open indices. The declaration scheduler checks the function and its
+dependencies first. Use the solved, zonked Core to check its constructor
+rows with the same checkers as interface publication. A Boolean test can
+use only an already checked predicate on two structural operands.
+
+Publish the equations and private selector before checking the
+constructor result. The nominal equations can now occur in a type or
+coercion, so final Core publication preserves them. The usual source
+rule checks apply to the case and to the predicate.
+-}
+
 -- | Publish the equation of the generated first selector of a retained record.
 -- The generated match returns the first field of this exact constructor.
 publishRetainedRecordWitness :: DataCon -> Id -> TcM TyCon
@@ -2361,8 +2418,9 @@ publishRetainedRecordWitness con owner
        ; publishConstructorCase owner signature [ConstructorCaseRow [lhs] (CaseField witness)] }
   | otherwise = pprPanic "publishRetainedRecordWitness: invalid selector" (ppr owner)
 
--- | Validate the exports that were unavailable when checking local witnesses.
--- See Note [Retained field kinds in source equations].
+-- | Validate the exports that were unavailable when checking local cases.
+-- See Note [Retained field kinds in source equations] and
+-- Note [Local Boolean constructor equations].
 checkLocalRetainedWitnessExports :: TcGblEnv -> [Id] -> TcM ()
 checkLocalRetainedWitnessExports env owners = do
     let exported = availsToNameSet (tcg_exports env)
@@ -2381,7 +2439,29 @@ checkLocalRetainedWitnessExports env owners = do
                            ++ occNameString (nameOccName (dataConName con)) ++ " to make it available."
               setSrcSpan (nameSrcSpan (fromMaybe name dependent)) $
                 addErr (TcRnOpenTypeEval name dependent reason)
+          | isNominalStructuralSource owner
+          , isJust (booleanSelector table)
+          , hidden : _ <- unexported_case_types exported table -> do
+              let name = idName owner
+                  reason = "The dependent type needs this equation. Export the constructors of "
+                           ++ occNameString (nameOccName hidden) ++ " to make it available."
+              setSrcSpan (nameSrcSpan name) $
+                addErr (TcRnOpenTypeEval name Nothing reason)
         _ -> pure ()
+  where
+    unexported_case_types exported table =
+      sortBy stableNameCmp $
+        [ name | tc <- nonDetEltsUniqSet (tyConsOfTypes (concatMap equation_types tables))
+               , let parent = maybe tc dataConTyCon (isPromotedDataCon_maybe tc)
+                     name = tyConName parent
+               , isAlgTyCon parent, nameModule_maybe name == Just (tcg_semantic_mod env)
+               , not (publicCaseType env exported (const False) parent) ]
+      where
+        tables = table : fromMaybe [] (sourceTableCallees table)
+        equation_types tc = tyConKind tc :
+          [ ty | axiom <- maybeToList (closedFamilyTyConCoAxiom_maybe tc)
+               , branch <- fromBranches (coAxiomBranches axiom)
+               , ty <- coAxBranchRHS branch : coAxBranchLHS branch ++ map tyVarKind (coAxBranchTyVars branch) ]
 
 -- | The early witness path only considers signatures accepted by this rule.
 isMonomorphicRetainedWitness :: Id -> Bool
@@ -2861,6 +2941,7 @@ isTwoStructuralCaseTable table =
 isStructuralSourceTable :: TyCon -> Bool
 isStructuralSourceTable table
   | isReverseWorkerTable table = True
+  | isJust (booleanSelector table) = True
   | isTwoStructuralCaseTable table
   , Just axiom <- closedFamilyTyConCoAxiom_maybe table
   = any matches_second (fromBranches (coAxiomBranches axiom))
@@ -4558,8 +4639,9 @@ isPartialConstructorCaseTable table = isJust $ do
 -- See Note [Checked Boolean branches].
 checkedBranchPredicate :: Id -> Maybe TyCon
 checkedBranchPredicate callee = do
-    guard (isFinalStructuralSource callee)
     table <- sourceTableId_maybe callee
+    guard (isFinalStructuralSource callee ||
+           (isNominalStructuralSource callee && isTwoStructuralCaseTable table))
     guard (tyConResKind table `eqType` boolTy)
     pure table
 
@@ -4573,6 +4655,13 @@ checkedBooleanConstructorCase public predicate owner rhs = do
   where
     checked_guard (ConstructorCaseRow _ CaseBoolean{}) = True
     checked_guard _ = False
+
+-- | Install the same private branch selector for early and interface equations.
+publishBooleanCase :: Id -> (ConstructorCaseType, [ConstructorCaseRow]) -> TcM (TyCon, TyCon)
+publishBooleanCase owner (signature@(ConstructorCaseType _ _ _ _ _ result), rows) = do
+    select <- publishBooleanSelector owner result
+    table <- publishConstructorCase owner signature (selectConstructorRows select rows)
+    pure (table, select)
 
 -- | Recover the private selector of an ordinary constructor case.
 booleanSelector :: TyCon -> Maybe TyCon
