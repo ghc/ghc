@@ -2811,7 +2811,7 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
         native_data_alt siblings name names = do
           dc <- tcIfaceDataCon name
           let structural = isNativeIndexDataAlt dc names ||
-                (isNativeOpaqueOrdinaryCon dc && isNativeIndexedDataAlt dc names
+                (isNativeOpaqueOrdinaryCon dc && isNativeIndexedDataAlt dc names && hasNoDups names
                  && isNativeIndexType (exprType scrut'))
           unless (structural && dataConHasPromotedRetainedSiblings dc == siblings) $
             failIfM (text "Missing or unsupported constructor proof in interface alternative:" <+> ppr dc <+> ppr names)
