@@ -1969,12 +1969,10 @@ sourceTableTyCons :: Bool -> LHsBinds GhcTc -> TcM [(Id, TyCon)]
 sourceTableTyCons local binds = do
     strict <- xoptM LangExt.Strict
     structural <- if local && not strict
-                  then catMaybes <$> traverse (runMaybeT . localStructuralTable . unLoc) binds
+                  then fmap catMaybes $ forM binds $ \bind ->
+                    runMaybeT (localStructuralTable (unLoc bind) <|> localListReverseTable bind)
                   else pure []
-    reverse_workers <- if local && not strict
-                       then catMaybes <$> traverse (runMaybeT . localListReverseTable) binds
-                       else pure []
-    collect strict (structural ++ reverse_workers) candidates
+    collect strict structural candidates
   where
     candidates = mapMaybe (sourceRows . unLoc) binds
     candidate_names = extendNameSetList emptyNameSet [idName f | (f, _, _, _) <- candidates]
@@ -3097,6 +3095,9 @@ publication. At this point the module has checked all user declarations.
 See Note [Nullary indexed source projections].
 The new private family is available to neither user declarations nor the
 helper collector. A no-code producer does not create it.
+
+A local signature can instead require an ordinary nominal table. See
+Note [Checked list reverse]. Do not remove that table after optimization.
 
 Before Tidy the driver checks the final optimized definition of the same
 owner with the same structural test. This check covers the actual callback,

@@ -2612,10 +2612,12 @@ can add a dependency. Compare the renamed element Name with the binder.
 Only schedule a lifted type binder with no further kind dependencies.
 
 For a binary function such as plus (S n) m = S (plus n m), the second
-domain is also a declaration dependency. The second pattern binds a
-variable that the recursive call must pass unchanged. Only fields of the
-first pattern can supply the decreasing argument. Check each recursive operand
-in the typed producer before constructing an axiom. Return all requested
+domain is also a declaration dependency. The general source row passes
+the second pattern's variable unchanged. Only fields of the first pattern
+can supply the decreasing argument. A list worker with one element type
+can also push the head onto the accumulator while recursing on the tail.
+See Note [Checked list reverse] in GHC.Tc.Gen.SourceTable. Check the
+recursive operands before constructing an axiom. Return all requested
 names so the caller can report an uncertified table at the source binding.
 
 A call to another signed source function introduces a dependency between
@@ -2834,7 +2836,7 @@ splitLocalSourceTables use dus group@HsGroup{hs_valds = vals@(XValBindsLR (HsVBG
     result_dependencies :: HsOuterSigTyVarBndrs GhcRn -> LHsType GhcRn -> Maybe [(Name, Int)]
     result_dependencies outer ty = case unLoc (ignoreParens ty) of
       HsFunTy _ (HsModifiedFunArr _ [] HsStandardArr{}) carried result
-        | Just [_] <- outer_vars outer -> do
+        | TableInType{} <- use, Just [_] <- outer_vars outer -> do
             deps <- domain_dependencies outer carried
             res <- domain_dependencies outer result
             pure (deps ++ res)

@@ -146,6 +146,9 @@ test('NativeOpenInstalledReverse',
                                                'PreludeMapLengthSource.hs', 'PreludeMapLengthProof.hs']]
                   + ['NativeOpenInstalledReverseProducer.hs'])],
      run_command, ['bash NativeOpenInstalledReverse.sh "{compiler}" "{libdir}"'])
+test('NativeLocalListAccumulator',
+     [req_host_target_ghc, only_ways(['normal']), extra_files(['NativeLocalListAccumulator.hs'])],
+     run_command, ['bash NativeLocalListAccumulator.sh "{compiler}" "{libdir}"'])
 
 test('NativeOpenIndexedAppend',
      [req_interp, req_rts_linker, only_ways(['normal']),
