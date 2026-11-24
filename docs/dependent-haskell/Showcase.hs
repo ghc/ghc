@@ -175,6 +175,7 @@ import qualified OrdinaryFamilyBranches
 import qualified PreludeFoldrProof
 import qualified PreludeZipProof
 import qualified HaskLib
+import qualified CastedConstructorGivens as TreeProof
 import qualified SumOfSizes
 import qualified Client as HaskLibClient
 import qualified PreludeZipWithLengthProof
@@ -1957,6 +1958,11 @@ main = do
     observe "apply the same partially applied addition to equal sizes"
         (HaskLibClient.addUnder prefixBound prefixBound HaskLib.Zero)
     observe "compare a runtime size with itself" (HaskLib.eqSize prefixBound prefixBound, HaskLib.eqSizeRefl prefixBound)
+    let treeProof = TreeProof.Both TreeProof.Here (TreeProof.Both TreeProof.Here TreeProof.Here)
+        relation = TreeProof.Branches TreeProof.Same (TreeProof.Branches TreeProof.Same TreeProof.Same)
+    case TreeProof.preserve relation treeProof of
+        TreeProof.Both TreeProof.Here (TreeProof.Both TreeProof.Here TreeProof.Here) ->
+            observe "transport evidence for three leaves across related trees" True
     case SumOfSizes.plusExists prefixBound prefixBound of
         Sigma.Pair k Refl -> observe "read the sum with its equality proof" k
     prefixInput <- newIORef (True : error "forced the list beyond the prefix") >>= readIORef

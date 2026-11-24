@@ -551,6 +551,7 @@ prove that reverse preserves list length: (Refl,Succ (Succ Zero))
 pass size as a callback and check the reversed list length: Succ (Succ Zero)
 apply the same partially applied addition to equal sizes: Refl
 compare a runtime size with itself: (True,Refl)
+transport evidence for three leaves across related trees: True
 read the sum with its equality proof: Succ (Succ Zero)
 take a runtime-bounded prefix and prove its length: ([True],Refl)
 prove that map distributes over append: (Refl,[False,True,False],[False,True,False],(True,True))
