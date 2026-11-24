@@ -93,8 +93,10 @@ and 562 build products have been retired. Their Git revisions and test
 receipts remain available. The exact 7.81 GB inventory is in
 `_build/on-demand/retirement-560-562-for-plfh-20261124`.
 
-The GHC queue has two slots. Other benchmark jobs take priority and freeze
-the GHC slice. Jobs 1947 and 1949 were exploratory allocation measurements.
+The GHC queue has two slots. Local benchmark jobs take priority and freeze
+the GHC slice. The remote Colab benchmark uses the
+`colab-inkling-graded-*` label in the `build` group and runs alongside GHC.
+Jobs 1947 and 1949 were exploratory allocation measurements.
 Both pilot harnesses are retired. Their prompts, draft code and measurements
 are archived for reference under `_build/reference-only`. Active performance
 work needs independently written benchmarks. OpenCode reviews stopped on 24 November 2026. The coordinator and the
