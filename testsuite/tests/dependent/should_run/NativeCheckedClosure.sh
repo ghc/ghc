@@ -43,3 +43,11 @@ for opt in -O0 -O2; do
         fi
     done
 done
+
+mkdir "$work/interactive"
+cd "$work/interactive"
+cp "$inputs/NativeCheckedClosureProvider.hs" "$inputs/NativeCheckedClosure.hs" .
+"${ghc[@]}" --interactive -ignore-dot-ghci -fwrite-source-equations \
+    NativeCheckedClosure.hs -e 'print caseBinder' >observed
+grep -Fxq Refl observed
+test ! -e NativeCheckedClosureProvider.o

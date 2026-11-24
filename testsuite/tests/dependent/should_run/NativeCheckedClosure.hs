@@ -28,6 +28,16 @@ caseBinder :: P.replace
                 P.Lit :~: P.Test P.Lit P.Lit (P.At P.New)
 caseBinder = Refl
 
+type CanStep :: forall g a. P.Expr g a -> Type
+data CanStep m where
+    CanStep :: Step m n -> CanStep m
+
+-- Loop has no result equality of its own in this indexed datatype.
+loopStep :: forall (a :: P.Sort). foreach (m :: P.Expr P.Empty a) -> Maybe (CanStep m)
+loopStep m = case m of
+    P.Loop body -> Just (CanStep (Unroll @P.Empty @a @body))
+    _ -> Nothing
+
 #ifdef WRONG_CAPTURE
 captured :: Step (P.Call (P.Bind Body) Inserted)
                  (P.Bind (P.Bind (P.At P.New)))
