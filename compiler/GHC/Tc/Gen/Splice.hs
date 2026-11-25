@@ -1146,12 +1146,14 @@ convertAnnotationWrapper fhv = do
 runQinTcM :: TH.Q a -> TcM a
 runQinTcM (TH.Q act) = withRunInIO $ \runInIO -> act (metaHandlersTcM runInIO)
 
+#if defined(HAVE_INTERNAL_INTERPRETER)
 -- | Like 'runQinTcM' but forcing methods' arguments, to trigger exceptions
 --   originating from the splice.
 --
 -- See Note [Exceptions in TH]
 runQinTcM' :: TH.Q a -> TcM a
 runQinTcM' (TH.Q act) = withRunInIO $ \runInIO -> act (TH.forceMetaHandlersArgs $ metaHandlersTcM runInIO)
+#endif
 
 runRemoteModFinalizers :: ThModFinalizers -> TcM ()
 runRemoteModFinalizers (ThModFinalizers finRefs) = do
