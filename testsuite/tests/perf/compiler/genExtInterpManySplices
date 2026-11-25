@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# One module with many trivial splices
+NSPLICES=1000
+{
+  echo "{-# LANGUAGE TemplateHaskell #-}"
+  echo "module ExtInterpManySplices where"
+  echo "import Language.Haskell.TH.Syntax"
+  for i in $(seq $NSPLICES); do
+    echo "x$i :: Int"
+    echo "x$i = \$(lift ($i :: Int))"
+  done
+} > ExtInterpManySplices.hs

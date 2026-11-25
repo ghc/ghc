@@ -890,3 +890,15 @@ test ('T26989',
       multimod_compile,
       ['T26989', '-v0 -O'])
 
+# Compile many trivial splices with -fno-code, to try and isolate the cost of communication with ext-interp.
+# Introduced as a test against a regression that had been introduced in the async-rpc branch work.
+test('ExtInterpManySplices',
+     [ collect_compiler_stats('bytes allocated', 2),
+       req_th,
+       unless(config.have_ext_interp, skip),
+       pre_cmd('./genExtInterpManySplices'),
+       extra_files(['genExtInterpManySplices']),
+       only_ways(['normal']),
+     ],
+     compile,
+     ['-fno-code -fexternal-interpreter'])
