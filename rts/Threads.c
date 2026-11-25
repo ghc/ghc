@@ -440,7 +440,17 @@ wakeBlockingQueue(Capability *cap, StgBlockingQueue *bq)
         if (i != &stg_IND_info) {
             ASSERT(i == &stg_MSG_BLACKHOLE_info);
             tryWakeupThread(cap,msg->tso);
+
         }
+    }
+
+    // Changing the closure type to IND makes these fields inaccessible,
+    // so we need to push them to the update remembered set.
+    // See Note [Update remembered set] in rts/sm/NonMovingMark.c
+    IF_NONMOVING_WRITE_BARRIER_ENABLED {
+      updateRemembSetPushClosure(cap, (StgClosure *) bq->bh);
+      updateRemembSetPushClosure(cap, (StgClosure *) bq->owner);
+      updateRemembSetPushClosure(cap, (StgClosure *) bq->queue);
     }
 
     // overwrite the BQ with an indirection so it will be

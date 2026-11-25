@@ -1,0 +1,8 @@
+section: rts
+synopsis: Fix the nonmoving GC sending spurious NonTermination exceptions
+description:
+  We fix the nonmoving GC's logic for waking up threads blocked on a thunk, which had
+  a bug leading to threads being falsely being GC'd too soon.
+  This could lead to spurious NonTermination exceptions.
+mrs: !17050
+issues: #28171

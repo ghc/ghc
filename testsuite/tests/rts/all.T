@@ -807,3 +807,9 @@ test('T27376',
        only_ways(['nonmoving_thr', 'nonmoving_thr_sanity']),
        extra_run_opts('+RTS -A2m -RTS') ],
      compile_and_run, ['-O2'])
+
+test('T28171',
+     [ req_target_smp,
+       extra_ways(['nonmoving_thr', 'nonmoving_thr_sanity']),
+       only_ways(['nonmoving_thr', 'nonmoving_thr_sanity'])],
+     compile_and_run, [''])
