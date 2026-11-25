@@ -1,5 +1,4 @@
-ghc: Failed to lookup symbol: unload_wkr_throw_missing_symbol, you might consider using --optimistic-linking
-
+ghc: Failed to lookup symbol: unload_wkr_throw_missing_symbol
 ghc: Could not load Object Code UnloadWkrB.o.
 
 could not load dependencies for decls

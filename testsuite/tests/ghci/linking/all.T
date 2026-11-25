@@ -106,6 +106,7 @@ def normalise_unload_wkr(s):
     # the iserv binary, which GHC generates into a temporary directory.
     # normalise_errmsg only knows how to normalise the compiler's own name.
     s = re.sub(r'^ghc_tmp_\d+\.iserv:', 'ghc:', s, flags=re.M)
+    s = re.sub(r', you might consider using --optimistic-linking\n', '', s)
     return s
 
 test('unload_wkr-throw',
