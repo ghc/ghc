@@ -184,8 +184,10 @@ def shorten_metric_name(name: str) -> str:
 # I/O manager discovery for a haskell binary. Returns the set of IO Manager
 # strings supported by the binary
 def discover_io_managers(hs_exe: Union[str, Path], cwd: Union[str, Path]) -> Set[str]:
+    # We must use an absolute path for the executable. Relative paths break on windows.
+    hs_exe_path = Path(cwd).joinpath(hs_exe)
     rp = subprocess.run(
-        [str(hs_exe), '+RTS', '--info', '-RTS'],
+        [hs_exe_path, '+RTS', '--info', '-RTS'],
         cwd=cwd,
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL)
