@@ -1216,6 +1216,9 @@ project-version:
   artifacts:
     paths:
       - version.sh
+  rules:
+    - if: '$NIGHTLY'
+    - if: '$RELEASE_JOB == "yes"'
 
 .ghcup-metadata:
   stage: deploy
