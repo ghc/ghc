@@ -26,7 +26,7 @@ prog025a:
 	$(LOCAL_GHC_PKG01) hide testpkg-0.2.0.0
 	$(LOCAL_GHC_PKG01) list
 
-	'$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) $(WAY_FLAGS) $(ghciWayFlags) \
+	'$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) $(ghciWayFlags) \
 		-no-user-package-db -fno-code -unit @unitA < prog025a.script
 
 # Same as prog025a, but the home unit arguments are not provided using a response file
@@ -49,6 +49,6 @@ prog025b:
 	$(LOCAL_GHC_PKG01) list
 
 	# Uses response file for argument, doesn't use it as a -unit argument
-	'$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) $(WAY_FLAGS) $(ghciWayFlags) \
+	'$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) $(ghciWayFlags) \
 		-no-user-package-db -fno-code \
 		@unitA < prog025b.script

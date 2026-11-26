@@ -29,5 +29,5 @@ prog-mhu007:
 	$(LOCAL_GHC_PKG_BAR) hide testpkg-bar
 	$(LOCAL_GHC_PKG_BAR) list
 
-	'$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) $(WAY_FLAGS) $(ghciWayFlags) \
+	'$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) $(ghciWayFlags) \
 		-no-user-package-db -fno-code -unit @unitA -unit @unitB < prog-mhu007.script
