@@ -27,10 +27,11 @@ ghci024:
 	    | grep -E "^([^ ]|  -package|base|ghc-prim|integer|rts|Cabal)" \
 	    | sed "s/Cabal-[0-9.]*/Cabal-VERSION/"
 
-.PHONY: ghci037
-ghci037:
-	'$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE)                   < ghci037.script
-	'$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -fno-ghci-sandbox < ghci037.script
+.PHONY: ghci037 ghci037ext
+ghci037ext: GHCI037_OPTS = -fexternal-interpreter
+ghci037 ghci037ext:
+	'$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) $(GHCI037_OPTS)                   < ghci037.script
+	'$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) $(GHCI037_OPTS) -fno-ghci-sandbox < ghci037.script
 
 ghci056_setup:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c ghci056_c.c
