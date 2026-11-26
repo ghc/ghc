@@ -6,6 +6,10 @@
 # Run `ci.sh usage` for usage information.
 set -Eeuo pipefail
 
+# Unset some of GitLab's pre-defined CI variables to avoid running into issues
+# with Windows environment length restrictions when the commit message is too large.
+unset CI_COMMIT_MESSAGE CI_COMMIT_DESCRIPTION CI_MERGE_REQUEST_DESCRIPTION
+
 # Configuration:
 # N.B. You may want to also update the index-state in hadrian/cabal.project.
 HACKAGE_INDEX_STATE="2026-03-10T17:36:36Z"
