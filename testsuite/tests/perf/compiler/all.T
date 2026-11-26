@@ -403,6 +403,7 @@ test('MultiLayerModulesTH_Make',
        # See Note [MultiLayerModules* test timeout]
        compile_timeout_multiplier(5),
        when(arch('wasm32'), fragile(25336)),
+       when(js_arch(), high_memory_usage), # #28190
        # We skip the test on darwin due to recent regression due to toolchain
        # upgrade (tracked in #24177)
        when(opsys('darwin'), skip)
@@ -419,6 +420,7 @@ test('MultiLayerModulesTH_OneShot',
        # See Note [MultiLayerModules* test timeout]
        compile_timeout_multiplier(5),
        when(arch('wasm32'), fragile(25336)),
+       when(js_arch(), high_memory_usage), # #28190
        # We skip the test on darwin due to recent regression due to toolchain
        # upgrade (tracked in #24177)
        when(opsys('darwin'), skip)
