@@ -271,7 +271,8 @@ test('T21969',
        extra_run_opts('50000'),
        run_timeout_multiplier(0.3), # default timeout seems to be 300, but lockups happen quickly
        req_target_smp,
-       req_ghc_smp
+       req_ghc_smp,
+       all_available_io_managers,
      ],
      compile_and_run, [''])
 
@@ -289,24 +290,28 @@ test('T21969',
 test('T21969a',
      [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
        when(opsys('mingw32'),skip), # POSIX only
+       all_available_io_managers,
      ],
      compile_and_run, [''])
 
 test('T21969b',
      [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
        when(opsys('mingw32'),skip), # POSIX only
+       all_available_io_managers,
      ],
      compile_and_run, [''])
 
 test('T21969c',
      [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
        when(opsys('mingw32'),skip), # POSIX only
+       all_available_io_managers,
      ],
      compile_and_run, [''])
 
 test('T21969d',
      [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
        when(opsys('mingw32'),skip), # POSIX only
+       all_available_io_managers,
      ],
      compile_and_run, [''])
 
@@ -314,12 +319,14 @@ test('T21969e',
      [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
        when(opsys('mingw32'),skip), # POSIX only
        run_timeout_multiplier(0.3),
+       all_available_io_managers,
      ],
      compile_and_run, [''])
 
 test('T21969f',
      [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
        when(opsys('mingw32'),skip), # POSIX only
+       all_available_io_managers,
      ],
      compile_and_run, [''])
 

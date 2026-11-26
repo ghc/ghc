@@ -408,6 +408,7 @@ test('T10590', [ ignore_stderr
                , when(opsys('mingw32'), skip)
                , js_skip # JS backend doesn't support pipes
                , req_process
+               , all_available_io_managers
                ], compile_and_run, [''])
 
 # Run with stdin and stdout closed -- that is what leaves those descriptors
