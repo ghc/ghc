@@ -100,6 +100,8 @@ test('T25155', [req_c, req_th, req_interp, req_rts_linker, extra_files(['T25155_
 
 def normalise_unload_wkr(s):
     import re
+    # normalise line endings
+    s = s.replace("\r\n","\n")
     # The failing object is named with the full path of the test directory.
     s = re.sub(r'(Could not load Object Code ).*(UnloadWkrB\.o)', r'\1\2', s)
     # With -fexternal-interpreter the messages are prefixed with the name of
@@ -108,12 +110,11 @@ def normalise_unload_wkr(s):
     s = re.sub(r'^ghc_tmp_\d+\.iserv:', 'ghc:', s, flags=re.M)
     s = re.sub(r', you might consider using --optimistic-linking\n', '', s)
     s = re.sub(r'_unload_wkr_throw_missing_symbol', 'unload_wkr_throw_missing_symbol', s)
-    s = re.sub(
-        r"^ghc:\s+\|\s+.*?: unknown symbol `([^']+)'$",
-        r"ghc: Failed to lookup symbol: \1",
-        s,
-        flags=re.M,
-    )
+    s = re.sub(r"^ghc(?:\.exe)?:\s+\|\s+.*?: unknown symbol [`‘]([^'’\n]+)['’]$",
+               r"ghc: Failed to lookup symbol: \1",
+               s,
+               flags=re.M,
+              )
     return s
 
 test('unload_wkr-throw',
