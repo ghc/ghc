@@ -376,6 +376,13 @@ as such you shouldn't need to set any of them explicitly. A flag
 
     and then ``sum`` can inline to potentially cancel away the ``I#`` box.
 
+    With :ghc-flag:`-fno-cpr-anal`, CPR analysis does not run at all. As a
+    result the module's interface file records no CPR information (other
+    than for functions that definitely diverge), so CPR analysis in
+    importing modules sees less. CPR analysis also does not run with
+    :ghc-flag:`-fno-worker-wrapper`, because its results are used only by
+    the worker/wrapper transformation.
+
     Here's an example of the function that *does not* return a constructed product: ::
 
          f :: [Int] -> (Int -> Int) -> Int
@@ -788,16 +795,19 @@ as such you shouldn't need to set any of them explicitly. A flag
     it on keeps all auto-generated rules.
 
 .. ghc-flag:: -flate-dmd-anal
-    :shortdesc: Run demand analysis again, at the end of the
-        simplification pipeline
+    :shortdesc: Run demand analysis, CPR analysis and worker/wrapper
+        again, late in the simplification pipeline
     :type: dynamic
     :reverse: -fno-late-dmd-anal
     :category:
 
     :default: off
 
-    Run demand analysis again, at the end of the simplification
-    pipeline. We found some opportunities for discovering strictness
+    Run the demand analysis, CPR analysis and worker/wrapper passes a
+    second time, late in the simplification pipeline. Each of these
+    passes runs only if its own flag (:ghc-flag:`-fstrictness`,
+    :ghc-flag:`-fcpr-anal`, :ghc-flag:`-fworker-wrapper`) is on.
+    We found some opportunities for discovering strictness
     that were not visible earlier; and optimisations like
     :ghc-flag:`-fspec-constr` can create functions with unused arguments which
     are eliminated by late demand analysis. Improvements are modest, but
@@ -1907,6 +1917,7 @@ as such you shouldn't need to set any of them explicitly. A flag
     :shortdesc: Enable the worker/wrapper transformation. Implied by :ghc-flag:`-O`
         and by :ghc-flag:`-fstrictness`.
     :type: dynamic
+    :reverse: -fno-worker-wrapper
     :category:
 
     :default: off but enabled by :ghc-flag:`-O`.

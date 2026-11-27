@@ -141,9 +141,6 @@ data WwOpts
     wo_fam_envs          :: !FamInstEnvs
   , -- | Options for the "Simple optimiser"
     wo_simple_opts       :: !SimpleOpts
-  , -- | Whether to enable "Constructed Product Result" analysis.
-    -- (Originally from DOI: 10.1017/S0956796803004751)
-    wo_cpr_anal          :: !Bool
   , -- | Used for absent argument error message
     wo_module            :: !Module
   , -- | Generate workers even if the only effect is some args get passed
@@ -1603,9 +1600,7 @@ mkWWcpr_entry
              CoreExpr -> CoreExpr,     -- New wrapper. 'nop_fn' if not useful
              CoreExpr -> CoreExpr)     -- New worker.  'nop_fn' if not useful
 -- ^ Entrypoint to CPR W/W. See Note [Worker/wrapper for CPR] for an overview.
-mkWWcpr_entry opts body_ty body_cpr
-  | not (wo_cpr_anal opts) = return (boringSplit, nop_fn, nop_fn)
-  | otherwise = do
+mkWWcpr_entry opts body_ty body_cpr = do
     -- Part (1)
     res_bndr <- mk_res_bndr body_ty
     let bind_res_bndr body scope = mkDefaultCase body res_bndr scope

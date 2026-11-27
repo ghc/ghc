@@ -132,6 +132,7 @@ getCoreToDo dflags hpt_rule_base extra_vars
     call_arity    = gopt Opt_CallArity                    dflags
     exitification = gopt Opt_Exitification                dflags
     strictness    = gopt Opt_Strictness                   dflags
+    cpr_anal      = gopt Opt_CprAnal                      dflags
     full_laziness = gopt Opt_FullLaziness                 dflags
     do_specialise = gopt Opt_Specialise                   dflags
     do_float_in   = gopt Opt_FloatIn                      dflags
@@ -172,14 +173,30 @@ getCoreToDo dflags hpt_rule_base extra_vars
     simpl_gently = CoreDoSimplify $ initSimplifyOpts dflags extra_vars max_iter
                                     (initGentleSimplMode dflags) hpt_rule_base
 
-    dmd_cpr_ww = if ww_on then [CoreDoDemand True,CoreDoCpr,CoreDoWorkerWrapper]
-                          else [CoreDoDemand False] -- NB: No CPR! See Note [Don't change boxity without worker/wrapper]
-
-
-    demand_analyser = (CoreDoPasses (
-                           dmd_cpr_ww ++
-                           [simplify "post-worker-wrapper"]
-                           ))
+    -- Demand analysis, CPR analysis, worker/wrapper, and a simplifier run
+    -- to clean up.  Each is controlled by its own flag, as follows
+    --
+    --   * Demand analysis runs if -fstrictness is on; it does boxity
+    --     analysis only if worker/wrapper follows, hence (CoreDoDemand ww_on)
+    --
+    --   * CPR analysis runs if -fcpr-anal is on, but only if worker/wrapper
+    --     follows. See Note [Don't change boxity without worker/wrapper]
+    --     in GHC.Core.Opt.DmdAnal
+    --
+    --   * Worker/wrapper runs if -fworker-wrapper is on, and at
+    --     least one of the analyses has run.
+    --
+    --   * The simplifier runs if at least one of the analyses has run,
+    --     regardless of worker/wrapper
+    dmd_cpr_ww simpl_name
+      = CoreDoPasses
+          [ runWhen strictness             (CoreDoDemand ww_on)
+          , runWhen do_cpr                 CoreDoCpr
+          , runWhen do_ww                  CoreDoWorkerWrapper
+          , runWhen (strictness || do_cpr) (simplify simpl_name) ]
+      where
+        do_cpr = ww_on && cpr_anal
+        do_ww  = ww_on && (strictness || do_cpr)
 
     add_caller_ccs =
         runWhen (profiling && not (null $ callerCcFilters dflags)) CoreAddCallerCcs
@@ -259,7 +276,7 @@ getCoreToDo dflags hpt_rule_base extra_vars
             ],
 
         -- Strictness analysis
-        runWhen strictness demand_analyser,
+        dmd_cpr_ww "post-worker-wrapper",
 
         runWhen exitification CoreDoExitify,
             -- See Note [Placement of the exitification pass]
@@ -319,16 +336,14 @@ getCoreToDo dflags hpt_rule_base extra_vars
 
         ---------  End of -O2 passes --------------
 
-        runWhen late_dmd_anal $ CoreDoPasses (
-            dmd_cpr_ww ++ [simplify "post-late-ww"]
-          ),
+        runWhen late_dmd_anal $ dmd_cpr_ww "post-late-ww",
 
         -- Final run of the demand_analyser, ensures that one-shot thunks are
         -- really really one-shot thunks. Only needed if the demand analyser
         -- has run at all. See Note [Final Demand Analyser run] in GHC.Core.Opt.DmdAnal
         -- It is EXTREMELY IMPORTANT to run this pass, otherwise execution
         -- can become /exponentially/ more expensive. See #11731, #12996.
-        runWhen (strictness || late_dmd_anal) (CoreDoDemand False),
+        runWhen strictness (CoreDoDemand False),
 
         maybe_rule_check FinalPhase,
 

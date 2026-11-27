@@ -1,0 +1,21 @@
+section: compiler
+synopsis:
+  ``-fno-cpr-anal`` now switches off CPR analysis itself, rather than just
+  stopping worker/wrapper from using its results.
+issues: #28187
+mrs: !17063
+description: {
+  Previously CPR analysis ran whenever worker/wrapper was enabled, regardless
+  of ``-fcpr-anal``. Now each of the demand analyser, CPR analyser and
+  worker/wrapper passes is controlled by its own flag:
+
+  - Demand analysis runs if ``-fstrictness`` is on.
+  - CPR analysis runs if both ``-fcpr-anal`` and ``-fworker-wrapper`` are on.
+  - Worker/wrapper runs if ``-fworker-wrapper`` is on and at least one of
+    the two analyses has run.
+
+  One consequence is that a module compiled with ``-fno-cpr-anal`` has no
+  CPR information in its interface file, so CPR analysis in importing
+  modules sees less. Also, ``-fno-strictness -fworker-wrapper`` now runs CPR
+  analysis and worker/wrapper, where previously it ran neither.
+}

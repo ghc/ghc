@@ -195,7 +195,8 @@ to transfer over the previous boxity to the new demand signature, in
 `setIdDmdAndBoxSig`.
 
 Why isn't CprAnal configured with a similar flag? Because if we aren't going to
-do worker/wrapper we don't run CPR analysis at all. (see GHC.Core.Opt.Pipeline)
+do worker/wrapper we don't run CPR analysis at all. (see `dmd_cpr_ww` in
+GHC.Core.Opt.Pipeline)
 
 It might be surprising that we only try to preserve *arg* boxity, not boxity on
 FVs. But FV demands won't make it into interface files anyway, so it's a waste
