@@ -18,7 +18,7 @@ module GHC.Utils.Misc (
 
         unzipWith,
 
-        mapFst, mapSnd, chkAppend,
+        mapFst, mapSnd, mapConst, chkAppend,
         mapAndUnzip, mapAndUnzip3, mapAndUnzip4,
         filterOut, partitionWith, partitionWithM,
 
@@ -328,6 +328,10 @@ mapSnd :: Functor f => (b->c) -> f(a,b) -> f(a,c)
 
 mapFst = fmap . first
 mapSnd = fmap . second
+
+mapConst :: a -> [b] -> [a]
+-- (mapConst k [a,b,c]) returns [k,k,k]
+mapConst k xs = [ k | _ <- xs ]
 
 zipWithAndUnzip :: (a -> b -> (c,d)) -> [a] -> [b] -> ([c],[d])
 zipWithAndUnzip f (a:as) (b:bs)

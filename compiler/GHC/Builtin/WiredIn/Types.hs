@@ -626,7 +626,7 @@ typeSymbolKindConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Symbol")
 pcTyCon :: Name -> Maybe (CType GhcTc) -> [TyVar] -> [DataCon] -> TyCon
 pcTyCon name cType tyvars cons
   = mkAlgTyCon name (mkTyConKind bndrs res_kind) bndrs 0 res_kind
-                (map (const Representational) tyvars)
+                (mapConst Representational tyvars)
                 cType
                 []              -- No stupid theta
                 (mkDataTyConRhs cons)
@@ -717,9 +717,9 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri
     -- we call pcDataConWithFixity' with static TyCons in the same module.
     -- See Note [Constructor tag allocation] and #14657
     data_con = mkDataCon dc_name declared_infix prom_info
-                (map (const no_bang) arg_tys)
-                (map (const HsLazy) arg_tys)
-                (map (const NotMarkedStrict) arg_tys)
+                (mapConst no_bang arg_tys)
+                (mapConst HsLazy arg_tys)
+                (mapConst NotMarkedStrict arg_tys)
                 []      -- No labelled fields
                 tyvars ex_tyvars
                 conc_tyvars

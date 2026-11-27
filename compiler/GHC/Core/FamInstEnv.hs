@@ -828,7 +828,7 @@ mkSingleCoAxiom role ax_name tvs eta_tvs cvs fam_tc lhs_tys rhs_ty
                                --      Note [Storing compatibility]
   where
     branch = mkCoAxBranch tvs eta_tvs cvs lhs_tys rhs_ty
-                          (map (const Nominal) tvs)
+                          (mapConst Nominal tvs)
                           (getSrcSpan ax_name)
 
 -- | Create a coercion constructor (axiom) suitable for the given

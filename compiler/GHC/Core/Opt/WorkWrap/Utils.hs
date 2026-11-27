@@ -221,7 +221,7 @@ mkWwBodies opts fun_id ww_arity arg_vars res_ty demands res_cpr
               zapped_arg_vars = map zap_var arg_vars
         ; (subst, cloned_arg_vars) <- cloneBndrsM empty_subst zapped_arg_vars
         ; let res_ty' = substTyUnchecked subst res_ty
-              init_str_marks = map (const NotMarkedStrict) cloned_arg_vars
+              init_str_marks = mapConst NotMarkedStrict cloned_arg_vars
 
         ; (useful1, work_args_str, wrap_fn_str, fn_args)
              <- -- pprTrace "mkWWbodies" (ppr fun_id $$ ppr (arg_vars `zip` cloned_arg_vars) $$ ppr demands) $
@@ -1050,7 +1050,7 @@ unbox_one_arg opts arg_var
 
              -- Mark arguments coming out of strict fields so we can seq them in the worker
              -- See Note [Call-by-value for worker args]
-             all_str_marks = (map (const NotMarkedStrict) ex_tvs') ++ con_str_marks
+             all_str_marks = mapConst NotMarkedStrict ex_tvs' ++ con_str_marks
 
        ; (nested_useful, worker_args, wrap_fn, wrap_args)
              <- mkWWstr opts (ex_tvs' ++ arg_ids') all_str_marks

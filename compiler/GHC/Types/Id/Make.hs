@@ -824,7 +824,7 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
     wrap_ty      = dataConWrapperType data_con
     ev_tys       = eqSpecPreds eq_spec ++ theta
     all_arg_tys  = map unrestricted ev_tys ++ orig_arg_tys
-    ev_ibangs    = map (const HsLazy) ev_tys
+    ev_ibangs    = mapConst HsLazy ev_tys
     orig_bangs   = dataConSrcBangs data_con
 
     wrap_arg_tys
@@ -852,10 +852,10 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
 
     arg_ibangs
       | new_tycon
-      = map (const HsLazy) orig_arg_tys -- See Note [HsImplBangs for newtypes]
-                                        -- orig_arg_tys should be a singleton, but
-                                        -- if a user declared a wrong newtype we
-                                        -- detect this later (see test T2334A)
+      = mapConst HsLazy orig_arg_tys -- See Note [HsImplBangs for newtypes]
+                                     -- orig_arg_tys should be a singleton, but
+                                     -- if a user declared a wrong newtype we
+                                     -- detect this later (see test T2334A)
       | otherwise
       = case dc_bang_opts of
           SrcBangOpts bang_opts -> zipWith (dataConSrcToImplBang platform bang_opts fam_envs)

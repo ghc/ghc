@@ -837,7 +837,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
                     rep_tc   = mkAlgTyCon rep_tc_name user_kind
                                           ty_binders (length extra_tcbs)
                                           res_kind
-                                          (map (const Nominal) ty_binders)
+                                          (mapConst Nominal ty_binders)
                                           (fmap (typeCheckCType . unLoc) cType) stupid_theta
                                           tc_rhs parent
                                           gadt_syntax

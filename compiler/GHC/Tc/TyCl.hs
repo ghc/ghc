@@ -3713,7 +3713,7 @@ tcTyFamInstEqn fam_tc mb_clsinfo
        -- (tcFamInstEqnGuts zonks to Type)
 
        ; let ax = mkCoAxBranch qtvs [] [] pats rhs_ty
-                    (map (const Nominal) qtvs)
+                    (mapConst Nominal qtvs)
                     (locA loc)
              vi = VI { vi_loc          = locA loc
                      , vi_qtvs         = qtvs

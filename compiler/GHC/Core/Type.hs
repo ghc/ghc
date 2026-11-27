@@ -1781,7 +1781,7 @@ fun_kind_arg_flags = go emptySubst
       where
         argf | isVisibleFunArg af = Required
              | otherwise          = Inferred
-    go _ _ arg_tys = map (const Required) arg_tys
+    go _ _ arg_tys = mapConst Required arg_tys
                         -- something is ill-kinded. But this can happen
                         -- when printing errors. Assume everything is Required.
 

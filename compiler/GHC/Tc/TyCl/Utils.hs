@@ -471,7 +471,7 @@ initialRoleEnv hsc_src annots = extendNameEnvList emptyNameEnv .
 
 initialRoleEnv1 :: HscSource -> RoleAnnotEnv -> TyCon -> (Name, [Role])
 initialRoleEnv1 hsc_src annots_env tc
-  | isFamilyTyCon tc      = (name, map (const Nominal) bndrs)
+  | isFamilyTyCon tc      = (name, mapConst Nominal bndrs)
   | isAlgTyCon tc         = (name, default_roles)
   | isTypeSynonymTyCon tc = (name, default_roles)
   | otherwise             = pprPanic "initialRoleEnv1" (ppr tc)

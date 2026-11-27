@@ -291,9 +291,9 @@ type MethInfo       -- A temporary intermediate, to communicate
 
 buildClass :: Name  -- Name of the class/tycon (they have the same Name)
            -> Kind
-           -> [TyConBinder]                -- Of the tycon
+           -> [TyConBinder]          -- Of the tycon
            -> [Role]
-           -> [FunDep TyVar]               -- Functional dependencies
+           -> [FunDep TyVar]         -- Functional dependencies
            -> KnotTied ThetaType     -- Superclasess
            -> [ClassATItem]          -- Associated types
            -> [KnotTied MethInfo]    -- Methods
@@ -330,7 +330,7 @@ buildClass tycon_name kind binders roles fds sc_theta at_items sig_stuff mindef 
               rec_tycon  = classTyCon rec_clas
               univ_bndrs = tyVarSpecToBinders $ tyConInvisTVBinders binders
               univ_tvs   = binderVars univ_bndrs
-              bang_opts  = FixedBangOpts (map (const HsLazy) args)
+              bang_opts  = FixedBangOpts (mapConst HsLazy args)
 
         ; rep_nm   <- newTyConRepName datacon_name
         ; dict_con <- buildDataCon (panic "buildClass: FamInstEnvs")
@@ -338,7 +338,7 @@ buildClass tycon_name kind binders roles fds sc_theta at_items sig_stuff mindef 
                                    datacon_name
                                    False        -- Not declared infix
                                    rep_nm
-                                   (map (const no_bang) args)
+                                   (mapConst no_bang args)
                                    [{- No fields -}]
                                    univ_tvs
                                    [{- no existentials -}]
@@ -353,8 +353,7 @@ buildClass tycon_name kind binders roles fds sc_theta at_items sig_stuff mindef 
         ; let rhs | unary_class
                   = UnaryClassTyCon dict_con
                   | isCTupleTyConName tycon_name
-                  = TupleTyCon { data_con = dict_con
-                               , tup_sort = ConstraintTuple }
+                  = TupleTyCon { data_con = dict_con, tup_sort = ConstraintTuple }
                   | otherwise
                   = mkDataTyConRhs [dict_con]
 

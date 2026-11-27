@@ -655,7 +655,7 @@ tc_pat scaled_exp_pat_ty@(Scaled w_pat exp_pat_ty) penv ps_pat thing_inside =
 
     OrPat _ pats -> do -- See Note [Implementation of OrPatterns], Typechecker (1)
       { let pats_list   = NE.toList pats
-            pat_exp_tys = map (const scaled_exp_pat_ty) pats_list
+            pat_exp_tys = mapConst scaled_exp_pat_ty pats_list
       ; (pats_list', (res, pat_ct)) <- tc_lpats pat_exp_tys penv pats_list (captureConstraints thing_inside)
       ; let pats' = NE.fromList pats_list' -- tc_lpats preserves non-emptiness
       ; emitConstraints pat_ct

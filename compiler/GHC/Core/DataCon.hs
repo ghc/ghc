@@ -1193,7 +1193,7 @@ mkDataCon name declared_infix prom_info
 
     roles = map (\tv -> if isTyVar tv then Nominal else Phantom)
                 (univ_tvs ++ ex_tvs)
-            ++ map (const Representational) (theta ++ map scaledThing orig_arg_tys)
+            ++ mapConst Representational (theta ++ map scaledThing orig_arg_tys)
 
 freshNames :: [Name] -> [Name]
 -- Make an infinite list of Names whose Uniques and OccNames

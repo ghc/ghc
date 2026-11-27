@@ -1369,7 +1369,7 @@ tc_hs_tuple_ty rn_ty mode HsBoxedOrConstraintTuple hs_tys exp_kind
                             checkExpectedKind hs_ty ty kind arg_kind
                           | ((L loc hs_ty),ty,kind) <- zip3 hs_tys tys kinds ]
 
-       ; finish_tuple rn_ty tup_sort tys' (map (const arg_kind) tys') exp_kind }
+       ; finish_tuple rn_ty tup_sort tys' (mapConst arg_kind tys') exp_kind }
 tc_hs_tuple_ty rn_ty mode HsUnboxedTuple tys exp_kind =
     tc_tuple rn_ty mode UnboxedTuple tys exp_kind
 
