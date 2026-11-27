@@ -1322,42 +1322,88 @@ mkGReflCo r ty mco
 mkGReflMCo :: HasDebugCallStack => Role -> Type -> CoercionN -> Coercion
 mkGReflMCo r ty co = mkGReflCo r ty (MCo co)
 
+{- Note [Inline tiny MCo functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The MCoercion functions (mkSymMCo, mkCastTyMCo, mkCoherenceRightMCo, etc.)
+are tiny wrappers whose whole purpose is the fast path for MRefl.  We give
+them INLINE pragmas, rather than relying on the inliner's heuristics, because
+the benefit of inlining them is usually invisible at the call site.
+
+Example: homogeniseHetRedn (in GHC.Core.Reduction) is used in the type-family
+rewriter.  After inlining it and mkCoherenceRightMRedn (both INLINE) we get
+something like
+     let kco' = mkSymMCo kco
+     in Reduction (mkCoherenceRightMCo r ty2 kco' co1)
+                  (mkCastTyMCo ty2 kco')
+where `kco` is typically already evaluated (has an OtherCon [] unfolding),
+but its constructor is unknown.  `kco'` is used twice, so it is not inlined
+at its use sites; and its RHS is a boring context for a non-INLINE function.
+So, judged by its argument and context alone, `mkSymMCo kco` has no
+discernible benefit, and does not inline.  But if it does inline, case-of-case
+moves the (cheap) `case kco` outwards, and the two consumers become
+case-of-known-constructor:
+     case kco of
+       MRefl  -> Reduction co1 ty2         -- No allocation at all
+       MCo co -> ...
+Kind coercions are usually reflexive, so this MRefl path is the hot one.
+The benefit comes entirely from the downstream consumers of the result.
+
+Why not just make interestingArg regard an evaluated (OtherCon []) argument as
+interesting?  Because in exactly the same situation it causes useless
+inlining: see `maMB` in test T18140, where the arguments come from strict
+fields and the result goes into a constructor field.  See (IA2) in
+Note [Interesting arguments] in GHC.Core.Opt.Simplify.Utils.
+
+Being tiny, these functions cost little to inline even when nothing is known
+about the argument.  Without these pragmas, tests T9872{a,b,c,d} and
+TcPlugin_RewritePerf allocated around 2.5% more (Nov 2026), almost all of it
+due to out-of-line calls of mkSymMCo from GHC.Tc.Solver.Rewrite.
+-}
+
 -- | Compose two MCoercions via transitivity
 mkTransMCo :: MCoercion -> MCoercion -> MCoercion
 mkTransMCo MRefl     co2       = co2
 mkTransMCo co1       MRefl     = co1
 mkTransMCo (MCo co1) (MCo co2) = MCo (mkTransCo co1 co2)
+{-# INLINE mkTransMCo #-}  -- See Note [Inline tiny MCo functions]
 
 mkTransMCoL :: MCoercion -> Coercion -> MCoercion
 mkTransMCoL MRefl     co2 = coToMCo co2
 mkTransMCoL (MCo co1) co2 = MCo (mkTransCo co1 co2)
+{-# INLINE mkTransMCoL #-}  -- See Note [Inline tiny MCo functions]
 
 mkTransMCoR :: Coercion -> MCoercion -> MCoercion
 mkTransMCoR co1 MRefl     = coToMCo co1
 mkTransMCoR co1 (MCo co2) = MCo (mkTransCo co1 co2)
+{-# INLINE mkTransMCoR #-}  -- See Note [Inline tiny MCo functions]
 
 -- | Get the reverse of an 'MCoercion'
 mkSymMCo :: MCoercion -> MCoercion
 mkSymMCo MRefl    = MRefl
 mkSymMCo (MCo co) = MCo (mkSymCo co)
+{-# INLINE mkSymMCo #-}  -- See Note [Inline tiny MCo functions]
 
 -- | Cast a type by an 'MCoercion'
 mkCastTyMCo :: Type -> MCoercion -> Type
 mkCastTyMCo ty MRefl    = ty
 mkCastTyMCo ty (MCo co) = ty `mkCastTy` co
+{-# INLINE mkCastTyMCo #-}  -- See Note [Inline tiny MCo functions]
 
 mkGReflLeftMCo :: Role -> Type -> MCoercionN -> Coercion
 mkGReflLeftMCo r ty MRefl    = mkReflCo r ty
 mkGReflLeftMCo r ty (MCo co) = mkGReflLeftCo r ty co
+{-# INLINE mkGReflLeftMCo #-}  -- See Note [Inline tiny MCo functions]
 
 mkGReflRightMCo :: Role -> Type -> MCoercionN -> Coercion
 mkGReflRightMCo r ty MRefl    = mkReflCo r ty
 mkGReflRightMCo r ty (MCo co) = mkGReflRightCo r ty co
+{-# INLINE mkGReflRightMCo #-}  -- See Note [Inline tiny MCo functions]
 
 -- | Like 'mkCoherenceRightCo', but with an 'MCoercion'
 mkCoherenceRightMCo :: Role -> Type -> MCoercionN -> Coercion -> Coercion
 mkCoherenceRightMCo _ _  MRefl    co2 = co2
 mkCoherenceRightMCo r ty (MCo co) co2 = mkCoherenceRightCo r ty co co2
+{-# INLINE mkCoherenceRightMCo #-}  -- See Note [Inline tiny MCo functions]
 
 isReflMCo :: MCoercion -> Bool
 isReflMCo MRefl = True

@@ -1106,6 +1106,14 @@ Wrinkles:
    arguments were evaluated.  That in turn made the enclosing function too big
    to inline elsewhere.)
 
+   But this choice is delicate.  Sometimes inlining a tiny function applied to
+   an evaluated argument /is/ very beneficial, because the /result/ is
+   scrutinised downstream; mkSymMCo in the type-family rewriter is an example.
+   Neither the argument nor the call context reveals this, so in those cases
+   we use an INLINE pragma: see Note [Inline tiny MCo functions] in
+   GHC.Core.TyCo.Make.  (Without those INLINE pragmas, returning TrivArg here
+   makes the compiler itself slower: T9872{a,b,c,d} allocate ~2.5% more.)
+
    Reason for (b): we want to inline integerCompare here
      integerLt# :: Integer -> Integer -> Bool#
      integerLt# (IS x) (IS y)                  = x <# y
