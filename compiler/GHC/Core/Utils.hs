@@ -2271,11 +2271,12 @@ app_ok fun_ok primop_ok fun val_args
   | otherwise
   = case idDetails fun of
       DFunId terminating -> terminating
-         -- DFuns terminate, unless the dict is implemented
-         -- by a no-op in which case they may not
-         -- See (UCM3) in Note [Unary class magic] in GHC.Core.TyCon
+         -- DFuns terminate, except for unary classes
+         -- See (UCM3a) in Note [Unary class magic] in GHC.Core.TyCon
 
       DataConWorkId dc
+        | isUnaryClassDataCon dc -> all ok_for_spec val_args
+              -- (MkC e) is just e; see (UCM3b) in Note [Unary class magic]
         | dataConRepIsLazy dc    -> True  -- Args are all thunks
         | otherwise              -> fields_ok (dataConRepArgCbvInfos dc)
 
@@ -2712,7 +2713,7 @@ exprIsHNFlike is_con is_con_unf rubbish_lit_result e
     check_saturated id val_args
       | Just dc <- isDataConWorkId_maybe id
       , isUnaryClassDataCon dc   -- (MkC e) is just e
-      = all is_hnf_like val_args -- See (UCM4) in Note [Unary class magic]
+      = all is_hnf_like val_args -- See (UCM3b) in Note [Unary class magic]
 
       | Just dc <- isDataConWorkId_maybe id
       , let arg_infos = dataConRepArgCbvInfos dc

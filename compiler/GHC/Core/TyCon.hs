@@ -1504,16 +1504,27 @@ There are a number of wrinkles
 (UCM2) The TyCon for a unary class is /not/ identified as a newtype.
    Rather, it has its own AlgTyConRhs, namely `UnaryClassTyCon`
 
-(UCM3) Unlike non-unary classes, a value of type (C ty), where `C` is a unary
+(UCM3a) Unlike non-unary classes, a value of type (C ty), where `C` is a unary
    class, might be bottom, because it is represented by the method type alone.
    See GHC.Core.Type.isTerminatingType, and Note [NON-BOTTOM-DICTS invariant]
    in GHC.Core
 
-   Similarly in exprOkForSpeculation/exprOkToDiscard/exprOkForSpecEval,
-   in GHC.Core.Utils.  In the utility funcion `app_ok` we need a special
-   case for the DFunIds; they generally terminate, but not for unary classes.
+(UCM3b) Following (UCM3a), (MkC e) is a value, or ok-for-speculation, only if
+   `e` is.  So `GHC.Core.Utils.exprIsHNF`, `exprIsConLike`, and `app_ok`
+   (used by exprOkForSpeculation/exprOkToDiscard/exprOkForSpecEval) have a
+   special case for unary-class data constructors.  (#28183 shows why this
+   matters.)
 
-(UMC4) To avoid regressions, in Core we want to remember that
+   We do /not/ achieve this by giving the data constructor a strict field
+         data C a = MkC !(a->a)
+   That would be semantically fine, but it leaks into DmdAnal, the StrictArg
+   treatment in the Simplifier, and the field seqs of (SFC2) in Note [Strict
+   fields in Core]; for example (op dict x) would become
+         case $cop of m { __DEFAULT -> m x }
+   which bloats code (T5321FD got 10% worse).  Those field seqs are pointless
+   for unary classes anyway, because of (UCM13).
+
+(UCM4) To avoid regressions, in Core we want to remember that
              (MkUC x) is really just  x
              (op d)   is really just  d
     We account for this in several places:
@@ -3065,8 +3076,8 @@ isUnaryClassTyCon tc@(TyCon { tyConDetails = details })
 
 isTerminatingTyCon :: TyCon -> Bool
 -- ^ True <=> a value of type (T t1..tn), where `T` is this TyCon, cannot be bottom.
--- The only TyCons that satisfy `isTerminatingTyCon` are non-unary class TyCons.
--- See (UCM3) in Note [Unary class magic], and
+-- The only TyCons that satisfy `isTerminatingTyCon` are /non-unary/ class TyCons.
+-- See (UCM3a) in Note [Unary class magic], and
 -- Note [NON-BOTTOM-DICTS invariant] in GHC.Core.
 -- An AbstractTyCon returns False: it comes from an hs-boot file, and the real
 -- declaration may turn out to be a unary class. See (NBD2) in that Note.

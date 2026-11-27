@@ -331,6 +331,8 @@ buildClass tycon_name kind binders roles fds sc_theta at_items sig_stuff mindef 
               univ_bndrs = tyVarSpecToBinders $ tyConInvisTVBinders binders
               univ_tvs   = binderVars univ_bndrs
               bang_opts  = FixedBangOpts (mapConst HsLazy args)
+                -- NB: even for unary classes the field is lazy;
+                -- see (UCM3b) in Note [Unary class magic]
 
         ; rep_nm   <- newTyConRepName datacon_name
         ; dict_con <- buildDataCon (panic "buildClass: FamInstEnvs")
