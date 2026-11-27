@@ -3415,7 +3415,8 @@ life" in one of two ways:
 
 Thus, when we are simply reconstructing a case (the common case), and the
 case binder is not dead, or the scrutinee is a variable, we zap the
-occurrence info on DataAlt field binders. See `adjustFieldOccInfo`.
+occurrence info on DataAlt field binders. See `fieldOccInfoStable`
+and `adjustFieldsIdInfo`.
 
 Note [Improving seq]
 ~~~~~~~~~~~~~~~~~~~~
@@ -3623,37 +3624,50 @@ do it here).  The right thing is to do some kind of binder-swap;
 see #15226 for discussion.
 -}
 
-adjustFieldsIdInfo :: Maybe OutExpr -> OutId -> BinderSwapDecision -> DataCon -> [Id] -> [Id]
+adjustFieldsIdInfo :: Maybe OutExpr -> OutId -> BinderSwapDecision
+                   -> DataCon -> [InBndr] -> [InBndr]
 -- See Note [Adding evaluatedness info to pattern-bound variables]
 -- and Note [DataAlt occ info]
+--
+-- This can be a hot path in the compiler (e.g. T9233 which has a large strict record)
+-- Hence
+--   (a) we build the result list strictly: it is consumed in full right away,
+--       so thunks for the elements or the spine are pure waste
+--   (b) we update each field binder's IdInfo at most once
+--   (c) we leave alone a field binder that is dead and will stay dead
+--       (see `fieldOccInfoStable`); its evaluated-ness is irrelevant
 adjustFieldsIdInfo scrut case_bndr bndr_swap con vs
+
   -- Deal with seq# applications
   | Just scr <- scrut
   , isUnboxedTupleDataCon con
-  , [s,x] <- vs
     -- Use stripNArgs rather than collectArgsTicks to avoid building
     -- a list of arguments only to throw it away immediately.
   , Just (Var f) <- stripNArgs 4 scr
   , f `hasKey` seqHashKey
-  , let x' = setCaseBndrEvald MarkedStrict x
-  = map (adjustFieldOccInfo case_bndr bndr_swap) [s, x']
+  = go vs [NotMarkedStrict, MarkedStrict]   -- seq# returns an evaluated x
 
   -- Deal with banged datacon fields
-  -- This case is quite allocation sensitive to T9233 which has a large record
-  -- with strict fields. Hence we try not to update vs twice!
-adjustFieldsIdInfo _scrut case_bndr bndr_swap con vs
   | isLazyDataConRep con
       -- A common fast path; no need to allocate `the_strs` when
       -- they are all lazy anyway! It shaves off 2% in T9675
-  = map (adjustFieldOccInfo case_bndr bndr_swap) vs
+  = if occ_stable
+    then vs    -- Nothing to do at all
+    else strictMap zapFieldOccInfo vs
+
+  -- General case
   | otherwise
   = go vs the_strs
   where
-    the_strs = dataConRepStrictness con
+    the_strs   = dataConRepStrictness con
+    occ_stable = fieldOccInfoStable case_bndr bndr_swap
 
     go [] [] = []
-    go (v:vs') strs | isTyVar v = v : go vs' strs
-    go (v:vs') (str:strs) = adjustFieldOccInfo case_bndr bndr_swap (setCaseBndrEvald str v) : go vs' strs
+    go (v:vs') strs | isTyVar v  -- Type variables do not consume a strictness mark
+                          = let !vs'' = go vs' strs in v : vs''
+    go (v:vs') (str:strs) = let !v'   = adjust str v
+                                !vs'' = go vs' strs
+                            in v' : vs''
     go _ _ = pprPanic "Simplify.adjustFieldsIdInfo"
               (ppr con $$
                ppr vs  $$
@@ -3667,21 +3681,40 @@ adjustFieldsIdInfo _scrut case_bndr bndr_swap con vs
         strdisp MarkedStrict = text "MarkedStrict"
         strdisp NotMarkedStrict = text "NotMarkedStrict"
 
-adjustFieldOccInfo :: OutId -> BinderSwapDecision -> CoreBndr -> CoreBndr
--- Kill occ info if we do binder swap and the case binder is alive;
--- see Note [DataAlt occ info]
-adjustFieldOccInfo case_bndr bndr_swap field_bndr
-  | isTyVar field_bndr
-  = field_bndr
+    -- Set evaluated-ness (if str is MarkedStrict) and zap occ-info
+    -- (if not occ_stable), with at most one IdInfo update
+    adjust :: StrictnessMark -> Id -> Id
+    adjust MarkedStrict v
+      | occ_stable = if isDeadBinder v then nop v else set_evald v
+      | otherwise  = set_evald_zap_occ v
+    adjust NotMarkedStrict v
+      | occ_stable = nop v
+      | otherwise  = zap_occ v
 
-  | not (isDeadBinder case_bndr)  -- (1) in the Note: If the case binder is alive,
-  = zapIdOccInfo field_bndr       -- the field binders might come back alive
+    nop               v = v
+    set_evald         v = v `setIdUnfolding` evaldUnfolding
+    zap_occ           v = zapIdOccInfo v
+    set_evald_zap_occ v = modifyIdInfo (\info -> info `setUnfoldingInfo` evaldUnfolding
+                                                      `setOccInfo`       noOccInfo) v
 
-  | DoBinderSwap{} <- bndr_swap   -- (2) in the Note: If binder swap might take place,
-  = zapIdOccInfo field_bndr       -- the case binder might come back alive
+zapFieldOccInfo :: InBndr -> InBndr
+-- Kill occ info on a field binder, which might come back to life;
+-- see Note [DataAlt occ info] and `fieldOccInfoStable`
+zapFieldOccInfo field_bndr
+  | isTyVar field_bndr = field_bndr
+  | otherwise          = zapIdOccInfo field_bndr
 
-  | otherwise
-  = field_bndr                    -- otherwise the field binders stay dead
+fieldOccInfoStable :: OutId -> BinderSwapDecision -> Bool
+-- True <=> the occ-info on the field binders of a DataAlt remains valid;
+-- in particular a dead field binder will stay dead.
+-- False <=> we must zap the field binders' occ-info.
+-- See Note [DataAlt occ info]
+fieldOccInfoStable case_bndr bndr_swap
+  | not (isDeadBinder case_bndr) = False  -- (1) in the Note: If the case binder is alive,
+                                          -- the field binders might come back alive
+  | DoBinderSwap{} <- bndr_swap  = False  -- (2) in the Note: If binder swap might take place,
+                                          -- the case binder might come back alive
+  | otherwise                    = True   -- Otherwise the field binders stay dead
 
 addDefaultUnfoldings :: SimplEnv -> OutId -> BinderSwapDecision -> [AltCon] -> SimplEnv
 addDefaultUnfoldings env case_bndr bndr_swap imposs_deflt_cons
