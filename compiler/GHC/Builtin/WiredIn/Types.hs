@@ -719,7 +719,8 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri
     data_con = mkDataCon dc_name declared_infix prom_info
                 (mapConst no_bang arg_tys)
                 (mapConst HsLazy arg_tys)
-                (mapConst NotMarkedStrict arg_tys)
+                (mapConst NotMarkedStrict theta ++
+                 mapConst NotMarkedStrict arg_tys)
                 []      -- No labelled fields
                 tyvars ex_tyvars
                 conc_tyvars

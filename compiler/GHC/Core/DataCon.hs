@@ -44,14 +44,15 @@ module GHC.Core.DataCon (
         dataConIsInfix,
         dataConWorkId, dataConWrapId, dataConWrapId_maybe,
         dataConImplicitTyThings,
-        dataConRepStrictness,
+        dataConRepStrictness, dataConRepArgCbvInfos,
+        ArgCbvInfo(..),
         dataConImplBangs, dataConBoxer,
+        dataConRepIsLazy,
 
         splitDataProductType_maybe,
 
         -- ** Predicates on DataCons
         isNullarySrcDataCon, isNullaryRepDataCon,
-        isLazyDataConRep,
         isTupleDataCon, isBoxedTupleDataCon, isUnboxedTupleDataCon,
         isUnboxedSumDataCon, isCovertGadtDataCon, isUnaryClassDataCon,
         isVanillaDataCon, isNewDataCon, isTypeDataCon, isBoxingDataCon,
@@ -523,16 +524,36 @@ data DataCon
                 -- See Note [Bangs on data constructor arguments]
 
         dcStricts :: [StrictnessMark],
-                -- One mark for every field of the DataCon worker;
-                -- if it's empty, then all fields are lazy,
-                -- otherwise 1-1 with dataConRepArgTys.
+                -- One mark for every field of the DataCon /worker/
+                -- INVARIANT: length dcStricts = length dataConRepArgTys
+                -- Relates only to user-specified strictness annotations,
+                --   not to liftedness or otherwise
+                -- E.g. data T a = MkT {-# UNPACK #-} !(S a) Int# !a
+                --      data S a = MkS a !a
+                -- Then the worker for MkT has four fields, the first two arising from
+                --   unpacking S.  The corresponding strictness marks are [-,!,-,!]; again
+                --   the first two come from MkS
                 -- See also Note [Strict fields in Core] in GHC.Core
-                -- for the effect on the strictness signature
+                --    for the effect on the strictness signature
+
+        dcArgCbvInfos :: [ArgCbvInfo],
+                -- One entry for each /value/ argument of the worker,
+                --   /including/ each CoVar in dcExTyCoVars
+                -- Unlike dcStricts, takes account of liftedness
+                -- INVARIANT: length dcArgCbvInfos = dataConRepArity
+                -- See (EXCO1) Note [Existential coercion variables]
+                -- and Note [ArgCbvInfo]
 
         dcFields  :: [FieldLabel],
                 -- Field labels for this constructor, in the
                 -- same order as the dcOrigArgTys;
                 -- length = 0 (if not a record) or dataConSourceArity.
+
+        dcIsLazy :: Bool,
+                -- True <=> all of dcArgCbvInfos are ArgCbn; that is
+                --   (a) all fields of the data con /worker/ are definitely lifted
+                --   (b) no field has a `StrictnessMark` that forces evaluation
+                -- So if `dcIsLazy` is True then all fields of the worker are lazy thunks
 
         -- The curried worker function that corresponds to the constructor:
         -- It doesn't have an unfolding; the code generator saturates these Ids
@@ -582,18 +603,30 @@ we can in Core. Consider having:
 
   data T :: forall k. k -> k -> Constraint where
     MkT :: forall k (a::k) (b::k).
-           forall k' (c::k') (co::k'~k).
-           (b ~# (c|>co)) => T k a b
+           forall k' (c::k') (co::k'~#k).
+           (b ~# (c|>co)) => !a -> T k a b
 
   dcUnivTyVars       = [k,a,b]
   dcExTyCoVars       = [k',c,co]
   dcUserTyVarBinders = [k,a,k',c]
   dcEqSpec           = [b ~# (c|>co)]
   dcOtherTheta       = []
-  dcOrigArgTys       = []
+  dcOrigArgTys       = [a]
   dcRepTyCon         = T
+  dcStricts          = [NotMarkedStrict, MarkedStrict]
+  dcArgCbvInfos      = [ArgCbv, ArgCbv, ArgCbv]  -- (EXCO1)
 
-Function call 'dataConKindEqSpec' returns [k'~k]
+* `dataConKindEqSpec` returns [k'~k].
+* `dataConRepArgTys`  returns [ b~#(c|>co), a ]
+
+(EXCO1) In a call of the data constructor worker we will see
+            MkT tk ta tb tk' tc (co1::tk'~#tk) (co2::tb~#(tc |> co1))
+   dcArgCbvInfos returns a [ArgCbvInfo] that lines up with all the
+   value arguments, /including/ co1.  (Coercion arguments are unlifted,
+   hence ArgCbv; see Note [ArgCbvInfo].)
+
+   dcArgCbvInfos lines up with dcStricts almost always; they differ in length
+   only in the rare case that we have existential coercion variables
 
 Note [DataCon arities]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -830,7 +863,7 @@ data DataConRep
 
         , dcr_boxer   :: DataConBoxer
 
-        , dcr_arg_tys :: [Scaled Type]    -- Final, representation argument types,
+        , dcr_arg_tys :: [Scaled Type]    -- Final, representation /value/ argument types,
                                           -- after unboxing and flattening,
                                           -- and *including* all evidence args
 
@@ -853,7 +886,8 @@ type DataConEnv a = UniqFM DataCon a     -- Keyed by DataCon
 -- In the AST, the @SourceText@ is hidden inside the extension point
 -- 'Language.Haskell.Syntax.Extension.XConDeclField'.
 data HsSrcBang
-  = HsSrcBang SourceText SrcUnpackedness SrcStrictness -- See Note [Pragma source text] in "GHC.Types.SourceText"
+  = HsSrcBang SourceText SrcUnpackedness SrcStrictness
+              -- See Note [Pragma source text] in "GHC.Types.SourceText"
   deriving Data.Data
 
 -- | Haskell Implementation Bang
@@ -861,14 +895,14 @@ data HsSrcBang
 -- Bangs of data constructor arguments as generated by the compiler
 -- after consulting HsSrcBang, flags, etc.
 data HsImplBang
-  = HsLazy    -- ^ Lazy field, or one with an unlifted type
+  = HsLazy        -- ^ Lazy field, or one with an unlifted type
+
   | HsStrict Bool -- ^ Strict but not unpacked field
-                  -- True <=> we could have unpacked, but opted not to
-                  -- because of -O0.
-                  -- See Note [Detecting useless UNPACK pragmas]
-  | HsUnpack (Maybe Coercion)
-    -- ^ Strict and unpacked field
-    -- co :: arg-ty ~ product-ty HsBang
+      -- True <=> we could have unpacked, but opted not to because of -O0
+      --          See Note [Detecting useless UNPACK pragmas]
+
+  | HsUnpack (Maybe Coercion)  -- ^ Strict and unpacked field
+                               -- co :: arg-ty ~ product-ty HsBang
   deriving Data.Data
 
 
@@ -878,6 +912,45 @@ data HsImplBang
 -- of the DataCon *worker* fields
 data StrictnessMark = MarkedStrict | NotMarkedStrict
     deriving Eq
+
+-- | How a data constructor worker treats one of its value arguments
+-- See Note [ArgCbvInfo]
+data ArgCbvInfo
+  = ArgCbn      -- ^ Call-by-need: definitely lifted, and no bang:
+                --   the worker does not evaluate the argument
+  | ArgCbv      -- ^ Call-by-value: definitely unlifted, or has a bang
+                --   (MarkedStrict): the argument is certainly evaluated
+  | ArgRepPoly  -- ^ No bang, but representation-polymorphic,
+                --   so we don't know whether it is lifted or not
+  deriving Eq
+
+
+{- Note [ArgCbvInfo]
+~~~~~~~~~~~~~~~~~~~~
+`dcArgCbvInfos :: [ArgCbvInfo]` tells, for each value argument of a data
+constructor worker, whether that argument is certainly evaluated
+(ArgCbv), certainly not evaluated (ArgCbn), or we don't know
+(ArgRepPoly, e.g. the fields of an unboxed tuple (#,#), whose types
+are representation-polymorphic until instantiated).
+
+An argument is evaluated if it has an unlifted type, or if it is a strict
+field (see Note [Strict fields in Core] in GHC.Core).  For many purposes
+these are the same thing, so we combine them here; e.g. both
+    K (case x of (a,b) -> a)      where K has a strict field
+    I# (case x of (a,b) -> a#)
+should become (case x of (a,b) -> K a) in the Simplifier (#28169).
+
+Consumers must decide what to do with ArgRepPoly, and the right choice
+depends on the consumer, in opposite directions:
+
+* SpecConstr (argToPat) treats ArgRepPoly as /lazy/.  There "strict"
+  only enables an optimisation; claiming laziness is always safe.
+
+* `exprIsHNF` (check_field) and `exprOkForSpeculation` (field_ok) in
+  GHC.Core.Utils treat ArgRepPoly as /possibly strict/.  There, wrongly
+  claiming laziness would wrongly say that (K e) is a value even if `e`
+  is an unlifted expression that might diverge.
+-}
 
 -- | An 'EqSpec' is a tyvar/type pair representing an equality made in
 -- rejigging a GADT constructor
@@ -950,9 +1023,9 @@ Terminology:
   you the demand signature of the wrapper, if it exists.
 
   These demand signatures are set in GHC.Types.Id.Make.mkDataConWorkId,
-  computed from the single source of truth `dataConRepStrictness`, which is
-  generated from `dcStricts`.
-  Note that `dataConRepStrictness` lines up 1-1 with `idDmdSig (dataConWorkId dc)`.
+  computed from the single source of truth `dataConRepStrictness`, plus a
+  lazy demand for each existential CoVar; so they line up 1-1 with
+  `dataConRepArgCbvInfos`, but reflect only the bangs, not liftedness.
 
 Note [Detecting useless UNPACK pragmas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1031,6 +1104,11 @@ instance Outputable HsImplBang where
 instance Outputable StrictnessMark where
     ppr MarkedStrict    = text "!"
     ppr NotMarkedStrict = empty
+
+instance Outputable ArgCbvInfo where
+    ppr ArgCbn     = text "cbn"
+    ppr ArgCbv     = text "cbv"
+    ppr ArgRepPoly = text "rep-poly"
 
 instance Binary StrictnessMark where
     put_ bh NotMarkedStrict = putByte bh 0
@@ -1118,7 +1196,7 @@ mkDataCon name declared_infix prom_info
           impl_bangs   -- Must match orig_arg_tys 1-1
           str_marks    -- Must be empty or match dataConRepArgTys 1-1
           fields
-          univ_tvs ex_tvs conc_tvs user_tvbs
+          univ_tvs ex_tcvs conc_tvs user_tvbs
           eq_spec theta
           orig_arg_tys orig_res_ty rep_info rep_tycon tag
           stupid_theta work_id rep
@@ -1132,44 +1210,62 @@ mkDataCon name declared_infix prom_info
 
   = con
   where
-    is_vanilla = null ex_tvs && null eq_spec && null theta
-    str_marks' | not $ any isMarkedStrict str_marks = []
-               | otherwise                          = str_marks
+    is_vanilla = null ex_tcvs && null eq_spec && null theta
+    full_arg_info = replicate n_ex_co_vars ArgCbv  -- Coercions are unlifted
+                    ++ zipWith mk_arg_info str_marks rep_arg_tys
+    mk_arg_info str (Scaled _ ty)
+      | isMarkedStrict str        = ArgCbv
+      | definitelyLiftedType ty   = ArgCbn
+      | definitelyUnliftedType ty = ArgCbv
+      | otherwise                 = ArgRepPoly
+    is_lazy = all (== ArgCbn) full_arg_info
 
-    con = MkData {dcName = name, dcUnique = nameUnique name,
-                  dcVanilla = is_vanilla, dcInfix = declared_infix,
-                  dcUnivTyVars = univ_tvs,
-                  dcExTyCoVars = ex_tvs,
-                  dcConcreteTyVars = conc_tvs,
-                  dcUserTyVarBinders = user_tvbs,
-                  dcEqSpec = eq_spec,
-                  dcOtherTheta = theta,
-                  dcStupidTheta = stupid_theta,
-                  dcOrigArgTys = orig_arg_tys, dcOrigResTy = orig_res_ty,
-                  dcRepTyCon = rep_tycon,
-                  dcSrcBangs = arg_stricts, dcImplBangs = impl_bangs,
-                  dcStricts = str_marks',
-                  dcFields = fields, dcTag = tag, dcRepType = rep_ty,
-                  dcWorkId = work_id,
-                  dcRep = rep,
-                  dcSourceArity = length orig_arg_tys,
-                  dcRepArity = length rep_arg_tys + count isCoVar ex_tvs,
-                  dcPromoted = promoted }
+    con = MkData { dcName    = name
+                 , dcUnique  = nameUnique name
+                 , dcInfix   = declared_infix
+                 , dcTag     = tag
+                 , dcVanilla = is_vanilla
+
+                 , dcUnivTyVars       = univ_tvs
+                 , dcExTyCoVars       = ex_tcvs
+                 , dcConcreteTyVars   = conc_tvs
+                 , dcUserTyVarBinders = user_tvbs
+                 , dcEqSpec           = eq_spec
+                 , dcOtherTheta       = theta
+                 , dcStupidTheta      = stupid_theta
+                 , dcOrigArgTys       = orig_arg_tys
+                 , dcOrigResTy        = orig_res_ty
+
+                 , dcRep         = rep
+                 , dcRepType     = rep_ty
+                 , dcRepTyCon    = rep_tycon
+                 , dcSrcBangs    = arg_stricts
+                 , dcImplBangs   = impl_bangs
+                 , dcStricts     = assertPpr (equalLength str_marks rep_arg_tys)
+                                             (ppr name <+> ppr str_marks)
+                                   str_marks
+                 , dcArgCbvInfos = full_arg_info
+                 , dcIsLazy      = is_lazy
+                 , dcFields      = fields
+                 , dcWorkId      = work_id
+                 , dcSourceArity = length orig_arg_tys
+                 , dcRepArity    = n_ex_co_vars + length rep_arg_tys
+                 , dcPromoted    = promoted }
 
         -- The 'arg_stricts' passed to mkDataCon are simply those for the
         -- source-language arguments.  We add extra ones for the
         -- dictionary arguments right here.
 
-    rep_arg_tys = dataConRepArgTys con
+    n_ex_co_vars = count isCoVar ex_tcvs
+    rep_arg_tys  = dataConRepArgTys con
 
-    rep_ty =
-      case rep of
+    rep_ty = case rep of
         -- If the DataCon has no wrapper, then the worker's type *is* the
         -- user-facing type, so we can simply use dataConWrapperType.
         NoDataConRep -> dataConWrapperType con
         -- If the DataCon has a wrapper, then the worker's type is never seen
         -- by the user. The visibilities we pick do not matter here.
-        DCR{} -> mkInfForAllTys univ_tvs $ mkTyCoInvForAllTys ex_tvs $
+        DCR{} -> mkInfForAllTys univ_tvs $ mkTyCoInvForAllTys ex_tcvs $
                  mkScaledFunctionTys rep_arg_tys $
                  mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
                  -- res_arg_tys is a mixture of TypeLike and ConstraintLike,
@@ -1192,7 +1288,7 @@ mkDataCon name declared_infix prom_info
                                          prom_res_kind roles rep_info
 
     roles = map (\tv -> if isTyVar tv then Nominal else Phantom)
-                (univ_tvs ++ ex_tvs)
+                (univ_tvs ++ ex_tcvs)
             ++ mapConst Representational (theta ++ map scaledThing orig_arg_tys)
 
 freshNames :: [Name] -> [Name]
@@ -1399,20 +1495,19 @@ isNullarySrcDataCon dc = dataConSourceArity dc == 0
 isNullaryRepDataCon :: DataCon -> Bool
 isNullaryRepDataCon dc = dataConRepArity dc == 0
 
-isLazyDataConRep :: DataCon -> Bool
--- ^ True <==> All fields are lazy
-isLazyDataConRep dc = null (dcStricts dc)
-
 dataConRepStrictness :: DataCon -> [StrictnessMark]
 -- ^ Give the demands on the runtime arguments of a Core DataCon worker
--- application.
--- The length of the list matches `dataConRepArgTys` (e.g., the number
--- of runtime arguments).
-dataConRepStrictness dc
-  | isLazyDataConRep dc
-  = replicate (dataConRepArity dc) NotMarkedStrict
-  | otherwise
-  = dcStricts dc
+-- application. Matches 1-1 with `dataConRepArgTys`
+dataConRepStrictness = dcStricts
+
+dataConRepArgCbvInfos :: DataCon -> [ArgCbvInfo]
+-- ^ Describes each value argument of a Core DataCon worker
+-- application, /including/ any existential CoVar args
+-- See Note [ArgCbvInfo] and (EXCO1) in Note [Existential coercion variables]
+dataConRepArgCbvInfos = dcArgCbvInfos
+
+dataConRepIsLazy :: DataCon -> Bool
+dataConRepIsLazy = dcIsLazy
 
 dataConImplBangs :: DataCon -> [HsImplBang]
 -- The implementation decisions about the strictness/unpack of each
@@ -1523,10 +1618,11 @@ dataConWrapperType (MkData { dcUserTyVarBinders = user_tvbs,
     res_ty
 
 -- | Finds the instantiated types of the arguments required to construct a
--- 'DataCon' representation
+--   data constructor worker application
 -- NB: these INCLUDE any dictionary args
---     but EXCLUDE the data-declaration context, which is discarded
--- It's all post-flattening etc; this is a representation type
+--     but EXCLUDE the "stupid theta" data-declaration context, which is discarded
+--
+-- Result list is 1-1 with dataConRepArgTys, and dataConRepStrictness
 dataConInstArgTys :: DataCon    -- ^ A datacon with no existentials or equality constraints
                                 -- However, it can have a dcTheta (notably it can be a
                                 -- class dictionary, with superclasses)
@@ -1621,9 +1717,10 @@ dataConOrigArgTys dc = dcOrigArgTys dc
 dataConOtherTheta :: DataCon -> ThetaType
 dataConOtherTheta dc = dcOtherTheta dc
 
--- | Returns the arg types of the worker, including *all* non-dependent
--- evidence, after any flattening has been done and without substituting for
--- any type variables
+-- | Returns the arg types of the worker, after any flattening has been done and
+-- without substituting for any type variables
+--
+-- Includes evidence, namely `dcEqSpec` and `dcOtherTheta`
 dataConRepArgTys :: DataCon -> [Scaled Type]
 dataConRepArgTys (MkData { dcRep        = rep
                          , dcEqSpec     = eq_spec
@@ -1642,8 +1739,10 @@ dataConRepArgTys (MkData { dcRep        = rep
           -- I think it's because of the call in mkDataCon, which in turn feeds
           -- into dcRepArity, which in turn is used in mkDataConWorkId.
           -- c.f. #23022
-        | otherwise          -> assert (null eq_spec) $
-                                map unrestricted theta ++ orig_arg_tys
+        | otherwise -> assert (null eq_spec) $
+                       -- null eq_spec: all GADTs go via DCR
+                       -- See `dataConUserTyVarsNeedWrapper`
+                       map unrestricted theta ++ orig_arg_tys
 
 -- | The string @package:module.name@ identifying a constructor, which is attached
 -- to its info table and used by the GHCi debugger and the heap profiler

@@ -31,7 +31,7 @@ module GHC.Types.Demand (
     multCard, multDmd, multSubDmd,
     -- ** Predicates on @Card@inalities and @Demand@s
     isAbs, isAtMostOnce, isStrict,
-    isAbsDmd, isAtMostOnceDmd, isStrUsedDmd, isStrictDmd,
+    isAbsDmd, isAtMostOnceDmd, isStrUsedDmd, isStrictDmd, isStrDataConDmd,
     isTopDmd, isWeakDmd, onlyBoxedArguments,
     -- ** Special demands
     evalDmd,
@@ -92,7 +92,7 @@ import GHC.Types.Basic
 import GHC.Data.Maybe   ( orElse )
 
 import GHC.Core.Type    ( Type, isTerminatingType )
-import GHC.Core.DataCon ( splitDataProductType_maybe, StrictnessMark, isMarkedStrict )
+import GHC.Core.DataCon ( splitDataProductType_maybe )
 import GHC.Core.Multiplicity    ( scaledThing )
 
 import GHC.Utils.Binary
@@ -1002,6 +1002,13 @@ isStrictDmd (n :* _) = isStrict n
 isStrUsedDmd :: Demand -> Bool
 isStrUsedDmd (n :* _) = isStrict n && not (isAbs n)
 
+-- | Is this demand, taken from the demand signature of a data constructor
+-- /worker/, the demand for a strict field?  The demands in a worker's
+-- signature are never absent (see GHC.Types.Id.Make.mkDataConWorkId), so
+-- unlike 'isStrUsedDmd' we don't need to check for absence.
+isStrDataConDmd :: Demand -> Bool
+isStrDataConDmd = isStrictDmd
+
 -- | Is the value used at most once?
 isAtMostOnceDmd :: Demand -> Bool
 isAtMostOnceDmd (n :* _) = isAtMostOnce n
@@ -1471,7 +1478,14 @@ arguments.  That is the job of dmdTransformDataConSig.  More precisely,
 When the data constructor worker has strict fields, an additional seq
 will be inserted for each field (see (SFC3) in Note [Strict fields in Core]).
 Hence we add an additional `seqDmd` for each strict field to emulate
-field eval insertion.
+field eval insertion.  We find the strict fields from the demand signature
+of the worker (built by GHC.Types.Id.Make.mkDataConWorkId), which has a
+strict demand for exactly the strict fields (bangs).
+
+NB: we must /not/ add a `seqDmd` for a field that is lazy but has an unlifted
+type: such an argument is evaluated before the call, not by the constructor,
+and adding `seqDmd` would turn an absent field into a used one, defeating
+absent-argument worker/wrapper (e.g. test T25177).
 
 For example, consider `data SP a b = MkSP !a !b` and expression `MkSP x y`,
 with the same sub-demand P(SL,A).
@@ -2487,17 +2501,20 @@ dmdTransformSig (DmdSig dmd_ty@(DmdType _ arg_ds)) sd
 
 -- | A special 'DmdTransformer' for data constructors that feeds product
 -- demands into the constructor arguments.
-dmdTransformDataConSig :: [StrictnessMark] -> DmdTransformer
+dmdTransformDataConSig :: DmdSig -> DmdTransformer
+-- The DmdSig is that of the data constructor worker
 -- See Note [Demand transformer for data constructors]
-dmdTransformDataConSig str_marks sd = case viewProd arity body_sd of
-  Just (_, dmds) -> mk_body_ty n dmds
-  Nothing        -> nopDmdType
+dmdTransformDataConSig (DmdSig (DmdType _ sig_dmds)) sd
+  = case viewProd arity body_sd of
+      Just (_, dmds) -> mk_body_ty n dmds
+      Nothing        -> nopDmdType
   where
-    arity = length str_marks
+    arity = length sig_dmds
     (n, body_sd) = peelManyCalls arity sd
-    mk_body_ty n dmds = DmdType nopDmdEnv (zipWith (bump n) str_marks dmds)
-    bump n str dmd | isMarkedStrict str = multDmd n (plusDmd str_field_dmd dmd)
-                   | otherwise          = multDmd n dmd
+    mk_body_ty n dmds = DmdType nopDmdEnv (zipWith (bump n) sig_dmds dmds)
+    bump n sig_dmd dmd
+      | isStrDataConDmd sig_dmd = multDmd n (plusDmd str_field_dmd dmd)  -- A strict field
+      | otherwise               = multDmd n dmd
     str_field_dmd = seqDmd -- See the bit about strict fields
                            -- in Note [Demand transformer for data constructors]
 

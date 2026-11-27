@@ -1020,15 +1020,16 @@ dmdTransform :: AnalEnv   -- ^ The analysis environment
                           -- this function plus demand on its free variables
 -- See Note [DmdSig: demand signatures, and demand-sig arity] in "GHC.Types.Demand"
 dmdTransform env var sd
-  -- Data constructors
-  | Just con <- isDataConWorkId_maybe var
-  = -- pprTraceWith "dmdTransform:DataCon" (\ty -> ppr con $$ ppr sd $$ ppr ty) $
-    dmdTransformDataConSig (dataConRepStrictness con) sd
-  -- See Note [DmdAnal for DataCon wrappers]
+  -- Data constructor workers
+  | isDataConWorkId var
+  = -- pprTraceWith "dmdTransform:DataCon" (\ty -> ppr var $$ ppr sd $$ ppr ty) $
+    dmdTransformDataConSig (idDmdSig var) sd
 
+  -- See Note [DmdAnal for DataCon wrappers]
   | Just rhs <- dataConWrapUnfolding_maybe var
   , WithDmdType dmd_ty _rhs' <- dmdAnal env sd rhs
   = dmd_ty
+
   -- Dictionary component selectors
   -- Used to be controlled by a flag.
   -- See #18429 for some perf measurements.
@@ -1036,10 +1037,12 @@ dmdTransform env var sd
   = -- pprTrace "dmdTransform:DictSel" (ppr var $$ ppr (idDmdSig var) $$ ppr sd) $
     dmdTransformDictSelSig (idDmdSig var) sd
   -- Imported functions
+
   | isGlobalId var
   , let res = dmdTransformSig (idDmdSig var) sd
   = -- pprTrace "dmdTransform:import" (vcat [ppr var, ppr (idDmdSig var), ppr sd, ppr res])
     res
+
   -- Top-level or local let-bound thing for which we use LetDown ('useLetUp').
   -- In that case, we have a strictness signature to unleash in our AnalEnv.
   | Just (sig, top_lvl) <- lookupSigEnv env var

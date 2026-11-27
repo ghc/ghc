@@ -2257,8 +2257,8 @@ inline y, we must *not* replace x by x' in the inlined copy!!
 
 Note [Fast path for lazy data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For applications of a /lazy/ data constructor worker, the full glory of
-rebuildCall is a waste of effort;
+For applications of a /lazy/ data constructor worker (one with no strict
+fields), the full glory of rebuildCall is a waste of effort;
 * They never inline, obviously
 * They have no rewrite rules
 * Lazy constructors don't need the `StrictArg` treatment.
@@ -2278,7 +2278,8 @@ valuable.
 simplInId :: SimplEnv -> InId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 simplInId env var cont
   | Just dc <- isDataConWorkId_maybe var
-  , isLazyDataConRep dc                    -- See Note [Fast path for lazy data constructors]
+  , not (any isMarkedStrict (dataConRepStrictness dc))
+                                 -- See Note [Fast path for lazy data constructors]
   = rebuild env (Var var) cont
   | otherwise
   = assertPpr (not (isCoVar var)) (ppr var) $
@@ -3647,25 +3648,30 @@ adjustFieldsIdInfo _scrut case_bndr bndr_swap con vs
       -- anyway! It shaves off 2% in T9675
   = map (adjustFieldOccInfo case_bndr bndr_swap) vs
   | otherwise
-  = go vs the_strs
+  = go vs wkr_dmds
   where
-    the_strs = dataConRepStrictness con
+    -- The demand signature of the worker has a strict demand for exactly the
+    -- strict (banged) fields; one demand for each value argument, including
+    -- existential CoVars.  See GHC.Types.Id.Make.mkDataConWorkId.
+    -- NB: we do /not/ mark an unlifted field as evaluated: that gains nothing,
+    -- and an OtherCon[] unfolding makes `interestingArg` say NonTrivArg,
+    -- which changes inlining decisions (we saw this in compiler/perf/T19695).
+    DmdSig (DmdType _ wkr_dmds) = idDmdSig (dataConWorkId con)
 
     go [] [] = []
-    go (v:vs') strs | isTyVar v = v : go vs' strs
-    go (v:vs') (str:strs) = adjustFieldOccInfo case_bndr bndr_swap (setCaseBndrEvald str v) : go vs' strs
+    go (v:vs') dmds | isTyVar v = v : go vs' dmds
+    go (v:vs') (dmd:dmds) = adjustFieldOccInfo case_bndr bndr_swap (set_evald dmd v) : go vs' dmds
     go _ _ = pprPanic "Simplify.adjustFieldsIdInfo"
               (ppr con $$
                ppr vs  $$
-               ppr_with_length (map strdisp the_strs) $$
-               ppr_with_length (dataConRepArgTys con) $$
-               ppr_with_length (dataConRepStrictness con))
+               ppr_with_length wkr_dmds $$
+               ppr_with_length (dataConRepArgTys con))
       where
         ppr_with_length list
           = ppr list <+> parens (text "length =" <+> ppr (length list))
-        strdisp :: StrictnessMark -> SDoc
-        strdisp MarkedStrict = text "MarkedStrict"
-        strdisp NotMarkedStrict = text "NotMarkedStrict"
+
+    set_evald dmd v | isStrDataConDmd dmd = setCaseBndrEvald MarkedStrict v
+                    | otherwise           = v
 
 adjustFieldOccInfo :: OutId -> BinderSwapDecision -> CoreBndr -> CoreBndr
 -- Kill occ info if we do binder swap and the case binder is alive;
@@ -4306,10 +4312,14 @@ mkDupableAlt _env case_bndr jfloats (Alt con alt_bndrs alt_rhs_in)
   | otherwise
   = do  { let rhs_ty'  = exprType alt_rhs_in
 
-              bangs
-                | DataAlt c <- con
-                = dataConRepStrictness c
-                | otherwise = []
+              -- The worker's demand signature is strict in exactly the
+              -- strict (banged) fields; see adjustFieldsIdInfo
+              bangs = case con of
+                          DataAlt dc | DmdSig (DmdType _ dmds) <- idDmdSig (dataConWorkId dc)
+                                     -> [ if isStrDataConDmd d then MarkedStrict
+                                                               else NotMarkedStrict
+                                        | d <- dmds ]
+                          _          -> []
 
               abstracted_binders = abstract_binders alt_bndrs bangs
 

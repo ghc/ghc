@@ -2276,10 +2276,8 @@ app_ok fun_ok primop_ok fun val_args
          -- See (UCM3) in Note [Unary class magic] in GHC.Core.TyCon
 
       DataConWorkId dc
-        | isLazyDataConRep dc
-        -> args_ok
-        | otherwise
-        -> fields_ok (dataConRepStrictness dc)
+        | dataConRepIsLazy dc    -> True  -- Args are all thunks
+        | otherwise              -> fields_ok (dataConRepArgCbvInfos dc)
 
       ClassOpId _ is_terminating_result
         | is_terminating_result -- See Note [exprOkForSpeculation and type classes]
@@ -2344,13 +2342,16 @@ app_ok fun_ok primop_ok fun val_args
     -- Used for strict DataCon worker arguments
     -- See (SFC1) of Note [Strict fields in Core]
     -- See Note [exprOkForSpeculation] (a,b)
-    fields_ok str_marks = all3Prefix field_ok val_arg_tys str_marks val_args
-    field_ok :: Type -> StrictnessMark -> CoreExpr -> Bool
-    field_ok arg_ty str arg
-       = ok_for_spec arg || (definitely_lifted arg_ty arg && str==NotMarkedStrict)
+    fields_ok arg_infos = all3Prefix field_ok val_arg_tys arg_infos val_args
+    field_ok :: Type -> ArgCbvInfo -> CoreExpr -> Bool
+    -- Conservative: treat ArgRepPoly as possibly strict; see Note [ArgCbvInfo]
+    field_ok _      ArgCbn     _   = True
+    field_ok _      ArgCbv     arg = ok_for_spec arg
+    field_ok arg_ty ArgRepPoly arg = arg_ok arg_ty arg
        -- The (ok_for_spec arg) test works for /both/ for unlifted types, /and/
        -- for lifted but strict fields. E.g. K (I# 3) is ok-for-spec,
        -- even if K is strict
+       -- For ArgRepPoly, arg_ok looks at the type of the argument itself
 
     -- We want to see if the argument type is definitely lifted.
     -- But consider
@@ -2650,9 +2651,9 @@ exprIsHNFlike is_con is_con_unf rubbish_lit_result e
     is_hnf_like e
   where
     is_hnf_like (Var v) -- NB: There are no value args at this point
-      =  id_app_is_value v [] -- Catches nullary constructors,
-                              --      so that [] and () are values, for example
-                              -- and (e.g.) primops that don't have unfoldings
+      =  check_app v [] -- Catches nullary constructors,
+                        --      so that [] and () are values, for example
+                        -- and (e.g.) primops that don't have unfoldings
       || is_con_unf (idUnfolding v)
         -- Check the thing's unfolding; it might be bound to a value
         --   or to a guaranteed-evaluated variable (isEvaldUnfolding)
@@ -2687,67 +2688,75 @@ exprIsHNFlike is_con is_con_unf rubbish_lit_result e
       = is_hnf_like rhs
     is_hnf_like _                = False
 
-    -- Collect arguments through Casts and Ticks and call id_app_is_value
+    -- Collect arguments through Casts and Ticks and call check_app
     app_is_value :: CoreExpr -> [CoreArg] -> Bool
-    app_is_value (Var f)    as = id_app_is_value f as
+    app_is_value (Var f)    as = check_app f as
     app_is_value (Tick _ f) as = app_is_value f as
     app_is_value (Cast f _) as = app_is_value f as
     app_is_value (App f a)  as | isValArg a = app_is_value f (a:as)
                                | otherwise  = app_is_value f as
     app_is_value _          _  = False
 
-    id_app_is_value id val_args
-      | Just dc <- isDataConWorkId_maybe id
-      , isUnaryClassDataCon  dc
-      = all is_hnf_like val_args  -- Look through unary class data cons
-      | otherwise
-      -- See Note [exprIsHNF for function applications]
-      --   for the specification and examples
+    -- check_app: See Note [exprIsHNF for function applications]
+    --            for the specification and examples
+    -- We check arity (and CONLIKEness) first because it's cheaper
+    --     and we reject quickly on saturated apps.
+    check_app :: Id -> [CoreArg] -> Bool
+    check_app id val_args
       = case compare (idArity id) (length val_args) of
-          EQ | is_con id ->      -- Saturated app of a DataCon/CONLIKE Id
-            case mb_str_marks id of
-              Just str_marks ->  -- with strict fields; see (SFC1) of Note [Strict fields in Core]
-                assert (val_args `equalLength` str_marks) $
-                fields_hnf str_marks
-              Nothing ->         -- without strict fields: like PAP
-                args_hnf         -- NB: CONLIKEs are lazy!
+          EQ -> check_saturated id val_args  -- Saturated application
+          GT -> check_args      id val_args  -- Partial application
+          LT -> False                        -- Over-saturated
 
-          GT ->                  -- PAP: Check unlifted val_args
-            args_hnf
+    check_saturated :: Id -> [CoreArg] -> Bool
+    check_saturated id val_args
+      | Just dc <- isDataConWorkId_maybe id
+      , isUnaryClassDataCon dc   -- (MkC e) is just e
+      = all is_hnf_like val_args -- See (UCM4) in Note [Unary class magic]
 
-          _  -> False
+      | Just dc <- isDataConWorkId_maybe id
+      , let arg_infos = dataConRepArgCbvInfos dc
+      = -- Saturated data constructors; use `check_field`
+        -- to ensure we account for strict and unlifted fields
+        assertPpr (equalLength val_args arg_infos)
+                  (ppr dc $$ ppr val_args $$ ppr arg_infos) $
+        all2Prefix check_field val_args arg_infos
 
+      | is_con id  -- Saturated CONLIKE: check the arguments
+      = check_args id val_args
+
+      | otherwise  -- Saturated function, not a constructor => not HNF
+      = False
+
+    -- check_args: check that any unlifted args are hnf-like
+    -- NB: there may be fewer val_args than arg_tys (e.g. (map f))
+    check_args :: Id -> [CoreArg] -> Bool
+    check_args id val_args = all2Prefix check_arg val_args arg_tys
       where
-        -- Saturated, Strict DataCon: Check unlifted val_args and strict fields
-        fields_hnf str_marks = all3Prefix check_field val_arg_tys str_marks val_args
+        arg_tys = get_val_arg_tys id
 
-        -- PAP: Check unlifted val_args
-        args_hnf             = all2Prefix check_arg   val_arg_tys           val_args
+    -- check_arg: check unliftedness; for example f (x /# 12#) where f
+    -- has arity two, and the first argument is unboxed. This is not a value!
+    -- But  f 34#  is a value, so check unlifted args for HNFs.
+    check_arg arg arg_ty
+      | mightBeUnliftedType arg_ty = is_hnf_like arg
+      | otherwise                  = True
 
-        val_arg_tys = splitUninstantiatedValArgTys (idType id)
-          -- val_arg_tys = map exprType val_args, but much less costly.
-          -- The obvious definition regresses T16577 by 30% so we don't do it.
+    -- check_field: used for a data constructor worker:
+    --     check unlifted val_args /and/ strict fields
+    -- See (SFC1) of Note [Strict fields in Core]
+    -- Conservative: treat ArgRepPoly as possibly strict; see Note [ArgCbvInfo]
+    -- (check_arg would do the same, because the uninstantiated type of a
+    --  rep-poly field might be unlifted.)
+    check_field :: CoreArg -> ArgCbvInfo -> Bool
+    check_field _   ArgCbn     = True
+    check_field arg ArgCbv     = is_hnf_like arg
+    check_field arg ArgRepPoly = is_hnf_like arg
 
-        check_arg a_ty a
-          | mightBeUnliftedType a_ty = is_hnf_like a
-          | otherwise                = True
-         -- Check unliftedness; for example f (x /# 12#) where f has arity two,
-         -- and the first argument is unboxed. This is not a value!
-         -- But  f 34#  is a value, so check args for HNFs.
-         -- NB: We check arity (and CONLIKEness) first because it's cheaper
-         --     and we reject quickly on saturated apps.
-        check_field a_ty str a
-          | mightBeUnliftedType a_ty = is_hnf_like a
-          | isMarkedStrict str       = is_hnf_like a
-          | otherwise                = True
-          -- isMarkedStrict: Respect Note [Strict fields in Core]
+    get_val_arg_tys id = splitUninstantiatedValArgTys (idType id)
+       -- val_arg_tys = map exprType val_args, but much less costly.
+       -- The obvious definition regresses T16577 by 30% so we don't do it.
 
-        mb_str_marks id
-          | Just dc <- isDataConWorkId_maybe id
-          , not (isLazyDataConRep dc)
-          = Just (dataConRepStrictness dc)
-          | otherwise
-          = Nothing
 
 {-
 Note [exprIsHNF Tick]
@@ -2903,7 +2912,7 @@ dataConInstPat fss uniqs mult con inst_tys
     ex_tvs   = dataConExTyCoVars con
     arg_tys  = dataConRepArgTys con
     arg_strs = dataConRepStrictness con  -- 1-1 with arg_tys
-    n_ex = length ex_tvs
+    n_ex     = length ex_tvs
 
       -- split the Uniques and FastStrings
     (ex_uniqs, id_uniqs) = splitAt n_ex uniqs

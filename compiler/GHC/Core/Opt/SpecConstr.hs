@@ -2605,7 +2605,7 @@ callToPat env bndr_occs call@(Call fn args con_env)
   = do  { let in_scope = substInScopeSet (sc_subst env)
 
         ; arg_triples <- argsToPats env in_scope con_env (idType fn) args bndr_occs
-                                    (repeat NotMarkedStrict)
+                                    (repeat ArgCbn)
                    -- This trims the args to be no longer than
                    -- the lambdas in the function definition (bndr_occs)
 
@@ -2666,7 +2666,7 @@ argsToPats :: ScEnv
            -> Type                -- ^ type of the head (function or data constructor)
            -> [CoreArg]           -- ^ arguments of the head
            -> [ArgOcc]            -- ^ occurrence info, one per argument; the result is trimmed to this length
-           -> [StrictnessMark]    -- ^ strictness info, one per value argument
+           -> [ArgCbvInfo]        -- ^ strictness info, one per value argument
            -> UniqSM [(Bool, CoreArg, [Id])]
 argsToPats env in_scope val_env = go
   where
@@ -2674,7 +2674,7 @@ argsToPats env in_scope val_env = go
     go _ _ [] _ = return []
     go fun_ty (arg : args) (occ : occs) strs
       = do { (pat, strs') <- case arg of
-               Type {} -> do { pat <- argToPat env in_scope val_env arg_ty arg occ NotMarkedStrict
+               Type {} -> do { pat <- argToPat env in_scope val_env arg_ty arg occ ArgCbn
                              ; return (pat, strs) }
                _ | str : strs' <- strs
                        -> do { pat <- argToPat env in_scope val_env arg_ty arg occ str
@@ -2699,7 +2699,7 @@ argToPat :: ScEnv
          -> Type                        -- ^ type for this argument
          -> CoreArg                     -- ^ A call arg (or component thereof)
          -> ArgOcc                      -- ^ occurrence info for the argument
-         -> StrictnessMark              -- ^ Tells us if this argument is a strict field of a data constructor
+         -> ArgCbvInfo                  -- ^ Tells us if this argument is a strict field of a data constructor
                                         -- See Note [SpecConstr and strict fields]
          -> UniqSM (Bool, CoreArg, [Id])
 
@@ -2726,7 +2726,7 @@ argToPat1 :: ScEnv
   -> Type
   -> Expr CoreBndr
   -> ArgOcc
-  -> StrictnessMark
+  -> ArgCbvInfo
   -> UniqSM (Bool, Expr CoreBndr, [Id])
 argToPat1 _env _in_scope _val_env _pat_ty arg@(Type {}) _arg_occ _arg_str
   = return (False, arg, [])
@@ -2767,9 +2767,9 @@ argToPat1 env in_scope val_env _pat_ty arg arg_occ _arg_str
   , not (ignoreDataCon env dc)        -- See Note [NoSpecConstr]
   , Just arg_occs <- mb_scrut dc
   = do { let (ty_args, rest_args) = splitAtList (dataConUnivTyVars dc) args
-             con_str :: [StrictnessMark]
+             con_str :: [ArgCbvInfo]
              -- con_str corresponds 1-1 with the /value/ arguments
-             con_str = dataConRepStrictness dc
+             con_str = dataConRepArgCbvInfos dc
              con_ty  = applyTypeToArgs (dataConRepType dc) ty_args
       --  ; pprTraceM "bangs" (ppr (length rest_args == length con_str) $$
       --       ppr dc $$
@@ -2808,7 +2808,7 @@ argToPat1 env in_scope val_env _pat_ty (Var v) arg_occ arg_str
        -- box that we can eliminate in the caller
   , not (ignoreType env (varType v))
   -- See Note [SpecConstr and strict fields]
-  = return (True, Var v, if isMarkedStrict arg_str then [v] else mempty)
+  = return (True, Var v, if arg_str == ArgCbv then [v] else mempty)
   where
     is_value
         | isLocalId v = v `elemInScopeSet` in_scope
@@ -2860,11 +2860,13 @@ argToPat1 _env _in_scope _val_env pat_ty _arg _arg_occ arg_str
   = wildCardPat pat_ty arg_str
 
 -- | wildCardPats are always boring
-wildCardPat :: Type -> StrictnessMark -> UniqSM (Bool, CoreArg, [Id])
+wildCardPat :: Type -> ArgCbvInfo -> UniqSM (Bool, CoreArg, [Id])
 wildCardPat ty str
   = do { id <- mkSysLocalOrCoVarM (fsLit "sc") ManyTy ty
        -- ; pprTraceM "wildCardPat" (ppr id' <+> ppr (idUnfolding id'))
-       ; return (False, varToCoreExpr id, if isMarkedStrict str then [id] else []) }
+       ; return (False, varToCoreExpr id, if str == ArgCbv then [id] else []) }
+       -- NB: unlifted (ArgCbv) args will be filtered out by
+       -- wantCbvForId in mkSeqs; see Note [SpecConstr and strict fields]
 
 isValue :: ValueEnv -> CoreExpr -> Maybe Value
 isValue _env (Lit lit)

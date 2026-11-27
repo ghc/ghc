@@ -1726,12 +1726,10 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
     -- See Note [Strict fields in Core] for what a field seq is and (SFC2) for
     -- why we insert them
     mkFieldSeqFloats in_scope dc args
-      | isLazyDataConRep dc
-      = (in_scope, nilOL, args)
-      | otherwise
-      = (in_scope', floats', ty_args ++ val_args')
+      | dataConRepIsLazy dc = (in_scope, nilOL, args)  -- Short cut in common case
+      | otherwise           = (in_scope', floats', tyco_args ++ val_args')
       where
-        (ty_args, val_args) = splitAtList (dataConUnivAndExTyCoVars dc) args
+        (tyco_args, val_args) = splitAtList (dataConUnivAndExTyCoVars dc) args
         (in_scope', floats', val_args') = foldr do_one (in_scope, nilOL, []) $
                                           zipEqual str_marks val_args
         str_marks = dataConRepStrictness dc

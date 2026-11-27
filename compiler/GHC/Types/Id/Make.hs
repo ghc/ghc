@@ -541,7 +541,6 @@ mkDataConWorkId wkr_name data_con
     univ_tvs  = dataConUnivTyVars data_con
     ex_tcvs   = dataConExTyCoVars data_con
     arg_tys   = dataConRepArgTys  data_con  -- Should be same as dataConOrigArgTys
-    str_marks = dataConRepStrictness data_con
 
     ----------- Workers for data types --------------
     alg_wkr_info = noCafIdInfo
@@ -555,10 +554,20 @@ mkDataConWorkId wkr_name data_con
                    `setLFInfo`             wkr_lf_info
 
     wkr_inline_prag = alwaysConLikePragma
-    wkr_arity = dataConRepArity data_con
 
-    wkr_sig = mkClosedDmdSig wkr_dmds topDiv
-    wkr_dmds = map mk_dmd str_marks
+    -- Strictness signature has arity = wkr_arity
+    -- i.e. including any existential CoVars
+    -- See (EXCO1) in Note [Existential coercion variables]
+    -- The demands reflect only the bangs (strict fields), not liftedness;
+    -- GHC.Types.Demand.dmdTransformDataConSig relies on this.
+    -- See Note [Demand transformer for data constructors]
+    wkr_arity = dataConRepArity data_con
+    wkr_dmds  = replicate (count isCoVar ex_tcvs) topDmd
+                ++ map mk_dmd (dataConRepStrictness data_con)
+    wkr_sig   = assertPpr (wkr_dmds `lengthIs` wkr_arity &&
+                           splitUninstantiatedValArgTys wkr_ty `lengthIs` wkr_arity)
+                    (ppr data_con $$ ppr wkr_dmds $$ ppr wkr_ty) $
+                mkClosedDmdSig wkr_dmds topDiv
     mk_dmd MarkedStrict    = evalDmd
     mk_dmd NotMarkedStrict = topDmd
 
@@ -859,7 +868,7 @@ mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
       | otherwise
       = case dc_bang_opts of
           SrcBangOpts bang_opts -> zipWith (dataConSrcToImplBang platform bang_opts fam_envs)
-                                    orig_arg_tys orig_bangs
+                                           orig_arg_tys orig_bangs
           FixedBangOpts bangs   -> bangs
 
     (rep_tys_w_strs, wrappers)
@@ -999,11 +1008,11 @@ For further reading, see:
 
 Note [Bangs on imported data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We pass Maybe [HsImplBang] to mkDataConRep to make use of HsImplBangs
+We pass `DataConBangOpts` to `mkDataConRep` to make use of `HsImplBangs`
 from imported modules.
 
-- Nothing <=> use HsSrcBangs
-- Just bangs <=> use HsImplBangs
+- SrcBangOpts opts         <=> use HsSrcBangs
+- FixedBangOpts impl_bangs <=> use impl_bangs
 
 For imported types we can't work it all out from the HsSrcBangs,
 because we want to be very sure to follow what the original module
@@ -1011,8 +1020,8 @@ because we want to be very sure to follow what the original module
 flags were enabled when it was compiled. So we record the decisions in
 the interface file.
 
-The HsImplBangs passed are in 1-1 correspondence with the
-dataConOrigArgTys of the DataCon.
+The `HsImplBangs` passed are in 1-1 correspondence with the
+`dataConOrigArgTys` of the DataCon.
 
 Note [Data con wrappers and unlifted types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
