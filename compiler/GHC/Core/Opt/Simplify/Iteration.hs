@@ -64,7 +64,8 @@ import GHC.Builtin.KnownKeys( runRWKey, seqHashKey )
 import GHC.Builtin.WiredIn.Ids( seqId )
 
 import qualified GHC.Data.List.Infinite as Inf
-import GHC.Data.Maybe   ( isNothing, orElse, mapMaybe )
+import GHC.Data.List.Infinite ( Infinite(..) )
+import GHC.Data.Maybe   ( orElse, mapMaybe )
 import GHC.Data.FastString
 import GHC.Unit.Module ( moduleName )
 import GHC.Utils.Outputable
@@ -75,7 +76,6 @@ import GHC.Utils.Logger
 import GHC.Utils.Misc
 
 import Control.Monad
-import Data.List.NonEmpty (NonEmpty (..))
 
 {-
 The guts of the simplifier is in this module, but the driver loop for
@@ -1639,7 +1639,7 @@ rebuild_go env expr cont
 
       ApplyToVal { sc_arg = arg, sc_env = arg_se, sc_cast = arg_mco
                  , sc_cont = cont, sc_hole_ty = fun_ty }
-        -> do { arg' <- simplArg env Nothing fun_ty arg_se arg arg_mco
+        -> do { arg' <- simplArg env fun_ty arg_se arg arg_mco
               ; rebuild_go env (App expr arg') cont }
 
 completeBindX :: SimplEnv
@@ -1841,27 +1841,21 @@ pushCast env co cont
     go_mco (MCo co) opt cont = go co opt cont
 
 simplArg :: SimplEnvIS              -- ^ Used only for its InScopeSet
-         -> Maybe ArgInfo           -- ^ Just <=> This arg `ai` occurs in an app
-                                    --   `f a1 ... an` where we have ArgInfo on
-                                    --   how `f` uses `ai`, affecting the Stop
-                                    --   continuation passed to 'simplExprC'
          -> OutType                 -- ^ Type of the function applied to this arg
          -> StaticEnv -> CoreExpr   -- ^ Expression with its static envt
          -> MOutCoercion            -- Wrap this around the result
          -> SimplM OutExpr
-simplArg _ _ _ (Simplified {}) arg mco
+-- Simplify an argument in a boring context
+-- c.f. the lazy-argument case of `rebuildCall`, which does the same,
+--      but with a more informative Stop continuation
+simplArg _ _ (Simplified {}) arg mco
   = -- See Note [Avoid repeated simplification]
     case mco of
        MRefl  -> return arg       -- Vastly common case
        MCo co -> return (mkCast arg co)
-simplArg env mb_arg_info fun_ty (UnSimplified arg_se) arg mco
-  = do { let arg_env' = arg_se `setInScopeFromE` env
-             arg_ty   = funArgTy fun_ty
-             stop     = case mb_arg_info of
-                           Nothing -> mkBoringStop arg_ty
-                           Just ai -> mkLazyArgStop arg_ty ai
-             cont     = addCastMCo mco stop
-       ; simplExprC arg_env' arg cont }
+simplArg env fun_ty (UnSimplified arg_se) arg mco
+  = simplExprC (arg_se `setInScopeFromE` env) arg $
+    addCastMCo mco (mkBoringStop (funArgTy fun_ty))
 
 {-
 ************************************************************************
@@ -1920,7 +1914,7 @@ simpl_lam env bndr body (ApplyToVal { sc_arg = arg, sc_env = arg_se
              -- in this round of the Simplifier
              -> simplNonRecE env from_what bndr (arg, arg_env) body cont
 
-           _ -> do { arg' <- simplArg env Nothing fun_ty arg_se arg arg_mco
+           _ -> do { arg' <- simplArg env fun_ty arg_se arg arg_mco
                    ; completeBindX env from_what bndr arg' body cont }
        }
   where
@@ -2255,32 +2249,102 @@ zap the SubstEnv.  This is VITAL.  Consider
 We'll clone the inner \x, adding x->x' in the id_subst Then when we
 inline y, we must *not* replace x by x' in the inlined copy!!
 
-Note [Fast path for lazy data constructors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For applications of a /lazy/ data constructor worker (one with no strict
-fields), the full glory of rebuildCall is a waste of effort;
+Note [Simplifying data constructor applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For applications of a data constructor worker, much of the work done for
+an ordinary function application is a waste of effort:
+* Workers are global, so there is no need to look in the substitution
 * They never inline, obviously
 * They have no rewrite rules
-* Lazy constructors don't need the `StrictArg` treatment.
-So it's fine to zoom straight to `rebuild` which just rebuilds the
-call in a very straightforward way.
+* We know their argument strictness without looking at their type
+So `simplInId` takes a short cut:
 
-For a data constructor worker that is strict (see Note [Strict fields in Core])
-we take the slow path, so that we'll transform
-  K (case x of (a,b) -> a)  -->   case x of (a,b) -> K a
-via the StrictArg case of rebuildCall
+(SDC1) If the constructor is completely lazy (`dataConRepIsLazy`: all
+  arguments are lifted and none has a bang), there is nothing for
+  `rebuildCall` to do, so we zoom straight to `rebuild`, which just
+  rebuilds the call in a very straightforward way.
 
-Some programs have a /lot/ of data constructors in the source program
-(compiler/perf/T9961 is an example), so this fast path can be very
-valuable.
+  This is not just a nicety: `rebuildCall` costs noticeably more per
+  argument than `rebuild` (ArgInfo, ArgSpecs, argInfoExpr, closures), and
+  some programs have a /lot/ of data constructors (compiler/perf/T9961 is
+  an example).  Sending lazy constructors through `rebuildCall` made T9961
+  allocate about 3% more, even with the specialised SimpleArgInfo of (SDC2).
+
+(SDC2) Otherwise we go straight to `rebuildCall`, skipping `simplOutId`,
+  with a `SimpleArgInfo` built by `dataConArgInfo`.  `SimpleArgInfo` is a
+  specialised form of `ArgInfo`, with far fewer fields: a worker has no
+  rules, no unfolding discounts, never diverges, and its argument strictness
+  is given by `dataConRepArgCbvInfos`.  `rebuildCall` has a separate, much
+  simpler, equation for it.
+
+  We want `rebuildCall`, rather than `rebuild`, for its StrictArg treatment
+  of arguments that are evaluated: strict fields (see Note [Strict fields
+  in Core]), and unlifted arguments (#28169).  E.g. we want
+      K (case x of (a,b) -> a)    -->   case x of (a,b) -> K a
+      I# (case x of (a,b) -> a#)  -->   case x of (a,b) -> I# a#
+  See Note [ArgCbvInfo] in GHC.Core.DataCon.
+
+(SDC3) An /unsaturated/ worker application is a partial application, and
+  hence a value: it does not evaluate its arguments, not even the strict
+  ones.  E.g. with  data T = MkT !Int Int
+      MkT (case x of (a,b) -> a)    -/->   case x of (a,b) -> MkT a
+  because the latter is bottom if x is, whereas the former is not.  So
+  `dataConArgInfo` treats all the arguments as lazy if the call is
+  unsaturated, just as `mkArgInfo` does for ordinary functions (see Note
+  [Unsaturated functions] in GHC.Core.Opt.Simplify.Utils).
+
+  As it happens we don't know how to generate such a call: workers appear
+  unsaturated only through eta-reduction of (\b -> MkT a b), and then `a` is
+  already evaluated (the wrapper evaluated it), so it is never a `case`.
+  But nothing in Core forbids it, so we are defensive; `saturatedCont` is cheap.
+-}
+
+{- Note [Simple functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a call (f e1 .. en) where f
+  (a) has no rewrite rules (not even in the rule base),
+  (b) has no unfolding (so it cannot be inlined, and has no discounts),
+  (c) has a vanilla (nop) demand signature (so it never diverges, and its
+      only strict arguments are the unlifted ones), and
+  (d) is not in a context with rules (contHasRules), so we don't need to
+      be keen to inline in its arguments.
+Then the general machinery of simplOutId and rebuildCall can achieve
+nothing beyond what the much simpler SimpleArgInfo path does; that path
+is the same one we use for data constructor workers, see (SDC2) in
+Note [Simplifying data constructor applications].  `isSimpleFunId` checks
+(b,c); simplOutId checks (a,d).
+
+This matters at -O0, where interface pragmas are ignored, so all imported
+functions look like this; and for lambda-bound functions at any level.
+
+Differences from the general path:
+* Unlifted arguments get the StrictArg treatment even if the call is
+  unsaturated; the general path does not use type strictness then
+  (see Note [Unsaturated functions] in GHC.Core.Opt.Simplify.Utils).
+* When duplicating a StrictArg (Note [Duplicating StrictArg]) we always use
+  Plan B (a join point), just as for data constructors.  The benefits of
+  Plan A mostly come from inlining or rules for the function, once it sees
+  the particular case alternative; and a simple function has neither.
+
+  The remaining benefit of Plan A is call-pattern specialisation (#3116),
+  for a self-recursive call  go a (case x of ...)  in the RHS of `go`.
+  There `go` can be simple, because the Simplifier zaps the unfolding of
+  a recursive binder while simplifying its RHS (see `subst_id_bndr`).
+  But for a simple function only an /unlifted/ argument takes the StrictArg
+  route.  In #3116 the argument is lifted, and `go` is strict in it only
+  after demand analysis, by which time `go` has a non-nop signature and so
+  is not simple.  So we lose Plan A only for an unlifted argument, before
+  demand analysis; and even then the join point  $j x = go a x  is small,
+  and may well be inlined back into the branches.
 -}
 
 simplInId :: SimplEnv -> InId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 simplInId env var cont
-  | Just dc <- isDataConWorkId_maybe var
-  , not (any isMarkedStrict (dataConRepStrictness dc))
-                                 -- See Note [Fast path for lazy data constructors]
-  = rebuild env (Var var) cont
+  | Just dc <- isDataConWorkId_maybe var  -- See Note [Simplifying data constructor applications]
+  = if dataConRepIsLazy dc
+    then rebuild env (Var var) cont                              -- (SDC1)
+    else rebuildCall (zapSubstEnv env) (dataConArgInfo dc cont) cont  -- (SDC2)
+
   | otherwise
   = assertPpr (not (isCoVar var)) (ppr var) $
     case substId env var of
@@ -2400,10 +2464,18 @@ simplOutId env fun cont
 
 -- Normal case for (f e1 .. en)
 simplOutId env fun cont
-  = -- Try rewrite rules: Plan (BEFORE) in Note [When to apply rewrite rules]
-    do { rule_base <- getSimplRules
+  = do { rule_base <- getSimplRules
        ; let rules_for_me = getRules rule_base fun
-             out_args     = contOutArgs env cont :: [OutExpr]
+       ; if null rules_for_me && isSimpleFunId fun && not (contHasRules cont)
+         then -- A simple function: see Note [Simple functions]
+              rebuildCall env (simpleFunArgInfo fun) cont
+         else simplOutId_general env fun rules_for_me cont }
+
+simplOutId_general :: SimplEnvIS -> OutId -> [CoreRule] -> SimplCont
+                   -> SimplM (SimplFloats, OutExpr)
+simplOutId_general env fun rules_for_me cont
+  = -- Try rewrite rules: Plan (BEFORE) in Note [When to apply rewrite rules]
+    do { let out_args     = contOutArgs env cont :: [OutExpr]
        ; mb_match <- if not (null rules_for_me) &&
                         (isClassOpId fun || activeUnfolding (seMode env) fun)
                      then tryRules env rules_for_me fun out_args
@@ -2440,54 +2512,123 @@ rebuildCall :: SimplEnvIS -> ArgInfo -> SimplCont
 -- it is usually empty, and regardless should be ignored.
 -- Only the in-scope set matters, plus the seMode flags
 
--- Check the invariant
-rebuildCall env arg_info _cont
-  | assertPpr (checkSimplEnvIS env) (pprBadSimplEnvIS env $$ ppr arg_info) False
-  = pprPanic "rebuildCall" empty
+-- NB: rebuildCall takes the ArgInfo apart once, and then loops with `go`,
+-- passing only the pieces that change from one argument to the next.
+-- We only re-package an ArgInfo when we need one, for a StrictArg
+-- continuation.  This saves allocating a fresh ArgInfo record for every
+-- argument, which is measurable (e.g. compiler/perf/T9961).
+-- Similarly `go` loops over the [Demand] in the RemainingArgDmds; the
+-- Divergence (which says what happens when they run out) does not change.
+---------- Data constructor workers and simple functions ------------
+-- A specialised, much simpler, version of the general case below
+-- See (SDC2) in Note [Simplifying data constructor applications]
+-- and Note [Simple functions]
+rebuildCall env info@(SimpleArgInfo { ai_app = app0, ai_arg_cbvs = cbvs0 }) cont0
+  = assertPpr (checkSimplEnvIS env) (pprBadSimplEnvIS env) $
+    go app0 cbvs0 cont0
+  where
+    -- `app` is the function applied to the arguments so far
+    go :: OutExpr -> [ArgCbvInfo] -> SimplCont -> SimplM (SimplFloats, OutExpr)
+    go app cbvs (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = cont })
+      = go (App app (Type arg_ty)) cbvs cont
 
----------- Bottoming applications --------------
-rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_dmds = [] }) cont
-  -- When we run out of demands, it means that the call is definitely bottom.
-  -- See (TC2) in Note [Trimming the continuation for bottoming functions]
-  = rebuild env (argInfoExpr fun rev_args) (mkBottomCont cont)
+    go app cbvs
+       (ApplyToVal { sc_arg = arg, sc_env = arg_se, sc_cast = arg_mco
+                   , sc_hole_ty = fun_ty, sc_cont = cont })
+      | ArgCbv : _ <- cbvs        -- Strict field or unlifted arg; ArgRepPoly is lazy
+                                  -- See Note [ArgCbvInfo] in GHC.Core.DataCon
+      , UnSimplified arg_env <- arg_se
+      , seCaseCase env            -- Only when case-of-case is on.
+                                  -- See Note [Case-of-case and full laziness]
+      = simplExprF (arg_env `setInScopeFromE` env) arg $
+        addCastMCo arg_mco $
+        StrictArg { sc_fun = info { ai_app = app, ai_arg_cbvs = cbvs }
+                  , sc_fun_ty = fun_ty
+                  , sc_dup = NoDup
+                  , sc_cont = cont }
 
----------- Simplify type applications --------------
-rebuildCall env info (ApplyToTy { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = cont })
-  = rebuildCall env (addTyArgTo info arg_ty hole_ty) cont
+      | otherwise
+      = do  { arg' <- simplArg env fun_ty arg_se arg arg_mco
+            ; go (App app arg') (drop 1 cbvs) cont }
+                 -- drop 1: if `cbvs` runs out, further args are lazy
 
----------- Simplify value arguments --------------------
-rebuildCall env fun_info
-            (ApplyToVal { sc_arg = arg, sc_env = arg_se, sc_cast = arg_mco
-                        , sc_hole_ty = fun_ty, sc_cont = cont })
-  | UnSimplified arg_env <- arg_se
-  , isStrictArgInfo fun_info  -- Strict arguments
-  , seCaseCase env            -- But only when case-of-case is on.
-                              -- See Note [Case-of-case and full laziness]
-  = simplExprF (arg_env `setInScopeFromE` env) arg $
-    addCastMCo arg_mco $
-    StrictArg { sc_fun = fun_info, sc_fun_ty = fun_ty
-              , sc_dup = NoDup
-              , sc_cont = cont }
-                -- Note [Shadowing in the Simplifier]
+    go app _ cont   -- No rules for these functions
+      = rebuild env app cont
 
-  | otherwise      -- Lazy, or already simplified arguments
-  -- DO NOT float anything outside, hence simplExprC
-  -- There is no benefit (unlike in a let-binding), and we'd
-  -- have to be very careful about bogus strictness through
-  -- floating a demanded let.
-  = do  { arg' <- simplArg env (Just fun_info) fun_ty arg_se arg arg_mco
-        ; rebuildCall env (addValArgTo fun_info  arg' fun_ty) cont }
+---------- The general case ------------
+rebuildCall env info@(ArgInfo { ai_fun_id = fun, ai_args = rev_args0, ai_rules = rules
+                              , ai_encl = encl, ai_discs = discs0
+                              , ai_dmds = dmd_ty0@(DmdType { dt_env = dmd_env0
+                                                           , dt_args = dmds0 }) })
+            cont0
+  = assertPpr (checkSimplEnvIS env) (pprBadSimplEnvIS env $$ ppr info) $
+    go rev_args0 dmds0 discs0 cont0
+  where
+    go :: [ArgSpec] -> [Demand] -> Infinite Int -> SimplCont
+       -> SimplM (SimplFloats, OutExpr)
 
----------- No further useful info, revert to generic rebuild ------------
-rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_arg_specs, ai_rules = rules }) cont
-  | null rules
-  = rebuild env (argInfoExpr fun rev_arg_specs) cont
-  | otherwise  -- Try rules again: Plan (AFTER) in Note [When to apply rewrite rules]
-  = do { let arg_specs = reverse rev_arg_specs
-       ; mb_match <- tryRules env rules fun (map argSpecArg arg_specs)
-       ; case mb_match of
-           Just rule_match -> fireRuleAFTER env rule_match arg_specs cont
-           Nothing         -> rebuild env (argInfoExpr fun rev_arg_specs) cont }
+    ---------- Bottoming applications --------------
+    go rev_args [] _ cont
+      | isDeadEndDiv (de_div dmd_env0)  -- c.f. splitArgDmd
+      -- When we run out of demands, it means that the call is definitely bottom.
+      -- See (TC2) in Note [Trimming the continuation for bottoming functions]
+      = rebuild env (argInfoExpr fun rev_args) (mkBottomCont cont)
+
+    ---------- Simplify type applications --------------
+    go rev_args dmds discs (ApplyToTy { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = cont })
+      = go (TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty } : rev_args) dmds discs cont
+
+    ---------- Simplify value arguments --------------------
+    go rev_args dmds discs@(Inf _ discs')
+       (ApplyToVal { sc_arg = arg, sc_env = arg_se, sc_cast = arg_mco
+                   , sc_hole_ty = fun_ty, sc_cont = cont })
+      | UnSimplified arg_env <- arg_se
+      , seCaseCase env            -- Only when case-of-case is on.
+                                  -- See Note [Case-of-case and full laziness]
+      , isStrUsedDmd dmd          -- Strict arguments; c.f. isStrictArgInfo
+                                  -- NB: mkArgInfo makes unlifted args strict
+      = simplExprF (arg_env `setInScopeFromE` env) arg $
+        addCastMCo arg_mco $
+        StrictArg { sc_fun = info { ai_args = rev_args, ai_discs = discs
+                                  , ai_dmds = dmd_ty0 { dt_args = dmds } }
+                  , sc_fun_ty = fun_ty
+                  , sc_dup = NoDup
+                  , sc_cont = cont }
+                    -- Note [Shadowing in the Simplifier]
+
+      | otherwise      -- Lazy, or already simplified arguments
+      -- DO NOT float anything outside, hence simplExprC
+      -- There is no benefit (unlike in a let-binding), and we'd
+      -- have to be very careful about bogus strictness through
+      -- floating a demanded let.
+      = do  { arg' <- case arg_se of
+                 Simplified {}  -- See Note [Avoid repeated simplification]
+                   -> return (mkCastMCo arg arg_mco)
+                 UnSimplified arg_env
+                   -> simplExprC (arg_env `setInScopeFromE` env) arg $
+                      addCastMCo arg_mco $
+                      Stop (funArgTy fun_ty) (lazyArgCallCtxt encl discs)
+                           (subDemandIfEvaluated dmd)   -- c.f. mkLazyArgStop
+            ; go (ValArg { as_arg = arg', as_hole_ty = fun_ty, as_dmd = dmd } : rev_args)
+                 dmds' discs' cont }
+      where
+        !(dmd, dmds') = case dmds of
+                          dmd : dmds' -> (dmd, dmds')
+                          []          -> (topDmd, [])
+                             -- Not bottoming (see first equation of `go`),
+                             -- so the default demand is topDmd
+                          -- Bang: avoid allocating thunks for dmd and dmds'
+
+    ---------- No further useful info, revert to generic rebuild ------------
+    go rev_arg_specs _ _ cont
+      | null rules
+      = rebuild env (argInfoExpr fun rev_arg_specs) cont
+      | otherwise  -- Try rules again: Plan (AFTER) in Note [When to apply rewrite rules]
+      = do { let arg_specs = reverse rev_arg_specs
+           ; mb_match <- tryRules env rules fun (map argSpecArg arg_specs)
+           ; case mb_match of
+               Just rule_match -> fireRuleAFTER env rule_match arg_specs cont
+               Nothing         -> rebuild env (argInfoExpr fun rev_arg_specs) cont }
 
 -----------------------------------
 tryInlining :: SimplEnv -> Logger -> OutId -> SimplCont -> SimplM (Maybe OutExpr)
@@ -4059,20 +4200,22 @@ This trimming can also be done with other continuations:
 
 We implement the trimming in three parts:
 
-(TC1) In `mkArgInfo`, for a bottoming function, we make a list of `RemainingArgDmds`
-  with a finite list of elements (in the example above, just one).
+(TC1) In `mkArgInfo`, for a bottoming function, we use its `DmdType` as the
+  `RemainingArgDmds`. It has a finite list of argument demands (in the example
+  above, just one), and a divergence that `isDeadEndDiv`.
 
-  For comparison, note that, for non-bottoming functions, the `RemainingArgDmds`
-  always finishes with an infinite list of `topDmd`.
+  For comparison, note that, for non-bottoming functions, the divergence is
+  not `isDeadEndDiv`, so `splitArgDmd` yields `topDmd` once the argument
+  demands run out.
 
-(TC2) In `rebuildCall`, when we run out of `RemainingArgDmds` we discard the
+(TC2) In `rebuildCall`, when `splitArgDmd` returns Nothing we discard the
   remaining continuation.
 
   After discarding the continuation, the types might not match, in which case
   we leave behind a (case <hole> of {}) wrapper.  See the call to `mkBottomCont`.
 
 (TC3) In `mkDupableContWithDmds`, we similarly discard the continuation when
-  we run out of `RemainingArgDmds`.
+  `splitArgDmd` returns Nothing.
 -}
 
 --------------------
@@ -4104,7 +4247,7 @@ mkDupableCont :: SimplEnvIS
                                        --   extra let/join-floats and in-scope variables
                         , SimplCont)   -- dup_cont: duplicable continuation
 mkDupableCont env cont
-  = mkDupableContWithDmds (zapSubstEnv env) (repeat topDmd) cont
+  = mkDupableContWithDmds (zapSubstEnv env) nopDmdType cont
 
 mkDupableContWithDmds
    :: SimplEnvIS -> RemainingArgDmds
@@ -4122,7 +4265,7 @@ mkDupableContWithDmds env remaining_dmds cont
   --                 => simply trim the continuation
   -- c.f. the null-demands case in `rebuildCall`
   -- See (TC3) in Note [Trimming the continuation for bottoming functions]
-  | null remaining_dmds
+  | Nothing <- splitArgDmd remaining_dmds
   = return (emptyFloats env, mkBottomCont cont)
 
 mkDupableContWithDmds _ _ (Stop {}) = panic "mkDupableCont"     -- Handled by previous eqn
@@ -4164,18 +4307,20 @@ mkDupableContWithDmds env _
     (StrictArg { sc_fun = fun, sc_cont = cont
                , sc_fun_ty = fun_ty })
   -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
-  | isNothing (isDataConId_maybe (ai_fun fun))
-         -- isDataConId: see point (DJ4) of Note [Duplicating join points]
+  | ArgInfo { ai_dmds = fun_dmds, ai_args = args } <- fun
+       -- A SimpleArgInfo (data constructors, simple functions) always uses
+       -- Plan B: see (DJ4) in Note [Duplicating join points]
   , thumbsUpPlanA cont
   = -- Use Plan A of Note [Duplicating StrictArg]
---    pprTrace "Using plan A" (ppr (ai_fun fun) $$ text "args" <+> ppr (ai_args fun) $$ text "cont" <+> ppr cont) $
-    do { let _ :| dmds = expectNonEmpty (ai_dmds fun)   -- See Invariant of StrictArg;
-                                                        -- ai_dmds is never empty
+--    pprTrace "Using plan A" (ppr (ai_fun_id fun) $$ text "args" <+> ppr (ai_args fun) $$ text "cont" <+> ppr cont) $
+    do { let dmds = case splitArgDmd fun_dmds of
+                       Just (_, dmds) -> dmds
+                       Nothing -> pprPanic "mkDupableContWithDmds" (ppr fun)
+                          -- See Invariant of StrictArg
        ; (floats1, cont')  <- mkDupableContWithDmds env dmds cont
                               -- Use the demands from the function to add the right
                               -- demand info on any bindings we make for further args
-       ; (floats_s, args') <- mapAndUnzipM (makeTrivialArg env)
-                                           (ai_args fun)
+       ; (floats_s, args') <- mapAndUnzipM (makeTrivialArg env) args
        ; return ( foldl' addLetFloats floats1 floats_s
                 , StrictArg { sc_fun = fun { ai_args = args' }
                             , sc_cont = cont'
@@ -4216,13 +4361,14 @@ mkDupableContWithDmds env dmds
         --              let a = ...arg...
         --              in [...hole...] a
         -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
-    do  { let dmd:|cont_dmds =
-                -- We took care to handle an empty demand list at the start,
-                -- ensuring this call to 'expectNonEmpty' does not panic (#27261).
-                expectNonEmpty dmds
+    do  { let (dmd, cont_dmds) = case splitArgDmd dmds of
+                Just prs -> prs
+                Nothing  -> pprPanic "mkDupableContWithDmds:ApplyToVal" (ppr cont)
+                -- We took care to handle bottoming demands at the start,
+                -- ensuring this does not panic (#27261).
         ; (floats1, cont') <- mkDupableContWithDmds env cont_dmds cont
         ; let env' = env `setInScopeFromF` floats1
-        ; arg' <- simplArg env' Nothing hole_ty se arg arg_mco
+        ; arg' <- simplArg env' hole_ty se arg arg_mco
         ; (let_floats2, triv_arg) <- makeTrivial env' NotTopLevel dmd (fsLit "karg") arg'
         ; let all_floats = floats1 `addLetFloats` let_floats2
         ; return ( all_floats
@@ -4287,10 +4433,10 @@ mkDupableStrictBind env arg_bndr join_rhs res_ty
                         , sc_cont = mkBoringStop res_ty } )
   | otherwise
   = do { join_bndr <- newJoinId [arg_bndr] res_ty
-       ; let arg_info = ArgInfo { ai_fun   = join_bndr
-                                , ai_rules = [], ai_args  = []
-                                , ai_encl  = False, ai_dmds  = repeat topDmd
-                                , ai_discs = Inf.repeat 0 }
+       ; let arg_info = ArgInfo { ai_fun_id = join_bndr
+                                , ai_rules  = [], ai_args = []
+                                , ai_encl   = False, ai_dmds = nopDmdType
+                                , ai_discs  = Inf.repeat 0 }
        ; return ( addJoinFloats (emptyFloats env) $
                   unitJoinFloat                   $
                   NonRec join_bndr                $
@@ -4557,8 +4703,23 @@ unconditional-inlining for join points.
       optimisations from firing (see #25723)
 
 (DJ4) By the same token we want to use Plan B in Note [Duplicating StrictArg] when
-   the RHS of the new join point is a data constructor application.  See the
-   call to isDataConId in the StrictArg case of mkDupableContWithDmds.
+   the RHS of the new join point is a data constructor application.  We achieve
+   this by giving all data constructor applications a `SimpleArgInfo`, which
+   always uses Plan B (see the StrictArg case of mkDupableContWithDmds):
+   * Workers: see (SDC2) in Note [Simplifying data constructor applications]
+   * Wrappers: see `mkArgInfo`.  A wrapper is not inlined until FinalPhase
+     (Note [Activation for data constructor wrappers]), but exprIsConApp_maybe
+     sees through it, so it behaves just like a worker.  For example, with
+        data T = MkT !Int Int
+     consider
+        case $WMkT (case v of { A -> e1; B -> e2 }) x of MkT g y -> blah
+     Plan A would give
+        join $j2 g y = blah
+        in case v of { A -> $j2 e1 x; B -> $j2 e2 x }
+     and `blah` can no longer see that `y` is `x`.  Plan B gives
+        join $j a = case $WMkT a x of MkT g y -> blah
+        in case v of { A -> $j e1; B -> $j e2 }
+     and the case-of-known-constructor in $j tells `blah` that `y` is `x`.
 
    That same Note [Duplicating StrictArg] explains why we sometimes want Plan A
    when the RHS of the new join point would be a non-data-constructor

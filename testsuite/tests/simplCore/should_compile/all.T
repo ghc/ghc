@@ -632,3 +632,7 @@ test('T27910', grep_errmsg(r'KnownBranch'), compile, ['-O -dno-typeable-binds -d
 test('T27892', grep_errmsg(r'^f = g$'), compile, ['-O -ddump-cse -dsuppress-all -dsuppress-uniques'])
 test('T28095a', grep_errmsg(r'^f = g$'), compile, ['-O -ddump-cse -dsuppress-all -dsuppress-uniques'])
 test('T27212', normal, compile, ['-O'])
+
+# T28169: test that there are no calls to boxed arithmetic,e.g. GHC.Internal.Num.$fNumInt_$c+
+test('T28169', grep_errmsg(r'\$c'), compile, ['-O -ddump-simpl -dsuppress-uniques'])
+

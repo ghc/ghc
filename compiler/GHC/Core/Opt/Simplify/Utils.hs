@@ -31,11 +31,12 @@ module GHC.Core.Opt.Simplify.Utils (
         interestingCallContext,
 
         -- ArgInfo
-        ArgInfo(..), ArgSpec(..), RemainingArgDmds, mkArgInfo,
+        ArgInfo(..), ArgSpec(..), RemainingArgDmds, mkArgInfo, dataConArgInfo,
+        simpleFunArgInfo, isSimpleFunId, contHasRules,
         addValArgTo, addTyArgTo,
         argInfoExpr, argSpecArg,
         pushOutArgs, pushArgSpecs,
-        isStrictArgInfo, lazyArgContext,
+        isStrictArgInfo, lazyArgContext, lazyArgCallCtxt,
 
         abstractFloats,
 
@@ -44,7 +45,6 @@ module GHC.Core.Opt.Simplify.Utils (
     ) where
 
 import GHC.Prelude hiding (head, init, last, tail)
-import qualified GHC.Prelude as Partial (head)
 
 import GHC.Core
 import GHC.Types.Literal ( isLitRubbish )
@@ -64,7 +64,8 @@ import GHC.Core.Unfold.Make
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Type     hiding( substTy )
 import GHC.Core.Coercion hiding( substCo )
-import GHC.Core.DataCon ( dataConWorkId, isNullaryRepDataCon )
+import GHC.Core.DataCon ( DataCon, ArgCbvInfo(..), dataConWorkId, dataConRepArity, isNullaryRepDataCon
+                         , dataConRepArgCbvInfos )
 import GHC.Core.Multiplicity
 import GHC.Core.Opt.ConstantFold
 
@@ -150,7 +151,7 @@ Key points:
 data SimplCont
   = Stop                -- ^ Stop[e] = e
         OutType         -- ^ Type of the <hole>
-        CallCtxt        -- ^ Tells if there is something interesting about
+        !CallCtxt       -- ^ Tells if there is something interesting about
                         --          the syntactic context, and hence the inliner
                         --          should be a bit keener (see interestingCallContext)
                         -- Specifically:
@@ -158,7 +159,7 @@ data SimplCont
                         --     Inlining the call might allow the rule to fire
                         -- Never ValAppCxt (use ApplyToVal instead)
                         -- or CaseCtxt (use Select instead)
-        SubDemand       -- ^ The evaluation context of e. Tells how e is evaluated.
+        !SubDemand      -- ^ The evaluation context of e. Tells how e is evaluated.
                         -- This fuels eta-expansion or eta-reduction without looking
                         -- at lambda bodies, for example.
                         --
@@ -212,7 +213,7 @@ data SimplCont
       , sc_fun  :: ArgInfo     -- Specifies f, e1..en, whether f has rules, etc
                                --     plus demands and discount flags for *this* arg
                                --          and further args
-                               --     Invariant: ai_dmds and ai_discs are never empty
+                               --     Invariant: (splitArgDmd ai_dmds) is never Nothing
       , sc_fun_ty :: OutType   -- Type of the function (f e1 .. en),
                                -- presumably (arg_ty -> res_ty)
                                -- where res_ty is expected by sc_cont
@@ -317,7 +318,7 @@ instance Outputable SimplCont where
   ppr (StrictBind { sc_bndr = b, sc_cont = cont })
     = (text "StrictBind" <+> ppr b) $$ ppr cont
   ppr (StrictArg { sc_fun = ai, sc_cont = cont })
-    = (text "StrictArg" <+> ppr (ai_fun ai)) $$ ppr cont
+    = (text "StrictArg" <+> ppr (ai_fun_id ai)) $$ ppr cont
   ppr (Select { sc_env = env, sc_bndr = bndr, sc_alts = alts, sc_cont = cont })
     = (text "Select" <> braces (ppr env) <+> ppr bndr) $$
       whenPprDebug (nest 2 $ ppr alts) $$ ppr cont
@@ -352,9 +353,9 @@ doesn't matter because we'll never compute them all.
 
 data ArgInfo
   = ArgInfo {
-        ai_fun   :: OutId,      -- ^ The function
-        ai_args  :: [ArgSpec],  -- ^ ...applied to these args (which are in *reverse* order)
-                                -- NB: all these argumennts are already simplified
+        ai_fun_id :: OutId,       -- ^ The function
+        ai_args   :: [ArgSpec],   -- ^ ...applied to these args (which are in *reverse* order)
+                                  -- NB: all these argumennts are already simplified
 
         ai_rules :: [CoreRule], -- ^ Rules for this function
         ai_encl  :: Bool,
@@ -365,6 +366,7 @@ data ArgInfo
 
         ai_dmds :: RemainingArgDmds,
           -- ^ Demands on remaining value arguments (beyond 'ai_args')
+          --   Take it apart with 'splitArgDmd'
 
         ai_discs :: Infinite Int
           -- ^ Discounts for remaining value arguments (beyond 'ai_args')
@@ -372,12 +374,31 @@ data ArgInfo
           -- A non-zero value means: be keener to inline
     }
 
+  -- | A specialised, much smaller, ArgInfo for a function that
+  -- has no rules, no unfolding discounts, never diverges, and whose
+  -- argument strictness is fixed: a data constructor /worker/, or a
+  -- "simple" function (see `isSimpleFunId`).
+  -- See Note [Simplifying data constructor applications]
+  -- and Note [Simple functions], both in GHC.Core.Opt.Simplify.Iteration.
+  | SimpleArgInfo {
+        ai_fun_id   :: OutId,        -- ^ The function
+        ai_app      :: OutExpr,      -- ^ The function applied to
+                                     --   the (simplified) arguments so far
+        ai_arg_cbvs :: [ArgCbvInfo]  -- ^ Info about the remaining value arguments
+                                     --   See Note [ArgCbvInfo] in GHC.Core.DataCon
+                                     --   When it runs out, further args are lazy
+    }
+
 -- | 'RemainingArgDmds' gives the demands on any remaining value arguments.
 --
--- It is usually infinite (with 'topDmd's in the tail), but if it is finite it
--- guarantees that the function diverges after being applied to that number
--- of arguments.
-type RemainingArgDmds = [Demand]
+-- Take it apart with 'splitArgDmd'.  When its 'dt_args' run out, the
+-- Divergence in its 'dt_env' says what happens next:
+--   * if 'isDeadEndDiv', the function diverges after being applied to that
+--     number of arguments; 'splitArgDmd' returns Nothing.
+--   * otherwise all further arguments have demand 'topDmd'
+-- See Note [Trimming the continuation for bottoming functions]
+-- in GHC.Core.Opt.Simplify.Iteration
+type RemainingArgDmds = DmdType
 
 data ArgSpec
   -- | A value argument
@@ -389,20 +410,28 @@ data ArgSpec
           , as_hole_ty :: OutType }   -- ^ Type of the function (presumably @t1 -> t2@ for 'ValArg' or @forall a. blah@ for 'TyArg')
 
 instance Outputable ArgInfo where
-  ppr (ArgInfo { ai_fun = fun, ai_args = args, ai_dmds = dmds, ai_rules = rules })
+  ppr (ArgInfo { ai_fun_id = fun, ai_args = args, ai_dmds = dmds, ai_rules = rules })
     = text "ArgInfo" <+> braces
          (sep [ text "fun =" <+> ppr fun
-              , text "dmds(first 10) =" <+> ppr (take 10 dmds)
+              , text "dmds =" <+> ppr dmds
               , text "args =" <+> ppr args
               , text "rewrite =" <+> ppr rules ])
+  ppr (SimpleArgInfo { ai_app = app, ai_arg_cbvs = cbvs })
+    = text "SimpleArgInfo" <+> braces
+         (sep [ text "app =" <+> ppr app
+              , text "arg_cbvs =" <+> ppr cbvs ])
 
 instance Outputable ArgSpec where
   ppr (ValArg { as_arg = arg })  = text "ValArg" <+> ppr arg
   ppr (TyArg { as_arg_ty = ty }) = text "TyArg" <+> ppr ty
 
 addValArgTo :: ArgInfo ->  OutExpr -> OutType -> ArgInfo
+addValArgTo ai@(SimpleArgInfo { ai_app = app, ai_arg_cbvs = cbvs }) arg _hole_ty
+  = ai { ai_app = App app arg, ai_arg_cbvs = drop 1 cbvs }
+
 addValArgTo ai arg hole_ty
-  | ArgInfo { ai_dmds = dmd:dmds, ai_discs = Inf _ discs } <- ai
+  | ArgInfo { ai_dmds = dmds0, ai_discs = Inf _ discs } <- ai
+  , Just (dmd, dmds) <- splitArgDmd dmds0
       -- Pop the top demand and and discounts off
   , let arg_spec = ValArg { as_arg = arg, as_hole_ty = hole_ty, as_dmd = dmd }
   = ai { ai_args    = arg_spec : ai_args ai
@@ -413,15 +442,41 @@ addValArgTo ai arg hole_ty
     -- There should always be enough demands and discounts
 
 addTyArgTo :: ArgInfo -> OutType -> OutType -> ArgInfo
-addTyArgTo ai arg_ty hole_ty = ai { ai_args    = arg_spec : ai_args ai }
-  where
-    arg_spec = TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }
+addTyArgTo ai@(SimpleArgInfo { ai_app = app }) arg_ty _hole_ty
+  = ai { ai_app = App app (Type arg_ty) }
+addTyArgTo ai arg_ty hole_ty
+  = ai { ai_args   = TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty } : ai_args ai }
+
+argCbvInfoDmd :: ArgCbvInfo -> Demand
+-- The demand that a data constructor worker, or simple function, places
+-- on an argument.
+-- Treat ArgRepPoly as lazy; see Note [ArgCbvInfo] in GHC.Core.DataCon
+-- c.f. GHC.Types.Id.Make.mkDataConWorkId, which makes the same choice
+argCbvInfoDmd ArgCbv     = evalDmd
+argCbvInfoDmd ArgCbn     = topDmd
+argCbvInfoDmd ArgRepPoly = topDmd
 
 isStrictArgInfo :: ArgInfo -> Bool
 -- True if the function is strict in the next argument
+isStrictArgInfo (SimpleArgInfo { ai_arg_cbvs = cbvs })
+  = case cbvs of { ArgCbv : _ -> True; _ -> False }
 isStrictArgInfo (ArgInfo { ai_dmds = dmds })
-  | dmd:_ <- dmds = isStrUsedDmd dmd
-  | otherwise     = False
+  | Just (dmd,_) <- splitArgDmd dmds = isStrUsedDmd dmd
+  | otherwise                        = False
+
+argInfoNextDmd :: ArgInfo -> Demand
+-- The demand on the next argument; the call should not be bottoming
+argInfoNextDmd (SimpleArgInfo { ai_arg_cbvs = cbvs })
+  | cbv : _ <- cbvs                  = argCbvInfoDmd cbv
+  | otherwise                        = topDmd   -- Further args are lazy
+argInfoNextDmd ai@(ArgInfo { ai_dmds = dmds })
+  | Just (dmd,_) <- splitArgDmd dmds = dmd
+  | otherwise                        = pprPanic "argInfoNextDmd" (ppr ai)
+
+argInfoHasRules :: ArgInfo -> Bool
+-- True <=> this function, or an enclosing one, has rules; see ai_encl
+argInfoHasRules (SimpleArgInfo {})           = False
+argInfoHasRules (ArgInfo { ai_encl = encl }) = encl
 
 pushOutArgs :: Type -> [OutExpr] -> SimplCont -> SimplCont
 pushOutArgs _fun_ty [] cont
@@ -478,7 +533,7 @@ mkRhsStop ty is_rec bndr_dmd = Stop ty (RhsCtxt is_rec) (subDemandIfEvaluated bn
 mkLazyArgStop :: OutType -> ArgInfo -> SimplCont
 mkLazyArgStop ty fun_info = Stop ty (lazyArgContext fun_info) arg_sd
   where
-    arg_sd = subDemandIfEvaluated (Partial.head (ai_dmds fun_info))
+    arg_sd = subDemandIfEvaluated (argInfoNextDmd fun_info)
 
 -------------------
 contIsRhs :: SimplCont -> Maybe RecFlag
@@ -582,12 +637,18 @@ countArgs (ApplyToVal { sc_cont = cont }) = 1 + countArgs cont
 countArgs (CastIt     { sc_cont = cont }) = countArgs cont
 countArgs _                               = 0
 
-countValArgs :: SimplCont -> Int
--- Count value arguments only
-countValArgs (ApplyToTy  { sc_cont = cont }) = countValArgs cont
-countValArgs (ApplyToVal { sc_cont = cont }) = 1 + countValArgs cont
-countValArgs (CastIt     { sc_cont = cont }) = countValArgs cont
-countValArgs _                               = 0
+saturatedCont :: Arity -> SimplCont -> Bool
+-- (saturatedCont n cont) is True iff `cont` supplies at least n value arguments
+-- A tight, non-allocating loop
+saturatedCont n cont
+  | n <= 0 = True
+  | otherwise
+  = case cont of
+      ApplyToTy  { sc_cont = cont' } -> saturatedCont n     cont'
+      ApplyToVal { sc_cont = cont' } -> saturatedCont (n-1) cont'
+      CastIt     { sc_cont = cont' } -> saturatedCont n     cont'
+      _                              -> False
+
 
 -------------------
 contArgs :: SimplEnv -> SimplCont -> (Bool, [ArgSummary], SimplCont)
@@ -669,7 +730,7 @@ contEvalContext bndrs cont = go cont
                                               , text "cont:"  <+> ppr cont ])
                                       topSubDmd
 
-    go (StrictArg{sc_fun=fun_info}) = subDemandIfEvaluated (Partial.head (ai_dmds fun_info))
+    go (StrictArg{sc_fun=fun_info}) = subDemandIfEvaluated (argInfoNextDmd fun_info)
     go (StrictBind{sc_bndr=bndr})   = subDemandIfEvaluated (idDemandInfo bndr)
     go (Select{})                   = topSubDmd
     -- Perhaps reconstruct the demand on the scrutinee by looking at field
@@ -705,24 +766,77 @@ mkBottomCont cont = go cont
            stop_cont = contStop k
 
 -------------------
+dataConArgInfo :: DataCon -> SimplCont -> ArgInfo
+-- Like mkArgInfo, but specialised for a data constructor worker
+-- See Note [Simplifying data constructor applications]
+--     in GHC.Core.Opt.Simplify.Iteration
+dataConArgInfo dc cont
+  | saturatedCont (dataConRepArity dc) cont = mk_info (dataConRepArgCbvInfos dc)
+  | otherwise                               = mk_info []   -- (SDC3)
+  where
+    -- Choose the ArgCbvInfos before building the record, so that
+    -- we don't allocate a thunk for the ai_arg_cbvs field
+    mk_info cbvs = SimpleArgInfo { ai_fun_id   = wkr
+                                 , ai_app      = Var wkr
+                                 , ai_arg_cbvs = cbvs }
+    wkr = dataConWorkId dc
+
+isSimpleFunId :: OutId -> Bool
+-- True <=> the function has no unfolding (so it can't inline and has no
+-- discounts) and a vanilla demand signature (so it never diverges, and its
+-- only strict arguments are unlifted ones).  The caller must check for rules.
+-- See Note [Simple functions] in GHC.Core.Opt.Simplify.Iteration
+isSimpleFunId fun
+  | CoreUnfolding {} <- idUnfolding fun = False
+  | otherwise                           = isNopSig (idDmdSig fun)
+
+simpleFunArgInfo :: OutId -> ArgInfo
+-- Like mkArgInfo, but specialised for a simple function; see `isSimpleFunId`
+simpleFunArgInfo fun
+  = SimpleArgInfo { ai_fun_id   = fun
+                  , ai_app      = Var fun
+                  , ai_arg_cbvs = typeArgCbvInfos (idType fun) }
+
+typeArgCbvInfos :: Type -> [ArgCbvInfo]
+-- One ArgCbvInfo for each value argument of a function of this type:
+-- ArgCbv if it is definitely unlifted, etc.  We don't instantiate; so
+-- a representation-polymorphic argument gets ArgRepPoly (treated as lazy).
+-- The list is produced lazily.  If it runs out (e.g. the result type is a
+-- type variable), further arguments are treated as lazy.
+typeArgCbvInfos ty
+  | Just (tcv, res_ty) <- splitForAllTyCoVar_maybe ty
+  = if isCoVar tcv then ArgCbv : typeArgCbvInfos res_ty  -- Coercion args are values
+                   else          typeArgCbvInfos res_ty  -- Type args are not
+  | Just (_, _, arg_ty, res_ty) <- splitFunTy_maybe ty
+  = arg_cbv arg_ty : typeArgCbvInfos res_ty
+  | otherwise
+  = []
+  where
+    arg_cbv arg_ty
+      | definitelyLiftedType   arg_ty = ArgCbn
+      | definitelyUnliftedType arg_ty = ArgCbv
+      | otherwise                     = ArgRepPoly
+
 mkArgInfo :: SimplEnv -> Id -> [CoreRule] -> SimplCont -> ArgInfo
 mkArgInfo env fun rules_for_fun cont
-  | n_val_args < idArity fun            -- Note [Unsaturated functions]
-  = ArgInfo { ai_fun = fun, ai_args = []
+  | isDataConWrapId fun           -- Data constructor wrappers use SimpleArgInfo,
+  , not (contHasRules cont)       -- and hence Plan B in Note [Duplicating StrictArg]
+  = simpleFunArgInfo fun          -- See (DJ4) in Note [Duplicating join points]
+
+  | not (saturatedCont (idArity fun) cont)   -- Note [Unsaturated functions]
+  = ArgInfo { ai_fun_id = fun, ai_args = []
             , ai_rules = rules_for_fun
             , ai_encl = False
-            , ai_dmds = vanilla_dmds
+            , ai_dmds = nopDmdType
             , ai_discs = vanilla_discounts }
   | otherwise
-  = ArgInfo { ai_fun   = fun
-            , ai_args  = []
-            , ai_rules = rules_for_fun
-            , ai_encl  = fun_has_rules || contHasRules cont
-            , ai_dmds  = add_type_strictness (idType fun) arg_dmds
-            , ai_discs = arg_discounts }
+  = ArgInfo { ai_fun_id = fun
+            , ai_args   = []
+            , ai_rules  = rules_for_fun
+            , ai_encl   = fun_has_rules || contHasRules cont
+            , ai_dmds   = add_type_strictness (idType fun) arg_dmd_ty
+            , ai_discs  = arg_discounts }
   where
-    n_val_args  = countValArgs cont
-
     fun_has_rules = not (null rules_for_fun)
 
     vanilla_discounts, arg_discounts :: Infinite Int
@@ -732,30 +846,19 @@ mkArgInfo env fun rules_for_fun cont
                               -> discounts Inf.++ vanilla_discounts
                         _     -> vanilla_discounts
 
-    vanilla_dmds :: RemainingArgDmds
-    vanilla_dmds  = repeat topDmd
-
-    arg_dmds :: RemainingArgDmds
-    arg_dmds
+    arg_dmd_ty :: RemainingArgDmds
+    arg_dmd_ty
       | not (seInline env)
-      = vanilla_dmds -- See Note [Do not expose strictness if sm_inline=False]
-      | otherwise
-      = -- add_type_str fun_ty $
-        case splitDmdSig (idDmdSig fun) of
-          (demands, result_info)
-               | not (demands `lengthExceeds` n_val_args)
-               -> remaining_dmds     -- Enough args, use the strictness given.
-               | otherwise
-               -> warnPprTrace True "More demands than arity" (ppr fun <+> ppr (idArity fun)
-                                <+> ppr n_val_args <+> ppr demands) $
-                  vanilla_dmds      -- Not enough args, or no strictness
-
-                where
-                  remaining_dmds :: RemainingArgDmds
-                  -- isDeadEndDiv: if remaining_dmds is finite, result is bottom
-                  -- See (TC1) in Note [Trimming the continuation for bottoming functions]
-                  remaining_dmds | isDeadEndDiv result_info = demands
-                                 | otherwise                = demands ++ vanilla_dmds
+      = nopDmdType -- See Note [Do not expose strictness if sm_inline=False]
+      | DmdSig dmd_ty@(DmdType { dt_args = demands }) <- idDmdSig fun
+      = if saturatedCont (length demands) cont
+        then dmd_ty   -- Enough args, use the strictness given.
+                      -- If the divergence isDeadEndDiv, the result is bottom
+                      -- after (length demands) args; see (TC1) in
+                      -- Note [Trimming the continuation for bottoming functions]
+        else warnPprTrace True "More demands than arity" (ppr fun <+> ppr (idArity fun)
+                                <+> ppr demands) $
+             nopDmdType      -- Not enough args, or no strictness
 
     add_type_strictness :: Type -> RemainingArgDmds -> RemainingArgDmds
     -- If the function arg /types/ are strict, record that in the RemainingArgDmds
@@ -764,27 +867,35 @@ mkArgInfo env fun rules_for_fun cont
     -- add_type_strictness is done repeatedly (for each call);
     --   might be better once-for-all in the function
     -- But beware primops/datacons with no strictness
+    add_type_strictness fun_ty dmd_ty@(DmdType { dt_env = dmd_env, dt_args = dmds0 })
+      = dmd_ty { dt_args = go fun_ty dmds0 }
+      where
+        -- NB: when the dt_args run out we must carry on (with the default
+        -- demand, topDmd) as long as there are more argument types, unless
+        -- the call is bottoming.  c.f. splitArgDmd
+        is_bottoming = isDeadEndDiv (de_div dmd_env)
+        next_dmd (dmd : dmds)        = Just (dmd, dmds)
+        next_dmd [] | is_bottoming   = Nothing
+                    | otherwise      = Just (topDmd, [])
 
-    add_type_strictness fun_ty dmds
-      | null dmds = []
+        go fun_ty dmds
+          | Just (_, fun_ty') <- splitForAllTyCoVar_maybe fun_ty
+          = go fun_ty' dmds     -- Look through foralls
 
-      | Just (_, fun_ty') <- splitForAllTyCoVar_maybe fun_ty
-      = add_type_strictness fun_ty' dmds     -- Look through foralls
+          | Just (_, _, arg_ty, fun_ty') <- splitFunTy_maybe fun_ty        -- Add strict-type info
+          , Just (dmd, rest_dmds) <- next_dmd dmds
+          , let dmd'
+                 | definitelyUnliftedType arg_ty
+                 = strictifyDmd dmd
+                 | otherwise
+                 -- Something that's not definitely unlifted.
+                 -- If the type is representation-polymorphic, we can't know whether
+                 -- it's strict.
+                 = dmd
+          = dmd' : go fun_ty' rest_dmds
 
-      | Just (_, _, arg_ty, fun_ty') <- splitFunTy_maybe fun_ty        -- Add strict-type info
-      , dmd : rest_dmds <- dmds
-      , let dmd'
-             | definitelyUnliftedType arg_ty
-             = strictifyDmd dmd
-             | otherwise
-             -- Something that's not definitely unlifted.
-             -- If the type is representation-polymorphic, we can't know whether
-             -- it's strict.
-             = dmd
-      = dmd' : add_type_strictness fun_ty' rest_dmds
-
-      | otherwise
-      = dmds
+          | otherwise
+          = dmds
 
 {- Note [Unsaturated functions]
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -964,12 +1075,19 @@ the incentive to disappear when we inline `f`!
 
 lazyArgContext :: ArgInfo -> CallCtxt
 -- Use this for lazy arguments
+lazyArgContext (SimpleArgInfo {}) = BoringCtxt
 lazyArgContext (ArgInfo { ai_encl = encl_rules, ai_discs = discs })
+  = lazyArgCallCtxt encl_rules discs
+
+lazyArgCallCtxt :: Bool -> Infinite Int -> CallCtxt
+-- Same as lazyArgContext, but taking the relevant pieces of the ArgInfo
+lazyArgCallCtxt encl_rules discs
   | encl_rules                    = RuleArgCtxt
   | Inf disc _ <- discs, disc > 0 = DiscArgCtxt  -- Be keener here
   | otherwise                     = BoringCtxt   -- Nothing interesting
 
 strictArgContext :: ArgInfo -> CallCtxt
+strictArgContext (SimpleArgInfo {}) = RhsCtxt NonRecursive  -- See comments below
 strictArgContext (ArgInfo { ai_encl = encl_rules, ai_discs = discs })
 -- Use this for strict arguments
   | encl_rules                    = RuleArgCtxt
@@ -1050,7 +1168,7 @@ contHasRules cont
     go (ApplyToVal { sc_cont = cont }) = go cont
     go (ApplyToTy  { sc_cont = cont }) = go cont
     go (CastIt { sc_cont = cont })     = go cont
-    go (StrictArg { sc_fun = fun })    = ai_encl fun
+    go (StrictArg { sc_fun = fun })    = argInfoHasRules fun
     go (Stop _ RuleArgCtxt _)          = True
     go (TickIt _ c)                    = go c
     go (Select {})                     = False

@@ -59,7 +59,7 @@ module GHC.Types.Demand (
     nopDmdType, botDmdType,
     lubDmdType, maxDmdType, plusDmdType, multDmdType, discardArgDmds,
     -- ** Other operations
-    peelFV, findIdDemand, addDemand, splitDmdTy, deferAfterPreciseException,
+    peelFV, findIdDemand, addDemand, splitDmdTy, splitArgDmd, deferAfterPreciseException,
 
     -- * Demand signatures
     DmdSig(..), mkDmdSigForArity, mkClosedDmdSig, mkVanillaDmdSig,
@@ -2009,6 +2009,24 @@ splitDmdTy :: DmdType -> (Demand, DmdType)
 -- free vars, so no need to add more!
 splitDmdTy ty@DmdType{dt_args=dmd:args} = (dmd, ty{dt_args=args})
 splitDmdTy ty@DmdType{dt_env=env}       = (defaultArgDmd (de_div env), ty)
+
+splitArgDmd :: DmdType -> Maybe (Demand, DmdType)
+-- ^ Split off the demand on the next argument of a function with this DmdType
+--   * Nothing       <=> the call is definitely bottom; that is, we have run
+--                       out of argument demands, and the divergence isDeadEndDiv
+--   * Just (d, ty') <=> d is the demand on the next argument
+-- Contrast `splitDmdTy`, which returns the default argument demand when
+-- we run out, rather than Nothing.
+-- Used in the Simplifier; see Note [Trimming the continuation for bottoming functions]
+-- in GHC.Core.Opt.Simplify.Iteration
+{-# INLINE splitArgDmd #-}
+splitArgDmd ty@(DmdType { dt_args = dmd : dmds })
+  = Just (dmd, ty { dt_args = dmds })
+splitArgDmd ty@(DmdType { dt_env = env })
+  | isDeadEndDiv div = Nothing
+  | otherwise        = Just (defaultArgDmd div, ty)
+  where
+    div = de_div env
 
 multDmdType :: Card -> DmdType -> DmdType
 multDmdType C_11 dmd_ty = dmd_ty -- a vital optimisation for T25196

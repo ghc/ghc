@@ -943,8 +943,9 @@ should become (case x of (a,b) -> K a) in the Simplifier (#28169).
 Consumers must decide what to do with ArgRepPoly, and the right choice
 depends on the consumer, in opposite directions:
 
-* SpecConstr (argToPat) treats ArgRepPoly as /lazy/.  There "strict"
-  only enables an optimisation; claiming laziness is always safe.
+* `GHC.Core.Opt.Simplify.Utils.dataConArgInfo` and SpecConstr (argToPat)
+  treat ArgRepPoly as /lazy/.  There "strict" only enables an optimisation
+  (e.g. the StrictArg transformation); claiming laziness is always safe.
 
 * `exprIsHNF` (check_field) and `exprOkForSpeculation` (field_ok) in
   GHC.Core.Utils treat ArgRepPoly as /possibly strict/.  There, wrongly
